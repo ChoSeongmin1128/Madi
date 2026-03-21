@@ -1,0 +1,152 @@
+use tauri::State;
+
+use crate::application::dto::{BlockDto, BootstrapPayload, DocumentDto, DocumentSummaryDto, SearchResultDto};
+use crate::application::services;
+use crate::domain::models::{BlockKind, BlockTintPreset, ThemeMode};
+use crate::error::AppError;
+use crate::state::AppState;
+
+fn with_repository<T>(
+  state: State<'_, AppState>,
+  callback: impl FnOnce(&mut crate::infrastructure::sqlite::SqliteStore) -> Result<T, AppError>,
+) -> Result<T, String> {
+  let mut repository = state.repository.lock().map_err(|_| AppError::StateLock.to_string())?;
+  callback(&mut repository).map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub fn bootstrap_app(state: State<'_, AppState>) -> Result<BootstrapPayload, String> {
+  with_repository(state, services::bootstrap_app)
+}
+
+#[tauri::command]
+pub fn list_documents(state: State<'_, AppState>) -> Result<Vec<DocumentSummaryDto>, String> {
+  with_repository(state, services::list_documents)
+}
+
+#[tauri::command]
+pub fn open_document(state: State<'_, AppState>, document_id: String) -> Result<DocumentDto, String> {
+  with_repository(state, |repository| services::open_document(repository, &document_id))
+}
+
+#[tauri::command]
+pub fn create_document(state: State<'_, AppState>) -> Result<DocumentDto, String> {
+  with_repository(state, services::create_document)
+}
+
+#[tauri::command]
+pub fn rename_document(
+  state: State<'_, AppState>,
+  document_id: String,
+  title: Option<String>,
+) -> Result<DocumentDto, String> {
+  with_repository(state, |repository| services::rename_document(repository, &document_id, title))
+}
+
+#[tauri::command]
+pub fn delete_document(state: State<'_, AppState>, document_id: String) -> Result<BootstrapPayload, String> {
+  with_repository(state, |repository| services::delete_document(repository, &document_id))
+}
+
+#[tauri::command]
+pub fn delete_all_documents(state: State<'_, AppState>) -> Result<BootstrapPayload, String> {
+  with_repository(state, services::delete_all_documents)
+}
+
+#[tauri::command]
+pub fn search_documents(state: State<'_, AppState>, query: String) -> Result<Vec<SearchResultDto>, String> {
+  with_repository(state, |repository| services::search_documents(repository, &query))
+}
+
+#[tauri::command]
+pub fn create_block_below(
+  state: State<'_, AppState>,
+  document_id: String,
+  after_block_id: Option<String>,
+  kind: BlockKind,
+) -> Result<DocumentDto, String> {
+  with_repository(state, |repository| {
+    services::create_block_below(repository, &document_id, after_block_id.as_deref(), kind)
+  })
+}
+
+#[tauri::command]
+pub fn change_block_kind(
+  state: State<'_, AppState>,
+  block_id: String,
+  kind: BlockKind,
+) -> Result<BlockDto, String> {
+  with_repository(state, |repository| services::change_block_kind(repository, &block_id, kind))
+}
+
+#[tauri::command]
+pub fn move_block(
+  state: State<'_, AppState>,
+  document_id: String,
+  block_id: String,
+  target_position: i64,
+) -> Result<DocumentDto, String> {
+  with_repository(state, |repository| services::move_block(repository, &document_id, &block_id, target_position))
+}
+
+#[tauri::command]
+pub fn delete_block(state: State<'_, AppState>, block_id: String) -> Result<DocumentDto, String> {
+  with_repository(state, |repository| services::delete_block(repository, &block_id))
+}
+
+#[tauri::command]
+pub fn update_markdown_block(
+  state: State<'_, AppState>,
+  block_id: String,
+  content: String,
+) -> Result<BlockDto, String> {
+  with_repository(state, |repository| services::update_markdown_block(repository, &block_id, content))
+}
+
+#[tauri::command]
+pub fn update_code_block(
+  state: State<'_, AppState>,
+  block_id: String,
+  content: String,
+  language: Option<String>,
+) -> Result<BlockDto, String> {
+  with_repository(state, |repository| services::update_code_block(repository, &block_id, content, language))
+}
+
+#[tauri::command]
+pub fn update_text_block(
+  state: State<'_, AppState>,
+  block_id: String,
+  content: String,
+) -> Result<BlockDto, String> {
+  with_repository(state, |repository| services::update_text_block(repository, &block_id, content))
+}
+
+#[tauri::command]
+pub fn flush_document(state: State<'_, AppState>, document_id: String) -> Result<i64, String> {
+  with_repository(state, |repository| services::flush_document(repository, &document_id))
+}
+
+#[tauri::command]
+pub fn set_theme_mode(state: State<'_, AppState>, theme_mode: ThemeMode) -> Result<ThemeMode, String> {
+  with_repository(state, |repository| services::set_theme_mode(repository, theme_mode))
+}
+
+#[tauri::command]
+pub fn set_default_block_tint_preset(
+  state: State<'_, AppState>,
+  preset: BlockTintPreset,
+) -> Result<BlockTintPreset, String> {
+  with_repository(state, |repository| services::set_default_block_tint_preset(repository, preset))
+}
+
+#[tauri::command]
+pub fn set_document_block_tint_override(
+  state: State<'_, AppState>,
+  document_id: String,
+  block_tint_override: Option<BlockTintPreset>,
+) -> Result<DocumentDto, String> {
+  with_repository(state, |repository| {
+    services::set_document_block_tint_override(repository, &document_id, block_tint_override)
+  })
+}

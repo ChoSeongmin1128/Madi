@@ -1,0 +1,28 @@
+[package]
+name = "minnote"
+version = "0.1.0"
+description = "MinNote desktop app"
+authors = ["seongmin"]
+license = ""
+repository = ""
+edition = "2021"
+rust-version = "1.77.2"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "minnote_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.5.6", features = [] }
+
+[dependencies]
+log = "0.4"
+rusqlite = { version = "0.32", features = ["bundled"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tauri = { version = "2.10.3", features = [] }
+tauri-plugin-log = "2"
+thiserror = "2.0"
+uuid = { version = "1.18", features = ["v4"] }

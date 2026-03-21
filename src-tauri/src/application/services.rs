@@ -1,0 +1,242 @@
+use crate::application::dto::{BlockDto, BootstrapPayload, DocumentDto, DocumentSummaryDto, SearchResultDto};
+use crate::domain::models::{BlockKind, BlockTintPreset, ThemeMode};
+use crate::error::AppError;
+use crate::ports::repositories::AppRepository;
+
+pub fn bootstrap_app(repository: &mut impl AppRepository) -> Result<BootstrapPayload, AppError> {
+  repository.ensure_initial_document()?;
+  repository.migrate_legacy_markdown_blocks()?;
+  let settings = repository.get_app_settings()?;
+  let documents = repository.list_documents()?;
+  let document_summaries = documents
+    .clone()
+    .into_iter()
+    .map(DocumentSummaryDto::from)
+    .collect::<Vec<_>>();
+
+  let current_document_id = repository
+    .get_last_opened_document_id()?
+    .or_else(|| documents.first().map(|document| document.id.clone()));
+
+  let current_document = current_document_id
+    .as_deref()
+    .map(|document_id| open_document(repository, document_id))
+    .transpose()?;
+
+  Ok(BootstrapPayload {
+    documents: document_summaries,
+    current_document,
+    theme_mode: settings.theme_mode,
+    default_block_tint_preset: settings.default_block_tint_preset,
+    icloud_sync_enabled: settings.icloud_sync_enabled,
+  })
+}
+
+pub fn list_documents(repository: &mut impl AppRepository) -> Result<Vec<DocumentSummaryDto>, AppError> {
+  Ok(
+    repository
+    .list_documents()?
+    .into_iter()
+    .map(DocumentSummaryDto::from)
+    .collect::<Vec<_>>(),
+  )
+}
+
+pub fn open_document(repository: &mut impl AppRepository, document_id: &str) -> Result<DocumentDto, AppError> {
+  let document = repository.mark_document_opened(document_id)?;
+  repository.set_last_opened_document_id(document_id)?;
+  hydrate_document(repository, document_id, Some(document))
+}
+
+pub fn create_document(repository: &mut impl AppRepository) -> Result<DocumentDto, AppError> {
+  let document = repository.create_document(None)?;
+  let document_id = document.id.clone();
+  repository.set_last_opened_document_id(&document_id)?;
+  hydrate_document(repository, &document_id, Some(document))
+}
+
+pub fn rename_document(
+  repository: &mut impl AppRepository,
+  document_id: &str,
+  title: Option<String>,
+) -> Result<DocumentDto, AppError> {
+  let document = repository.rename_document(document_id, title)?;
+  hydrate_document(repository, document_id, Some(document))
+}
+
+pub fn delete_document(
+  repository: &mut impl AppRepository,
+  document_id: &str,
+) -> Result<BootstrapPayload, AppError> {
+  repository.delete_document(document_id)?;
+  repository.ensure_initial_document()?;
+  let settings = repository.get_app_settings()?;
+
+  let documents = repository.list_documents()?;
+  let current_document_id = repository
+    .get_last_opened_document_id()?
+    .filter(|stored| stored != document_id)
+    .or_else(|| documents.first().map(|document| document.id.clone()));
+
+  if let Some(current_document_id) = current_document_id.as_deref() {
+    repository.set_last_opened_document_id(current_document_id)?;
+  }
+
+  let current_document = current_document_id
+    .as_deref()
+    .map(|id| open_document(repository, id))
+    .transpose()?;
+
+  Ok(BootstrapPayload {
+    documents: documents.into_iter().map(DocumentSummaryDto::from).collect(),
+    current_document,
+    theme_mode: settings.theme_mode,
+    default_block_tint_preset: settings.default_block_tint_preset,
+    icloud_sync_enabled: settings.icloud_sync_enabled,
+  })
+}
+
+pub fn delete_all_documents(repository: &mut impl AppRepository) -> Result<BootstrapPayload, AppError> {
+  repository.delete_all_documents()?;
+  repository.ensure_initial_document()?;
+
+  let settings = repository.get_app_settings()?;
+  let documents = repository.list_documents()?;
+  let current_document_id = documents
+    .first()
+    .map(|document| document.id.clone())
+    .ok_or_else(|| AppError::validation("초기 문서를 만들지 못했습니다."))?;
+
+  repository.set_last_opened_document_id(&current_document_id)?;
+  let current_document = open_document(repository, &current_document_id)?;
+
+  Ok(BootstrapPayload {
+    documents: documents.into_iter().map(DocumentSummaryDto::from).collect(),
+    current_document: Some(current_document),
+    theme_mode: settings.theme_mode,
+    default_block_tint_preset: settings.default_block_tint_preset,
+    icloud_sync_enabled: settings.icloud_sync_enabled,
+  })
+}
+
+pub fn set_document_block_tint_override(
+  repository: &mut impl AppRepository,
+  document_id: &str,
+  block_tint_override: Option<BlockTintPreset>,
+) -> Result<DocumentDto, AppError> {
+  let document = repository.set_document_block_tint_override(document_id, block_tint_override)?;
+  hydrate_document(repository, document_id, Some(document))
+}
+
+pub fn set_theme_mode(repository: &mut impl AppRepository, theme_mode: ThemeMode) -> Result<ThemeMode, AppError> {
+  repository.set_theme_mode(theme_mode.clone())?;
+  Ok(theme_mode)
+}
+
+pub fn set_default_block_tint_preset(
+  repository: &mut impl AppRepository,
+  preset: BlockTintPreset,
+) -> Result<BlockTintPreset, AppError> {
+  repository.set_default_block_tint_preset(preset.clone())?;
+  Ok(preset)
+}
+
+pub fn search_documents(
+  repository: &mut impl AppRepository,
+  query: &str,
+) -> Result<Vec<SearchResultDto>, AppError> {
+  Ok(
+    repository
+    .search_documents(query)?
+    .into_iter()
+    .map(SearchResultDto::from)
+    .collect::<Vec<_>>(),
+  )
+}
+
+pub fn create_block_below(
+  repository: &mut impl AppRepository,
+  document_id: &str,
+  after_block_id: Option<&str>,
+  kind: BlockKind,
+) -> Result<DocumentDto, AppError> {
+  repository.create_block_below(document_id, after_block_id, kind)?;
+  hydrate_document(repository, document_id, None)
+}
+
+pub fn change_block_kind(
+  repository: &mut impl AppRepository,
+  block_id: &str,
+  kind: BlockKind,
+) -> Result<BlockDto, AppError> {
+  repository.change_block_kind(block_id, kind)?.try_into()
+}
+
+pub fn move_block(
+  repository: &mut impl AppRepository,
+  document_id: &str,
+  block_id: &str,
+  target_position: i64,
+) -> Result<DocumentDto, AppError> {
+  repository.move_block(document_id, block_id, target_position)?;
+  hydrate_document(repository, document_id, None)
+}
+
+pub fn delete_block(repository: &mut impl AppRepository, block_id: &str) -> Result<DocumentDto, AppError> {
+  let document_id = repository.delete_block(block_id)?;
+  hydrate_document(repository, &document_id, None)
+}
+
+pub fn update_markdown_block(
+  repository: &mut impl AppRepository,
+  block_id: &str,
+  content: String,
+) -> Result<BlockDto, AppError> {
+  repository.update_markdown_block(block_id, content)?.try_into()
+}
+
+pub fn update_code_block(
+  repository: &mut impl AppRepository,
+  block_id: &str,
+  content: String,
+  language: Option<String>,
+) -> Result<BlockDto, AppError> {
+  repository.update_code_block(block_id, content, language)?.try_into()
+}
+
+pub fn update_text_block(
+  repository: &mut impl AppRepository,
+  block_id: &str,
+  content: String,
+) -> Result<BlockDto, AppError> {
+  repository.update_text_block(block_id, content)?.try_into()
+}
+
+pub fn flush_document(repository: &mut impl AppRepository, document_id: &str) -> Result<i64, AppError> {
+  repository.touch_document(document_id)
+}
+
+fn hydrate_document(
+  repository: &mut impl AppRepository,
+  document_id: &str,
+  document_override: Option<crate::domain::models::Document>,
+) -> Result<DocumentDto, AppError> {
+  let document = match document_override {
+    Some(document) => document,
+    None => repository
+      .get_document(document_id)?
+      .ok_or_else(|| AppError::validation("문서를 찾을 수 없습니다."))?,
+  };
+
+  let blocks = repository.list_blocks(document_id)?;
+  let preview = blocks
+    .iter()
+    .find_map(|block| (!block.search_text.trim().is_empty()).then(|| block.search_text.trim().to_string()))
+    .unwrap_or_default();
+  let blocks = blocks
+    .into_iter()
+    .map(BlockDto::try_from)
+    .collect::<Result<Vec<_>, _>>()?;
+
+  Ok(DocumentDto::new(document, preview, blocks))
+}
