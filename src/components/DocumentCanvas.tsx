@@ -52,8 +52,15 @@ export function DocumentCanvas() {
     if (!allBlocksSelected) {
       // 전체 선택 해제 시 남아있는 selection 클리어
       const selection = window.getSelection();
-      if (selection && blocksSelectionRef.current?.contains(selection.anchorNode)) {
+      if (selection) {
         selection.removeAllRanges();
+      }
+      // textarea 내부 선택도 클리어
+      const surface = blocksSelectionRef.current;
+      if (surface) {
+        for (const textarea of surface.querySelectorAll('textarea')) {
+          textarea.setSelectionRange(0, 0);
+        }
       }
       return;
     }

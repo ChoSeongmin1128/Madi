@@ -113,8 +113,8 @@ export function useAppShortcuts() {
         return;
       }
 
-      // 붙여넣기 (블록 선택 상태에서만 블록 붙여넣기)
-      if (event.key.toLowerCase() === 'v' && (allBlocksSelected || blockSelected)) {
+      // 붙여넣기: 에디터 밖이거나 블록 선택 상태면 블록 붙여넣기 시도
+      if (event.key.toLowerCase() === 'v' && (allBlocksSelected || blockSelected || !isEditableTarget(event.target))) {
         event.preventDefault();
         void pasteBlocks();
       }
