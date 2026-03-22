@@ -290,6 +290,8 @@ button {
   flex-direction: column;
   gap: 6px;
   padding-top: 2px;
+  -webkit-user-select: none;
+  user-select: none;
   --block-tint-odd: color-mix(in srgb, var(--bg) 62%, transparent);
   --block-tint-even: color-mix(in srgb, var(--bg) 56%, transparent);
 }
@@ -1024,6 +1026,8 @@ button {
 
 .block-editor-shell {
   background: transparent;
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 .markdown-blocknote-shell {
@@ -1181,11 +1185,8 @@ button {
   color: transparent;
   caret-color: var(--text);
   -webkit-text-fill-color: transparent;
-}
-
-.plain-editor-input.is-code::selection {
-  background: transparent;
-  color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .plain-editor-input.is-text {
