@@ -1,5 +1,6 @@
 import {
   forwardRef,
+  useCallback,
   useEffect,
   useImperativeHandle,
   useLayoutEffect,
@@ -63,9 +64,8 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
 }, ref) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const overlayRef = useRef<HTMLPreElement | null>(null);
-  const isComposingRef = useRef(false);
-  const lastEmittedValueRef = useRef(value);
-  const [localValue, setLocalValue] = useState(value);
+  const currentValueRef = useRef(value);
+  const [highlightSource, setHighlightSource] = useState(value);
   const [loadedLanguage, setLoadedLanguage] = useState<{ id: CodeLanguageId; key: string | null } | null>(null);
 
   const resolvedLanguage = mode === 'code' ? normalizeCodeLanguage(language ?? 'plaintext') : 'plaintext';
@@ -89,17 +89,21 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
     };
   }, [mode, resolvedLanguage]);
 
-  // 외부에서 value가 변경된 경우만 동기화 (자체 입력은 제외)
+  // 외부에서 value가 변경된 경우만 textarea DOM을 직접 업데이트
   useEffect(() => {
-    if (value !== lastEmittedValueRef.current) {
-      setLocalValue(value);
-      lastEmittedValueRef.current = value;
+    if (value !== currentValueRef.current) {
+      currentValueRef.current = value;
+      setHighlightSource(value);
+      if (textareaRef.current) {
+        textareaRef.current.value = value;
+        syncTextareaHeight(textareaRef.current);
+      }
     }
   }, [value]);
 
   useLayoutEffect(() => {
     syncTextareaHeight(textareaRef.current);
-  }, [localValue, mode]);
+  }, [highlightSource, mode]);
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -107,18 +111,18 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
       return;
     }
 
-    const position = focusPlacement === 'start' ? 0 : localValue.length;
+    const position = focusPlacement === 'start' ? 0 : textarea.value.length;
     textarea.focus();
     textarea.setSelectionRange(position, position);
-  }, [focusPlacement, focusNonce, localValue.length]);
+  }, [focusPlacement, focusNonce]);
 
   const highlightedHtml = useMemo(() => {
     if (mode !== 'code') {
       return '';
     }
 
-    return highlightCodeToHtml(activeLanguageKey, localValue);
-  }, [activeLanguageKey, mode, localValue]);
+    return highlightCodeToHtml(activeLanguageKey, highlightSource);
+  }, [activeLanguageKey, mode, highlightSource]);
 
   const syncOverlayScroll = () => {
     const textarea = textareaRef.current;
@@ -131,81 +135,71 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
     overlay.scrollLeft = textarea.scrollLeft;
   };
 
+  const emitChange = useCallback((nextValue: string) => {
+    currentValueRef.current = nextValue;
+    setHighlightSource(nextValue);
+    onChange(nextValue, mode === 'code' ? resolvedLanguage : null);
+  }, [mode, onChange, resolvedLanguage]);
+
+  const getVal = useCallback(() => textareaRef.current?.value ?? currentValueRef.current, []);
+
   useImperativeHandle(
     ref,
     () => ({
       async cut() {
         const textarea = textareaRef.current;
-        if (!textarea) {
-          return false;
-        }
+        if (!textarea) return false;
 
         const { selectionStart, selectionEnd } = textarea;
-        if (selectionStart === selectionEnd) {
-          return false;
-        }
+        if (selectionStart === selectionEnd) return false;
 
-        const text = localValue.slice(selectionStart, selectionEnd);
+        const val = getVal();
+        const text = val.slice(selectionStart, selectionEnd);
         await navigator.clipboard.writeText(text);
-        const nextValue = `${localValue.slice(0, selectionStart)}${localValue.slice(selectionEnd)}`;
-        onChange(nextValue, mode === 'code' ? resolvedLanguage : null);
-        requestAnimationFrame(() => {
-          const nextTextarea = textareaRef.current;
-          if (!nextTextarea) {
-            return;
-          }
-          nextTextarea.focus();
-          nextTextarea.setSelectionRange(selectionStart, selectionStart);
-        });
+        const nextValue = `${val.slice(0, selectionStart)}${val.slice(selectionEnd)}`;
+        textarea.value = nextValue;
+        emitChange(nextValue);
+        textarea.focus();
+        textarea.setSelectionRange(selectionStart, selectionStart);
+        syncTextareaHeight(textarea);
         return true;
       },
       async copy() {
         const textarea = textareaRef.current;
-        if (!textarea) {
-          return false;
-        }
+        if (!textarea) return false;
 
         const { selectionStart, selectionEnd } = textarea;
-        if (selectionStart === selectionEnd) {
-          return false;
-        }
+        if (selectionStart === selectionEnd) return false;
 
-        await navigator.clipboard.writeText(localValue.slice(selectionStart, selectionEnd));
+        await navigator.clipboard.writeText(getVal().slice(selectionStart, selectionEnd));
         return true;
       },
       async paste() {
         const textarea = textareaRef.current;
-        if (!textarea) {
-          return false;
-        }
+        if (!textarea) return false;
 
         const text = await navigator.clipboard.readText();
         const { selectionStart, selectionEnd } = textarea;
-        const nextValue = `${localValue.slice(0, selectionStart)}${text}${localValue.slice(selectionEnd)}`;
+        const val = getVal();
+        const nextValue = `${val.slice(0, selectionStart)}${text}${val.slice(selectionEnd)}`;
         const nextCaret = selectionStart + text.length;
-        onChange(nextValue, mode === 'code' ? resolvedLanguage : null);
-        requestAnimationFrame(() => {
-          const nextTextarea = textareaRef.current;
-          if (!nextTextarea) {
-            return;
-          }
-          nextTextarea.focus();
-          nextTextarea.setSelectionRange(nextCaret, nextCaret);
-        });
+        textarea.value = nextValue;
+        emitChange(nextValue);
+        textarea.focus();
+        textarea.setSelectionRange(nextCaret, nextCaret);
+        syncTextareaHeight(textarea);
         return true;
       },
       selectAll() {
         const textarea = textareaRef.current;
-        if (!textarea) {
-          return false;
-        }
+        if (!textarea) return false;
 
         textarea.focus();
-        textarea.setSelectionRange(0, localValue.length);
+        textarea.setSelectionRange(0, textarea.value.length);
         return true;
       },
     }),
-    [mode, onChange, resolvedLanguage, localValue],
+    [emitChange, getVal],
   );
 
   return (
@@ -222,32 +216,23 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
         <textarea
           ref={textareaRef}
           className={`plain-editor-input${mode === 'code' ? ' is-code' : ' is-text'}`}
-          value={localValue}
+          defaultValue={value}
           spellCheck={mode !== 'code'}
           autoCapitalize="off"
           autoCorrect="off"
           wrap={mode === 'code' ? 'off' : 'soft'}
           onFocus={onFocus}
           onScroll={syncOverlayScroll}
-          onCompositionStart={() => { isComposingRef.current = true; }}
-          onCompositionEnd={(event) => {
-            isComposingRef.current = false;
-            const nextValue = event.currentTarget.value;
-            setLocalValue(nextValue);
-            lastEmittedValueRef.current = nextValue;
-            onChange(nextValue, mode === 'code' ? resolvedLanguage : null);
-          }}
-          onChange={(event) => {
-            if (isComposingRef.current) return;
-            const nextValue = event.target.value;
-            setLocalValue(nextValue);
-            lastEmittedValueRef.current = nextValue;
-            onChange(nextValue, mode === 'code' ? resolvedLanguage : null);
+          onInput={(event) => {
+            const textarea = event.currentTarget;
+            emitChange(textarea.value);
+            syncTextareaHeight(textarea);
           }}
           onKeyDown={(event) => {
             const textarea = event.currentTarget;
             const { selectionStart, selectionEnd } = textarea;
             const isCollapsed = selectionStart === selectionEnd;
+            const val = textarea.value;
 
             if ((event.metaKey || event.ctrlKey) && event.key === 'ArrowUp') {
               event.preventDefault();
@@ -268,13 +253,25 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
               return;
             }
 
-            if (event.key === 'Backspace' && localValue.length === 0 && isCollapsed) {
+            if (event.key === 'Tab') {
+              event.preventDefault();
+              const tab = '  ';
+              const nextValue = `${val.slice(0, selectionStart)}${tab}${val.slice(selectionEnd)}`;
+              const nextCaret = selectionStart + tab.length;
+              textarea.value = nextValue;
+              textarea.setSelectionRange(nextCaret, nextCaret);
+              emitChange(nextValue);
+              syncTextareaHeight(textarea);
+              return;
+            }
+
+            if (event.key === 'Backspace' && val.length === 0 && isCollapsed) {
               event.preventDefault();
               onDeleteIfEmpty();
               return;
             }
 
-            if (event.key === 'ArrowUp' && isCollapsed && selectionStart === getLineStart(localValue, selectionStart) && getLineStart(localValue, selectionStart) === 0) {
+            if (event.key === 'ArrowUp' && isCollapsed && selectionStart === getLineStart(val, selectionStart) && getLineStart(val, selectionStart) === 0) {
               event.preventDefault();
               onNavigatePrevious('end');
               return;
@@ -283,8 +280,8 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
             if (
               event.key === 'ArrowDown' &&
               isCollapsed &&
-              selectionStart === getLineEnd(localValue, selectionStart) &&
-              getLineEnd(localValue, selectionStart) === localValue.length
+              selectionStart === getLineEnd(val, selectionStart) &&
+              getLineEnd(val, selectionStart) === val.length
             ) {
               event.preventDefault();
               onNavigateNext('start');
