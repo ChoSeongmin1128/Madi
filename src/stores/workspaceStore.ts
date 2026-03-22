@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { BlockTintPreset, ThemeMode } from '../lib/types';
 import type { DocumentSummaryVm, SearchResultVm } from '../adapters/documentAdapter';
+import type { CodeLanguageId } from '../lib/blockOptions';
 
 interface WorkspaceState {
   documents: DocumentSummaryVm[];
@@ -13,6 +14,7 @@ interface WorkspaceState {
   icloudSyncEnabled: boolean;
   isSettingsOpen: boolean;
   isSidebarOpen: boolean;
+  lastCodeLanguage: CodeLanguageId;
   setDocuments: (documents: DocumentSummaryVm[]) => void;
   upsertDocumentSummary: (document: DocumentSummaryVm) => void;
   removeDocument: (documentId: string) => void;
@@ -25,6 +27,7 @@ interface WorkspaceState {
   setIcloudSyncEnabled: (value: boolean) => void;
   setSettingsOpen: (isOpen: boolean) => void;
   setSidebarOpen: (isOpen: boolean) => void;
+  setLastCodeLanguage: (language: CodeLanguageId) => void;
 }
 
 function sortDocuments(documents: DocumentSummaryVm[]) {
@@ -42,6 +45,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   icloudSyncEnabled: false,
   isSettingsOpen: false,
   isSidebarOpen: false,
+  lastCodeLanguage: 'plaintext' as CodeLanguageId,
   setDocuments: (documents) => set({ documents: sortDocuments(documents) }),
   upsertDocumentSummary: (document) =>
     set((state) => ({
@@ -64,4 +68,5 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   setIcloudSyncEnabled: (icloudSyncEnabled) => set({ icloudSyncEnabled }),
   setSettingsOpen: (isSettingsOpen) => set({ isSettingsOpen }),
   setSidebarOpen: (isSidebarOpen) => set({ isSidebarOpen }),
+  setLastCodeLanguage: (lastCodeLanguage) => set({ lastCodeLanguage }),
 }));

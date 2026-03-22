@@ -18,6 +18,7 @@ import {
   updateTextBlock,
 } from '../controllers/appController';
 import { createEmptyMarkdownContent } from '../lib/markdown';
+import { useWorkspaceStore } from '../stores/workspaceStore';
 import type { BlockEditorHandle } from '../lib/editorHandle';
 import type { CodeLanguageId } from '../lib/blockOptions';
 import type { BlockCaretPlacement, BlockKind } from '../lib/types';
@@ -78,6 +79,7 @@ export function BlockCard({
   const isEmpty = isEffectivelyEmpty(block);
   const focusPlacement: BlockCaretPlacement | null =
     focusRequest?.blockId === block.id ? focusRequest.caret : null;
+  const focusNonce = focusRequest?.blockId === block.id ? focusRequest.nonce : 0;
 
   useEffect(() => {
     if (!isSelected) {
@@ -97,12 +99,16 @@ export function BlockCard({
 
     await changeBlockKind(block.id, kind);
 
-    if (kind === 'markdown') {
+    if (kind === 'markdown' || kind === 'text') {
       updateMarkdownBlock(block.id, createEmptyMarkdownContent());
       return;
     }
 
-    updateTextBlock(block.id, '');
+    if (kind === 'code') {
+      const lastLang = useWorkspaceStore.getState().lastCodeLanguage;
+      updateCodeBlock(block.id, '', lastLang);
+      return;
+    }
   }, [block.id, block.kind, onMenuClose]);
 
   const handleDeleteIfEmpty = useCallback(() => {
@@ -116,6 +122,7 @@ export function BlockCard({
     if (block.kind !== 'code') {
       return;
     }
+    useWorkspaceStore.getState().setLastCodeLanguage(language);
     updateCodeBlock(block.id, block.content, language);
   }, [block.content, block.id, block.kind, onMenuClose]);
 
@@ -181,7 +188,7 @@ export function BlockCard({
         setContextMenuPosition({ x: event.clientX, y: event.clientY });
       }}
       onKeyDownCapture={(event) => {
-        if (event.key === '/' && isEmpty && block.kind !== 'markdown') {
+        if (event.key === '/' && isEmpty) {
           event.preventDefault();
           onMenuClose();
           setTypeMenuOpen(true);
@@ -201,6 +208,15 @@ export function BlockCard({
           </button>
         </div>
       </div>
+
+      {block.kind === 'markdown' || block.kind === 'text' ? (
+        <span
+          className="block-kind-badge"
+          style={{ opacity: isSelected || isMenuOpen || contextMenuPosition != null ? 1 : 0 }}
+        >
+          {block.kind === 'markdown' ? 'Markdown' : 'Plain Text'}
+        </span>
+      ) : null}
 
       {block.kind === 'code' ? (
         <CodeLanguageTrigger
@@ -243,6 +259,7 @@ export function BlockCard({
             content={block.content}
             isSelected={isSelected}
             focusPlacement={focusPlacement}
+            focusNonce={focusNonce}
             onFocus={handleBlockFocus}
             onSelectionVisualChange={setMarkdownSelectionState}
             onCreateBelow={() => void createBlockBelow(block.id)}
@@ -260,6 +277,7 @@ export function BlockCard({
             value={block.content}
             language={block.language}
             focusPlacement={focusPlacement}
+            focusNonce={focusNonce}
             onFocus={handleBlockFocus}
             onCreateBelow={() => void createBlockBelow(block.id)}
             onNavigatePrevious={(caret) => focusPreviousBlock(block.id, caret)}
@@ -270,12 +288,15 @@ export function BlockCard({
         ) : null}
 
         {block.kind === 'text' ? (
-          <PlainTextBlockEditor
+          <MarkdownBlockEditor
             ref={editorRef}
-            mode="text"
-            value={block.content}
+            blockId={block.id}
+            content={block.content}
+            isSelected={isSelected}
             focusPlacement={focusPlacement}
+            focusNonce={focusNonce}
             onFocus={handleBlockFocus}
+            onSelectionVisualChange={setMarkdownSelectionState}
             onCreateBelow={() => void createBlockBelow(block.id)}
             onNavigatePrevious={(caret) => focusPreviousBlock(block.id, caret)}
             onNavigateNext={(caret) => focusNextBlock(block.id, caret)}

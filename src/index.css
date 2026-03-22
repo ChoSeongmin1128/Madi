@@ -74,8 +74,10 @@ button {
   width: 280px;
   flex-direction: column;
   gap: 14px;
-  border-right: 1px solid var(--border);
-  background: color-mix(in srgb, var(--bg) 90%, var(--bg-muted) 10%);
+  border-right: 1px solid color-mix(in srgb, CanvasText 8%, transparent);
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  backdrop-filter: blur(24px) saturate(1.2);
+  -webkit-backdrop-filter: blur(24px) saturate(1.2);
   padding: 18px 14px;
   transform: translateX(-100%);
   transition: transform 140ms ease;
@@ -226,11 +228,11 @@ button {
   z-index: 5;
   flex-shrink: 0;
   margin: -4px -8px 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--border) 80%, transparent);
-  background: color-mix(in srgb, var(--bg) 94%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, CanvasText 6%, transparent);
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
   padding: 8px 8px 10px;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(28px) saturate(1.3);
+  -webkit-backdrop-filter: blur(28px) saturate(1.3);
 }
 
 .workspace-header::after {
@@ -286,10 +288,10 @@ button {
   display: flex;
   min-height: 0;
   flex-direction: column;
-  gap: 0;
+  gap: 6px;
   padding-top: 2px;
-  --block-tint-odd: color-mix(in srgb, #8491a7 5%, Canvas);
-  --block-tint-even: color-mix(in srgb, #94a0b4 8%, Canvas);
+  --block-tint-odd: color-mix(in srgb, var(--bg) 62%, transparent);
+  --block-tint-even: color-mix(in srgb, var(--bg) 56%, transparent);
 }
 
 .document-slot-group {
@@ -411,33 +413,33 @@ button {
 }
 
 .document-surface[data-block-preset='mist'] {
-  --block-tint-odd: color-mix(in srgb, #7f8ca4 5%, Canvas);
-  --block-tint-even: color-mix(in srgb, #9aa5b8 7%, Canvas);
+  --block-tint-odd: color-mix(in srgb, #7f8ca4 8%, color-mix(in srgb, var(--bg) 60%, transparent));
+  --block-tint-even: color-mix(in srgb, #9aa5b8 10%, color-mix(in srgb, var(--bg) 54%, transparent));
 }
 
 .document-surface[data-block-preset='sage-rose'] {
-  --block-tint-odd: color-mix(in srgb, #7fa08f 6%, Canvas);
-  --block-tint-even: color-mix(in srgb, #b38d97 7%, Canvas);
+  --block-tint-odd: color-mix(in srgb, #7fa08f 9%, color-mix(in srgb, var(--bg) 60%, transparent));
+  --block-tint-even: color-mix(in srgb, #b38d97 10%, color-mix(in srgb, var(--bg) 54%, transparent));
 }
 
 .document-surface[data-block-preset='sky-amber'] {
-  --block-tint-odd: color-mix(in srgb, #7ca3c0 7%, Canvas);
-  --block-tint-even: color-mix(in srgb, #b59a67 7%, Canvas);
+  --block-tint-odd: color-mix(in srgb, #7ca3c0 10%, color-mix(in srgb, var(--bg) 60%, transparent));
+  --block-tint-even: color-mix(in srgb, #b59a67 10%, color-mix(in srgb, var(--bg) 54%, transparent));
 }
 
 .document-surface[data-block-preset='mint-plum'] {
-  --block-tint-odd: color-mix(in srgb, #79ae9c 7%, Canvas);
-  --block-tint-even: color-mix(in srgb, #987da1 7%, Canvas);
+  --block-tint-odd: color-mix(in srgb, #79ae9c 10%, color-mix(in srgb, var(--bg) 60%, transparent));
+  --block-tint-even: color-mix(in srgb, #987da1 10%, color-mix(in srgb, var(--bg) 54%, transparent));
 }
 
 .document-surface[data-block-preset='ocean-sand'] {
-  --block-tint-odd: color-mix(in srgb, #628ca4 7%, Canvas);
-  --block-tint-even: color-mix(in srgb, #a59a84 7%, Canvas);
+  --block-tint-odd: color-mix(in srgb, #628ca4 10%, color-mix(in srgb, var(--bg) 60%, transparent));
+  --block-tint-even: color-mix(in srgb, #a59a84 10%, color-mix(in srgb, var(--bg) 54%, transparent));
 }
 
 .document-surface[data-block-preset='violet-lime'] {
-  --block-tint-odd: color-mix(in srgb, #8977b4 7%, Canvas);
-  --block-tint-even: color-mix(in srgb, #92a26f 7%, Canvas);
+  --block-tint-odd: color-mix(in srgb, #8977b4 10%, color-mix(in srgb, var(--bg) 60%, transparent));
+  --block-tint-even: color-mix(in srgb, #92a26f 10%, color-mix(in srgb, var(--bg) 54%, transparent));
 }
 
 .document-head {
@@ -772,11 +774,14 @@ button {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  border-left: 2px solid transparent;
-  border-radius: 8px;
+  border: 1.5px solid color-mix(in srgb, CanvasText 6%, transparent);
+  border-radius: 12px;
   background: var(--block-tint-odd);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   padding: 12px 14px 12px 34px;
-  transition: background-color 120ms ease, border-color 120ms ease;
+  box-shadow: 0 1px 3px color-mix(in srgb, CanvasText 3%, transparent);
+  transition: border-color 120ms ease, box-shadow 120ms ease, background-color 120ms ease;
 }
 
 .block-card.is-alternate {
@@ -786,16 +791,19 @@ button {
 .block-card.is-selected,
 .block-card.is-markdown-select-all,
 .block-card.is-all-selected {
-  border-color: var(--border-strong);
+  border-color: color-mix(in srgb, Highlight 44%, transparent);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, Highlight 18%, transparent),
+    0 1px 4px color-mix(in srgb, Highlight 10%, transparent);
 }
 
 .block-card.is-markdown-select-all {
-  border-color: color-mix(in srgb, Highlight 62%, CanvasText 8%);
+  border-color: color-mix(in srgb, Highlight 58%, CanvasText 6%);
   background:
     linear-gradient(
       0deg,
-      color-mix(in srgb, Highlight 12%, transparent),
-      color-mix(in srgb, Highlight 12%, transparent)
+      color-mix(in srgb, Highlight 10%, transparent),
+      color-mix(in srgb, Highlight 10%, transparent)
     ),
     var(--block-tint-odd);
 }
@@ -804,23 +812,23 @@ button {
   background:
     linear-gradient(
       0deg,
-      color-mix(in srgb, Highlight 12%, transparent),
-      color-mix(in srgb, Highlight 12%, transparent)
+      color-mix(in srgb, Highlight 10%, transparent),
+      color-mix(in srgb, Highlight 10%, transparent)
     ),
     var(--block-tint-even);
 }
 
 .block-card.has-editor-selection:not(.is-markdown-select-all):not(.is-selected) {
-  border-color: color-mix(in srgb, Highlight 22%, transparent);
+  border-color: color-mix(in srgb, Highlight 24%, transparent);
 }
 
 .block-card.is-dragging {
-  border-color: color-mix(in srgb, Highlight 56%, transparent);
+  border-color: color-mix(in srgb, Highlight 50%, transparent);
   background:
     linear-gradient(
       0deg,
-      color-mix(in srgb, Highlight 10%, transparent),
-      color-mix(in srgb, Highlight 10%, transparent)
+      color-mix(in srgb, Highlight 8%, transparent),
+      color-mix(in srgb, Highlight 8%, transparent)
     ),
     color-mix(in srgb, var(--bg-hover) 72%, transparent);
   opacity: 0.74;
@@ -890,6 +898,33 @@ button {
   pointer-events: auto;
 }
 
+.block-kind-badge {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  z-index: 12;
+  padding: 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg) 80%, transparent);
+  color: var(--text-soft);
+  font-size: 0.72rem;
+  font-weight: 500;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.block-card:hover .block-kind-badge {
+  opacity: 0.7;
+}
+
+.block-card.is-selected .block-kind-badge,
+.block-card.is-markdown-select-all .block-kind-badge,
+.block-card.has-editor-selection .block-kind-badge {
+  opacity: 1;
+}
+
 .code-language-trigger {
   display: inline-flex;
   align-items: center;
@@ -910,21 +945,57 @@ button {
 }
 
 .code-language-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: 30;
+  position: fixed;
+  z-index: 100;
   display: flex;
-  max-height: 280px;
-  min-width: 188px;
+  max-height: 360px;
+  min-width: 220px;
   flex-direction: column;
-  gap: 2px;
-  overflow: auto;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: color-mix(in srgb, var(--bg) 94%, var(--bg-muted) 6%);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   padding: 6px;
   box-shadow: 0 16px 32px color-mix(in srgb, CanvasText 12%, transparent);
+}
+
+.code-language-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 4px;
+  color: var(--text-soft);
+}
+
+.code-language-search input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 0.82rem;
+  outline: none;
+}
+
+.code-language-search input::placeholder {
+  color: var(--text-soft);
+}
+
+.code-language-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: auto;
+  max-height: 280px;
+}
+
+.code-language-empty {
+  padding: 8px;
+  color: var(--text-soft);
+  font-size: 0.82rem;
+  text-align: center;
 }
 
 .code-language-menu button {
@@ -984,6 +1055,11 @@ button {
   padding: 2px 0;
 }
 
+.markdown-blocknote-shell .bn-block-content[data-content-type='checkListItem'] > div:has(> input) {
+  min-width: 28px;
+  justify-content: center;
+}
+
 .markdown-blocknote-shell .bn-block-content[data-content-type='codeBlock'] {
   border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
   border-radius: 10px;
@@ -1024,6 +1100,16 @@ button {
 .markdown-blocknote-shell .bn-editor .ProseMirror ::selection,
 .markdown-blocknote-shell .bn-editor .ProseMirror::selection {
   background: color-mix(in srgb, Highlight 28%, transparent);
+}
+
+.markdown-blocknote-shell .bn-block-group > .bn-block-outer:last-child:not(:first-child) .bn-inline-content:has(> .ProseMirror-trailingBreak:only-child)::before {
+  display: none;
+}
+
+.markdown-blocknote-shell .bn-block-group > .bn-block-outer:last-child:not(:first-child) .bn-inline-content:has(> .ProseMirror-trailingBreak:only-child) {
+  min-height: 0;
+  line-height: 0;
+  padding: 0;
 }
 
 .plain-editor {

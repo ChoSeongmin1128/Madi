@@ -50,8 +50,10 @@ export function getBlockNoteTextBoundaries(editor: BlockNoteEditorLike) {
 
   let firstCursorPos: number | null = null;
   let lastCursorPos: number | null = null;
+  let prevLastCursorPos: number | null = null;
+  let lastNodeSize = 0;
 
-  doc.descendants((node: { isTextblock: boolean; nodeSize: number }, pos: number) => {
+  doc.descendants((node: { isTextblock: boolean; nodeSize: number; textContent: string }, pos: number) => {
     if (!node.isTextblock) {
       return;
     }
@@ -60,16 +62,22 @@ export function getBlockNoteTextBoundaries(editor: BlockNoteEditorLike) {
       firstCursorPos = pos + 1;
     }
 
+    prevLastCursorPos = lastCursorPos;
     lastCursorPos = pos + node.nodeSize - 1;
+    lastNodeSize = node.nodeSize;
   });
 
   if (firstCursorPos === null || lastCursorPos === null) {
     return null;
   }
 
+  // 마지막 textblock이 빈 trailing paragraph(nodeSize <= 2)이고 다른 블록이 있으면 건너뛰기
+  const effectiveLastCursorPos =
+    lastNodeSize <= 2 && prevLastCursorPos !== null ? prevLastCursorPos : lastCursorPos;
+
   return {
     firstCursorPos,
-    lastCursorPos,
+    lastCursorPos: effectiveLastCursorPos,
     selectionFrom: selection.from,
     selectionTo: selection.to,
   };
@@ -122,14 +130,45 @@ export function deleteBlockNoteSelection(editor: BlockNoteEditorLike) {
   return true;
 }
 
-export function focusBlockNote(editor: BlockNoteEditorLike, focusPlacement: 'start' | 'end') {
-  const targetBlock = editor.document[focusPlacement === 'start' ? 0 : editor.document.length - 1];
-  if (!targetBlock || typeof targetBlock !== 'object' || !('id' in targetBlock)) {
-    return;
+function isEmptyTrailingBlock(block: unknown): boolean {
+  if (!block || typeof block !== 'object') return false;
+  const b = block as Record<string, unknown>;
+  if (b.type !== 'paragraph') return false;
+  const content = b.content;
+  if (!Array.isArray(content) || content.length === 0) return true;
+  return content.every((item: unknown) => {
+    if (!item || typeof item !== 'object') return true;
+    const node = item as Record<string, unknown>;
+    return node.type === 'text' && (typeof node.text === 'string' ? node.text.length === 0 : true);
+  });
+}
+
+export function focusBlockNote(editor: BlockNoteEditorLike, focusPlacement: 'start' | 'end'): boolean {
+  const view = editor._tiptapEditor?.view;
+  if (!view?.dom?.isConnected) {
+    return false;
   }
 
-  editor.focus();
-  editor.setTextCursorPosition((targetBlock as { id: string }).id, focusPlacement);
+  let targetIndex = focusPlacement === 'start' ? 0 : editor.document.length - 1;
+
+  // 'end' 배치 시 숨겨진 빈 trailing paragraph 건너뛰기
+  if (focusPlacement === 'end' && targetIndex > 0 && isEmptyTrailingBlock(editor.document[targetIndex])) {
+    targetIndex--;
+  }
+
+  const targetBlock = editor.document[targetIndex];
+  if (!targetBlock || typeof targetBlock !== 'object' || !('id' in targetBlock)) {
+    return false;
+  }
+
+  (view.dom as HTMLElement).focus();
+  try {
+    editor.setTextCursorPosition((targetBlock as { id: string }).id, focusPlacement);
+  } catch {
+    // setTextCursorPosition 실패 시에도 DOM focus는 유지
+  }
+
+  return view.hasFocus?.() ?? view.dom.contains(document.activeElement);
 }
 
 export function clearBlockNoteContent(editor: BlockNoteEditorLike, createEmptyBlocks: () => unknown[]) {

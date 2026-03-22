@@ -18,6 +18,7 @@ function formatLastSavedAt(value: number) {
   const time = [
     String(date.getHours()).padStart(2, '0'),
     String(date.getMinutes()).padStart(2, '0'),
+    String(date.getSeconds()).padStart(2, '0'),
   ];
 
   return `${parts.join('.')}. ${time.join(':')}`;
@@ -58,7 +59,7 @@ function App() {
           <div className="workspace-heading">
             {currentDocument ? (
               <span className="workspace-status">
-                {isFlushing ? '저장 중' : lastSavedAt ? formatLastSavedAt(lastSavedAt) : ''}
+                {isFlushing ? '저장 중…' : lastSavedAt ? `마지막 저장 ${formatLastSavedAt(lastSavedAt)}` : ''}
               </span>
             ) : null}
           </div>

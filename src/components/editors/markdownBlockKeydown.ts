@@ -96,10 +96,13 @@ export function createMarkdownKeydownHandler({
 
     if (event.key === 'Backspace' && isMarkdownContentEmpty(getCurrentMarkdown())) {
       if (isBlockNoteSelectionEmpty(editor)) {
-        event.preventDefault();
-        isWholeBlockSelectedRef.current = false;
-        onDeleteIfEmpty();
-        emitSelectionVisualState();
+        if (editor.document.length <= 1) {
+          event.preventDefault();
+          isWholeBlockSelectedRef.current = false;
+          onDeleteIfEmpty();
+          emitSelectionVisualState();
+        }
+        // 빈 paragraph가 여러 개면 BlockNote가 자체적으로 병합하도록 허용
       }
       return;
     }

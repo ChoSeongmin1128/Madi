@@ -23,6 +23,7 @@ interface MarkdownBlockEditorProps {
   content: string;
   isSelected: boolean;
   focusPlacement: BlockCaretPlacement | null;
+  focusNonce: number;
   onChange: (content: string) => void;
   onFocus: () => void;
   onSelectionVisualChange?: (state: {
@@ -40,6 +41,7 @@ export const MarkdownBlockEditor = forwardRef<BlockEditorHandle, MarkdownBlockEd
   content,
   isSelected,
   focusPlacement,
+  focusNonce,
   onChange,
   onFocus,
   onSelectionVisualChange,
@@ -153,10 +155,31 @@ export const MarkdownBlockEditor = forwardRef<BlockEditorHandle, MarkdownBlockEd
       return;
     }
 
-    focusBlockNote(editor, focusPlacement === 'start' ? 'start' : 'end');
-    isWholeBlockSelectedRef.current = false;
-    emitSelectionVisualState();
-  }, [editor, emitSelectionVisualState, focusPlacement]);
+    let cancelled = false;
+    let retryCount = 0;
+    const MAX_RETRIES = 20;
+
+    const attempt = () => {
+      if (cancelled || retryCount >= MAX_RETRIES) return;
+      retryCount++;
+
+      if (focusBlockNote(editor, focusPlacement === 'start' ? 'start' : 'end')) {
+        isWholeBlockSelectedRef.current = false;
+        emitSelectionVisualState();
+      } else {
+        requestAnimationFrame(attempt);
+      }
+    };
+
+    const timer = setTimeout(() => {
+      if (!cancelled) attempt();
+    }, 0);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [editor, emitSelectionVisualState, focusPlacement, focusNonce]);
 
   useEffect(() => {
     if (!isSelected) {
@@ -189,6 +212,7 @@ export const MarkdownBlockEditor = forwardRef<BlockEditorHandle, MarkdownBlockEd
           theme={resolvedTheme}
           formattingToolbar={false}
           linkToolbar={false}
+          slashMenu={false}
           sideMenu={false}
           filePanel={false}
           tableHandles={false}

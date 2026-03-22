@@ -1,4 +1,4 @@
-import { FilePenLine, FileText } from 'lucide-react';
+import { Code, FilePenLine, FileText } from 'lucide-react';
 import type { BlockKind } from './types';
 export {
   CODE_LANGUAGE_OPTIONS,
@@ -12,19 +12,21 @@ export {
 export const BLOCK_KIND_OPTIONS: Array<{
   kind: BlockKind;
   label: string;
-  description: string;
   icon: typeof FilePenLine;
 }> = [
   {
     kind: 'markdown',
     label: 'Markdown',
-    description: '구조적 문서 편집',
     icon: FilePenLine,
   },
   {
+    kind: 'code',
+    label: 'Code',
+    icon: Code,
+  },
+  {
     kind: 'text',
-    label: 'Text',
-    description: '가벼운 plain text',
+    label: 'Plain Text',
     icon: FileText,
   },
 ];

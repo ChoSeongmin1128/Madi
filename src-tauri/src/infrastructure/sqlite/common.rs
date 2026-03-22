@@ -77,18 +77,24 @@ impl SqliteStore {
 
   pub(crate) fn rewrite_positions(
     connection: &Connection,
-    document_id: &str,
+    _document_id: &str,
     ordered_ids: &[String],
   ) -> Result<(), AppError> {
-    connection.execute(
-      "UPDATE blocks SET position = -(position + 1) WHERE document_id = ?1",
-      params![document_id],
-    )?;
+    let n = ordered_ids.len() as i64;
 
-    for (index, block_id) in ordered_ids.iter().enumerate() {
+    // Phase 1: 모든 블록을 안전한 음수 범위 [-(n+1), -(2n)]로 이동 (충돌 불가)
+    for (i, block_id) in ordered_ids.iter().enumerate() {
       connection.execute(
         "UPDATE blocks SET position = ?1 WHERE id = ?2",
-        params![index as i64, block_id],
+        params![-(n + 1 + i as i64), block_id],
+      )?;
+    }
+
+    // Phase 2: 최종 순차 포지션 할당 [0, n-1]
+    for (i, block_id) in ordered_ids.iter().enumerate() {
+      connection.execute(
+        "UPDATE blocks SET position = ?1 WHERE id = ?2",
+        params![i as i64, block_id],
       )?;
     }
 

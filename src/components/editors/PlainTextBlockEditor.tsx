@@ -21,6 +21,7 @@ interface PlainTextBlockEditorProps {
   value: string;
   language?: CodeLanguageId | null;
   focusPlacement: BlockCaretPlacement | null;
+  focusNonce: number;
   onChange: (value: string, language: CodeLanguageId | null) => void;
   onFocus: () => void;
   onCreateBelow: () => void;
@@ -52,6 +53,7 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
   value,
   language,
   focusPlacement,
+  focusNonce,
   onChange,
   onFocus,
   onCreateBelow,
@@ -61,6 +63,8 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
 }, ref) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const overlayRef = useRef<HTMLPreElement | null>(null);
+  const lastEmittedValueRef = useRef(value);
+  const [localValue, setLocalValue] = useState(value);
   const [loadedLanguage, setLoadedLanguage] = useState<{ id: CodeLanguageId; key: string | null } | null>(null);
 
   const resolvedLanguage = mode === 'code' ? normalizeCodeLanguage(language ?? 'plaintext') : 'plaintext';
@@ -84,9 +88,17 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
     };
   }, [mode, resolvedLanguage]);
 
+  // 외부에서 value가 변경된 경우만 동기화 (자체 입력은 제외)
+  useEffect(() => {
+    if (value !== lastEmittedValueRef.current) {
+      setLocalValue(value);
+      lastEmittedValueRef.current = value;
+    }
+  }, [value]);
+
   useLayoutEffect(() => {
     syncTextareaHeight(textareaRef.current);
-  }, [value, mode]);
+  }, [localValue, mode]);
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -94,18 +106,18 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
       return;
     }
 
-    const position = focusPlacement === 'start' ? 0 : value.length;
+    const position = focusPlacement === 'start' ? 0 : localValue.length;
     textarea.focus();
     textarea.setSelectionRange(position, position);
-  }, [focusPlacement, value.length]);
+  }, [focusPlacement, focusNonce, localValue.length]);
 
   const highlightedHtml = useMemo(() => {
     if (mode !== 'code') {
       return '';
     }
 
-    return highlightCodeToHtml(activeLanguageKey, value);
-  }, [activeLanguageKey, mode, value]);
+    return highlightCodeToHtml(activeLanguageKey, localValue);
+  }, [activeLanguageKey, mode, localValue]);
 
   const syncOverlayScroll = () => {
     const textarea = textareaRef.current;
@@ -132,9 +144,9 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
           return false;
         }
 
-        const text = value.slice(selectionStart, selectionEnd);
+        const text = localValue.slice(selectionStart, selectionEnd);
         await navigator.clipboard.writeText(text);
-        const nextValue = `${value.slice(0, selectionStart)}${value.slice(selectionEnd)}`;
+        const nextValue = `${localValue.slice(0, selectionStart)}${localValue.slice(selectionEnd)}`;
         onChange(nextValue, mode === 'code' ? resolvedLanguage : null);
         requestAnimationFrame(() => {
           const nextTextarea = textareaRef.current;
@@ -157,7 +169,7 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
           return false;
         }
 
-        await navigator.clipboard.writeText(value.slice(selectionStart, selectionEnd));
+        await navigator.clipboard.writeText(localValue.slice(selectionStart, selectionEnd));
         return true;
       },
       async paste() {
@@ -168,7 +180,7 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
 
         const text = await navigator.clipboard.readText();
         const { selectionStart, selectionEnd } = textarea;
-        const nextValue = `${value.slice(0, selectionStart)}${text}${value.slice(selectionEnd)}`;
+        const nextValue = `${localValue.slice(0, selectionStart)}${text}${localValue.slice(selectionEnd)}`;
         const nextCaret = selectionStart + text.length;
         onChange(nextValue, mode === 'code' ? resolvedLanguage : null);
         requestAnimationFrame(() => {
@@ -188,11 +200,11 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
         }
 
         textarea.focus();
-        textarea.setSelectionRange(0, value.length);
+        textarea.setSelectionRange(0, localValue.length);
         return true;
       },
     }),
-    [mode, onChange, resolvedLanguage, value],
+    [mode, onChange, resolvedLanguage, localValue],
   );
 
   return (
@@ -209,7 +221,7 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
         <textarea
           ref={textareaRef}
           className={`plain-editor-input${mode === 'code' ? ' is-code' : ' is-text'}`}
-          value={value}
+          value={localValue}
           spellCheck={mode !== 'code'}
           autoCapitalize="off"
           autoCorrect="off"
@@ -217,7 +229,10 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
           onFocus={onFocus}
           onScroll={syncOverlayScroll}
           onChange={(event) => {
-            onChange(event.target.value, mode === 'code' ? resolvedLanguage : null);
+            const nextValue = event.target.value;
+            setLocalValue(nextValue);
+            lastEmittedValueRef.current = nextValue;
+            onChange(nextValue, mode === 'code' ? resolvedLanguage : null);
           }}
           onKeyDown={(event) => {
             const textarea = event.currentTarget;
@@ -243,13 +258,13 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
               return;
             }
 
-            if (event.key === 'Backspace' && value.length === 0 && isCollapsed) {
+            if (event.key === 'Backspace' && localValue.length === 0 && isCollapsed) {
               event.preventDefault();
               onDeleteIfEmpty();
               return;
             }
 
-            if (event.key === 'ArrowUp' && isCollapsed && selectionStart === getLineStart(value, selectionStart) && getLineStart(value, selectionStart) === 0) {
+            if (event.key === 'ArrowUp' && isCollapsed && selectionStart === getLineStart(localValue, selectionStart) && getLineStart(localValue, selectionStart) === 0) {
               event.preventDefault();
               onNavigatePrevious('end');
               return;
@@ -258,8 +273,8 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
             if (
               event.key === 'ArrowDown' &&
               isCollapsed &&
-              selectionStart === getLineEnd(value, selectionStart) &&
-              getLineEnd(value, selectionStart) === value.length
+              selectionStart === getLineEnd(localValue, selectionStart) &&
+              getLineEnd(localValue, selectionStart) === localValue.length
             ) {
               event.preventDefault();
               onNavigateNext('start');

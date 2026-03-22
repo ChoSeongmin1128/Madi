@@ -25,7 +25,6 @@ import {
   getCurrentDocument,
   normalizeErrorMessage,
   reportWorkspaceError,
-  setCurrentDocument,
   updateTouchedDocument,
 } from './controllerSupport';
 import { flushCurrentDocument } from './documentController';
@@ -80,9 +79,17 @@ export async function createBlockBelow(afterBlockId: string | null, kind: BlockK
 
     clearError();
     useWorkspaceStore.getState().upsertDocumentSummary(summarizeDocument(nextDocument));
-    setCurrentDocument(nextDocument);
+    const targetBlock = nextBlock ?? nextDocument.blocks[0] ?? null;
+    useDocumentSessionStore.setState({
+      currentDocument: nextDocument,
+      selectedBlockId: targetBlock?.id ?? null,
+      allBlocksSelected: false,
+      focusRequest: targetBlock
+        ? { blockId: targetBlock.id, caret: 'start' as const, nonce: Date.now() + Math.random() }
+        : null,
+      lastSavedAt: nextDocument.updatedAt,
+    });
     if (nextBlock) {
-      useDocumentSessionStore.getState().requestBlockFocus(nextBlock.id, 'start');
       enqueueSyncMutation({ kind: 'block-created', documentId: nextDocument.id, blockId: nextBlock.id });
     }
   } catch (error) {

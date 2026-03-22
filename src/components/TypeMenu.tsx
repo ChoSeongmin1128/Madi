@@ -15,6 +15,17 @@ export function TypeMenu({ onSelect, onClose }: TypeMenuProps) {
     rootRef.current?.focus();
   }, []);
 
+  useEffect(() => {
+    const onPointerDown = (event: MouseEvent) => {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        onClose();
+      }
+    };
+
+    window.addEventListener('mousedown', onPointerDown);
+    return () => window.removeEventListener('mousedown', onPointerDown);
+  }, [onClose]);
+
   const selectedOption = useMemo(
     () => BLOCK_KIND_OPTIONS[selectedIndex] ?? BLOCK_KIND_OPTIONS[0],
     [selectedIndex],
@@ -26,7 +37,6 @@ export function TypeMenu({ onSelect, onClose }: TypeMenuProps) {
       className="type-menu"
       role="menu"
       tabIndex={-1}
-      onMouseLeave={onClose}
       onKeyDown={(event) => {
         if (event.key === 'Escape') {
           event.preventDefault();
@@ -63,13 +73,10 @@ export function TypeMenu({ onSelect, onClose }: TypeMenuProps) {
             onMouseEnter={() => setSelectedIndex(index)}
             onClick={() => onSelect(option.kind)}
           >
-            <div className="row">
-              <span className="row">
-                <Icon size={16} />
-                <span>{option.label}</span>
-              </span>
-              <span className="hint-text">{option.description}</span>
-            </div>
+            <span className="row">
+              <Icon size={16} />
+              <span>{option.label}</span>
+            </span>
           </button>
         );
       })}

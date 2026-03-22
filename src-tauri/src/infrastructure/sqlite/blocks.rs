@@ -24,10 +24,16 @@ impl BlockRepository for SqliteStore {
       let (normalized_content, normalized_search_text, did_migrate) =
         Self::normalize_markdown_storage(&content);
 
-      if did_migrate || normalized_search_text != search_text {
+      if did_migrate {
         self.connection.execute(
           "UPDATE blocks SET content = ?1, search_text = ?2 WHERE id = ?3",
           params![normalized_content, normalized_search_text, block_id],
+        )?;
+        changed_document_ids.insert(document_id);
+      } else if normalized_search_text != search_text {
+        self.connection.execute(
+          "UPDATE blocks SET search_text = ?1 WHERE id = ?2",
+          params![normalized_search_text, block_id],
         )?;
         changed_document_ids.insert(document_id);
       }
@@ -86,11 +92,8 @@ impl BlockRepository for SqliteStore {
       None => 0,
     };
 
-    transaction.execute(
-      "UPDATE blocks SET position = -(position + 1) WHERE document_id = ?1",
-      params![document_id],
-    )?;
-    let new_block = Self::insert_empty_block(&transaction, document_id, target_index as i64, kind)?;
+    let temp_position = -(ordered_ids.len() as i64 + 1);
+    let new_block = Self::insert_empty_block(&transaction, document_id, temp_position, kind)?;
     ordered_ids.insert(target_index, new_block.id);
     Self::rewrite_positions(&transaction, document_id, &ordered_ids)?;
     transaction.commit()?;
