@@ -117,6 +117,7 @@ export function useAppShortcuts() {
       // 붙여넣기: 블록 데이터가 있으면 블록 붙여넣기
       if (event.key.toLowerCase() === 'v' && hasBlockDataInClipboard()) {
         event.preventDefault();
+        event.stopImmediatePropagation();
         void pasteBlocks();
       }
     };
@@ -125,10 +126,10 @@ export function useAppShortcuts() {
       void flushCurrentDocument();
     };
 
-    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keydown', onKeyDown, true);
     window.addEventListener('beforeunload', onBeforeUnload);
     return () => {
-      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keydown', onKeyDown, true);
       window.removeEventListener('beforeunload', onBeforeUnload);
     };
   }, [allBlocksSelected, blockSelected, currentDocument, selectedBlockId, setAllBlocksSelected, setBlockSelected]);
