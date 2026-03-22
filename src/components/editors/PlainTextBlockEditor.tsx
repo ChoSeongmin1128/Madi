@@ -63,6 +63,7 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
 }, ref) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const overlayRef = useRef<HTMLPreElement | null>(null);
+  const isComposingRef = useRef(false);
   const lastEmittedValueRef = useRef(value);
   const [localValue, setLocalValue] = useState(value);
   const [loadedLanguage, setLoadedLanguage] = useState<{ id: CodeLanguageId; key: string | null } | null>(null);
@@ -228,7 +229,16 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
           wrap={mode === 'code' ? 'off' : 'soft'}
           onFocus={onFocus}
           onScroll={syncOverlayScroll}
+          onCompositionStart={() => { isComposingRef.current = true; }}
+          onCompositionEnd={(event) => {
+            isComposingRef.current = false;
+            const nextValue = event.currentTarget.value;
+            setLocalValue(nextValue);
+            lastEmittedValueRef.current = nextValue;
+            onChange(nextValue, mode === 'code' ? resolvedLanguage : null);
+          }}
           onChange={(event) => {
+            if (isComposingRef.current) return;
             const nextValue = event.target.value;
             setLocalValue(nextValue);
             lastEmittedValueRef.current = nextValue;

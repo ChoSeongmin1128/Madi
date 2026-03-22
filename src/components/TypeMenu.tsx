@@ -1,15 +1,31 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { BLOCK_KIND_OPTIONS } from '../lib/blockOptions';
 import type { BlockKind } from '../lib/types';
 
 interface TypeMenuProps {
+  anchorRect: DOMRect | null;
   onSelect: (kind: BlockKind) => void;
   onClose: () => void;
 }
 
-export function TypeMenu({ onSelect, onClose }: TypeMenuProps) {
+export function TypeMenu({ anchorRect, onSelect, onClose }: TypeMenuProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const [position, setPosition] = useState({ top: 0, left: 0 });
+
+  useLayoutEffect(() => {
+    const menu = rootRef.current;
+    if (!menu || !anchorRect) return;
+
+    const menuHeight = menu.offsetHeight;
+    const spaceBelow = window.innerHeight - anchorRect.bottom - 8;
+    const top = spaceBelow >= menuHeight
+      ? anchorRect.bottom + 4
+      : Math.max(8, anchorRect.top - menuHeight - 4);
+    const left = Math.max(8, Math.min(anchorRect.left, window.innerWidth - menu.offsetWidth - 8));
+    setPosition({ top, left });
+  }, [anchorRect]);
 
   useEffect(() => {
     rootRef.current?.focus();
@@ -31,12 +47,13 @@ export function TypeMenu({ onSelect, onClose }: TypeMenuProps) {
     [selectedIndex],
   );
 
-  return (
+  return createPortal(
     <div
       ref={rootRef}
       className="type-menu"
       role="menu"
       tabIndex={-1}
+      style={{ top: position.top, left: position.left }}
       onKeyDown={(event) => {
         if (event.key === 'Escape') {
           event.preventDefault();
@@ -80,6 +97,7 @@ export function TypeMenu({ onSelect, onClose }: TypeMenuProps) {
           </button>
         );
       })}
-    </div>
+    </div>,
+    document.body,
   );
 }

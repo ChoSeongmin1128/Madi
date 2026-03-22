@@ -63,8 +63,9 @@ export function BlockCard({
   onGripPointerDown,
   onMenuClose,
 }: BlockCardProps) {
-  const [isTypeMenuOpen, setTypeMenuOpen] = useState(false);
+  const [typeMenuAnchor, setTypeMenuAnchor] = useState<DOMRect | null>(null);
   const [contextMenuPosition, setContextMenuPosition] = useState<{ x: number; y: number } | null>(null);
+  const blockCardRef = useRef<HTMLElement | null>(null);
   const [markdownSelectionState, setMarkdownSelectionState] = useState({
     hasSelection: false,
     isWholeBlockSelected: false,
@@ -90,7 +91,7 @@ export function BlockCard({
   }, [block.kind, isSelected]);
 
   const handleTypeChange = useCallback(async (kind: BlockKind) => {
-    setTypeMenuOpen(false);
+    setTypeMenuAnchor(null);
     setContextMenuPosition(null);
     onMenuClose();
     if (kind === block.kind) {
@@ -172,6 +173,7 @@ export function BlockCard({
 
   return (
     <section
+      ref={blockCardRef}
       data-block-card-id={block.id}
       className={`block-card block-card-${block.kind}${isSelected ? ' is-selected' : ''}${markdownSelectionState.hasSelection ? ' has-editor-selection' : ''}${markdownSelectionState.isWholeBlockSelected ? ' is-markdown-select-all' : ''}${isAllSelected ? ' is-all-selected' : ''}${isAlternate ? ' is-alternate' : ''}${isDragging ? ' is-dragging' : ''}`}
       onPointerEnter={() => {
@@ -179,14 +181,14 @@ export function BlockCard({
       }}
       onClick={() => {
         handleBlockFocus();
-        setTypeMenuOpen(false);
+        setTypeMenuAnchor(null);
         setContextMenuPosition(null);
         onMenuClose();
       }}
       onContextMenu={(event) => {
         event.preventDefault();
         handleBlockFocus();
-        setTypeMenuOpen(false);
+        setTypeMenuAnchor(null);
         onMenuClose();
         setContextMenuPosition({ x: event.clientX, y: event.clientY });
       }}
@@ -194,7 +196,8 @@ export function BlockCard({
         if (event.key === '/' && isEmpty) {
           event.preventDefault();
           onMenuClose();
-          setTypeMenuOpen(true);
+          const rect = blockCardRef.current?.getBoundingClientRect();
+          if (rect) setTypeMenuAnchor(rect);
         }
       }}
     >
@@ -213,11 +216,8 @@ export function BlockCard({
       </div>
 
       {block.kind === 'markdown' || block.kind === 'text' ? (
-        <span
-          className="block-kind-badge"
-          style={{ opacity: isSelected || isMenuOpen || contextMenuPosition != null ? 1 : 0 }}
-        >
-          {block.kind === 'markdown' ? 'Markdown' : 'Plain Text'}
+        <span className="block-kind-badge">
+          {block.kind === 'markdown' ? 'Markdown' : 'Text'}
         </span>
       ) : null}
 
@@ -229,10 +229,11 @@ export function BlockCard({
         />
       ) : null}
 
-      {isTypeMenuOpen ? (
+      {typeMenuAnchor ? (
         <TypeMenu
+          anchorRect={typeMenuAnchor}
           onSelect={(kind) => void handleTypeChange(kind)}
-          onClose={() => setTypeMenuOpen(false)}
+          onClose={() => setTypeMenuAnchor(null)}
         />
       ) : null}
       {isMenuOpen ? (

@@ -26,7 +26,7 @@ export const BLOCK_KIND_OPTIONS: Array<{
   },
   {
     kind: 'text',
-    label: 'Plain Text',
+    label: 'Text',
     icon: FileText,
   },
 ];
