@@ -255,13 +255,26 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
 
             if (event.key === 'Tab') {
               event.preventDefault();
-              const tab = '  ';
-              const nextValue = `${val.slice(0, selectionStart)}${tab}${val.slice(selectionEnd)}`;
-              const nextCaret = selectionStart + tab.length;
-              textarea.value = nextValue;
-              textarea.setSelectionRange(nextCaret, nextCaret);
-              emitChange(nextValue);
-              syncTextareaHeight(textarea);
+              const TAB = '    ';
+              if (event.shiftKey) {
+                const lineStart = getLineStart(val, selectionStart);
+                const linePrefix = val.slice(lineStart, selectionStart);
+                const removeCount = Math.min(TAB.length, linePrefix.length - linePrefix.trimStart().length);
+                if (removeCount > 0) {
+                  const nextValue = `${val.slice(0, lineStart)}${val.slice(lineStart + removeCount)}`;
+                  textarea.value = nextValue;
+                  textarea.setSelectionRange(selectionStart - removeCount, selectionEnd - removeCount);
+                  emitChange(nextValue);
+                  syncTextareaHeight(textarea);
+                }
+              } else {
+                const nextValue = `${val.slice(0, selectionStart)}${TAB}${val.slice(selectionEnd)}`;
+                const nextCaret = selectionStart + TAB.length;
+                textarea.value = nextValue;
+                textarea.setSelectionRange(nextCaret, nextCaret);
+                emitChange(nextValue);
+                syncTextareaHeight(textarea);
+              }
               return;
             }
 
