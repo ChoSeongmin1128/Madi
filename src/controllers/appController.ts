@@ -17,6 +17,7 @@ export {
   copySelectedBlocks,
   copySingleBlock,
   deleteSelectedBlocks,
+  hasBlockDataInClipboard,
   pasteBlocks,
 } from './blockController';
 export {

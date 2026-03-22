@@ -245,6 +245,12 @@ export function updateTextBlock(blockId: string, content: string) {
 const BLOCK_CLIPBOARD_PREFIX = '<!--minnote-block:';
 const BLOCK_CLIPBOARD_SUFFIX = '-->';
 
+let hasBlockClipboard = false;
+
+export function hasBlockDataInClipboard() {
+  return hasBlockClipboard;
+}
+
 interface ClipboardBlockData {
   kind: BlockKind;
   content: string;
@@ -281,6 +287,7 @@ export async function copySelectedBlocks() {
     language: b.kind === 'code' ? b.language : null,
   }));
 
+  hasBlockClipboard = true;
   await navigator.clipboard.writeText(encodeBlockClipboard(blockData));
 }
 
@@ -301,10 +308,12 @@ export async function copySingleBlock(blockId: string) {
     language: block.kind === 'code' ? block.language : null,
   }];
 
+  hasBlockClipboard = true;
   await navigator.clipboard.writeText(encodeBlockClipboard(blockData));
 }
 
 export async function pasteBlocks() {
+  hasBlockClipboard = false;
   try {
     const currentDocument = getCurrentDocument();
     if (!currentDocument) {
@@ -329,45 +338,44 @@ export async function pasteBlocks() {
     let afterBlockId = selectedBlockId ?? currentDocument.blocks.at(-1)?.id ?? null;
     let firstNewBlockId: string | null = null;
 
-    // 첫 번째 블록: 비어있으면 덮어쓰기
+    async function writeBlockContent(blockId: string, data: ClipboardBlockData) {
+      if (data.kind === 'markdown') {
+        await desktopApi.updateMarkdownBlock(blockId, data.content);
+      } else if (data.kind === 'text') {
+        await desktopApi.updateTextBlock(blockId, data.content);
+      } else if (data.kind === 'code') {
+        await desktopApi.updateCodeBlock(blockId, data.content, data.language ?? null);
+      }
+    }
+
+    // 첫 번째 블록: 비어있으면 덮어쓰기, 아니면 아래에 삽입
     const firstData = blocksToInsert[0];
     if (isSelectedEmpty && selectedBlock && firstData) {
       if (firstData.kind !== selectedBlock.kind) {
         await desktopApi.changeBlockKind(selectedBlock.id, firstData.kind);
       }
-      if (firstData.kind === 'markdown' || firstData.kind === 'text') {
-        await desktopApi.updateMarkdownBlock(selectedBlock.id, firstData.content);
-      } else if (firstData.kind === 'code') {
-        await desktopApi.updateCodeBlock(selectedBlock.id, firstData.content, firstData.language ?? null);
-      }
+      await writeBlockContent(selectedBlock.id, firstData);
       firstNewBlockId = selectedBlock.id;
       afterBlockId = selectedBlock.id;
     } else if (firstData) {
       const doc = toDocumentVm(await desktopApi.createBlockBelow(currentDocument.id, afterBlockId, firstData.kind));
       const created = doc.blocks.find((b) => !currentDocument.blocks.some((ob) => ob.id === b.id));
       if (created) {
-        if (firstData.kind === 'markdown' || firstData.kind === 'text') {
-          await desktopApi.updateMarkdownBlock(created.id, firstData.content);
-        } else if (firstData.kind === 'code') {
-          await desktopApi.updateCodeBlock(created.id, firstData.content, firstData.language ?? null);
-        }
-        firstNewBlockId = firstNewBlockId ?? created.id;
+        await writeBlockContent(created.id, firstData);
+        firstNewBlockId = created.id;
         afterBlockId = created.id;
       }
+      updateTouchedDocument(doc);
     }
 
-    // 나머지 블록: 아래에 추가
+    // 나머지 블록: 아래에 순서대로 추가
     for (const data of blocksToInsert.slice(1)) {
       const latestDoc = getCurrentDocument();
       if (!latestDoc) break;
       const doc = toDocumentVm(await desktopApi.createBlockBelow(latestDoc.id, afterBlockId, data.kind));
       const created = doc.blocks.find((b) => !latestDoc.blocks.some((ob) => ob.id === b.id));
       if (created) {
-        if (data.kind === 'markdown' || data.kind === 'text') {
-          await desktopApi.updateMarkdownBlock(created.id, data.content);
-        } else if (data.kind === 'code') {
-          await desktopApi.updateCodeBlock(created.id, data.content, data.language ?? null);
-        }
+        await writeBlockContent(created.id, data);
         firstNewBlockId = firstNewBlockId ?? created.id;
         afterBlockId = created.id;
       }

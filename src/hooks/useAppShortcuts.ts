@@ -5,6 +5,7 @@ import {
   deleteBlock,
   deleteSelectedBlocks,
   flushCurrentDocument,
+  hasBlockDataInClipboard,
   pasteBlocks,
 } from '../controllers/appController';
 import { useDocumentSessionStore } from '../stores/documentSessionStore';
@@ -113,8 +114,8 @@ export function useAppShortcuts() {
         return;
       }
 
-      // 붙여넣기: 에디터 밖이거나 블록 선택 상태면 블록 붙여넣기 시도
-      if (event.key.toLowerCase() === 'v' && (allBlocksSelected || blockSelected || !isEditableTarget(event.target))) {
+      // 붙여넣기: 블록 데이터가 있으면 블록 붙여넣기
+      if (event.key.toLowerCase() === 'v' && hasBlockDataInClipboard()) {
         event.preventDefault();
         void pasteBlocks();
       }
