@@ -55,11 +55,15 @@ export function DocumentCanvas() {
       if (selection) {
         selection.removeAllRanges();
       }
-      // textarea 내부 선택도 클리어
+      // textarea/contenteditable 내부 선택도 클리어
       const surface = blocksSelectionRef.current;
       if (surface) {
         for (const textarea of surface.querySelectorAll('textarea')) {
+          textarea.blur();
           textarea.setSelectionRange(0, 0);
+        }
+        for (const editable of surface.querySelectorAll<HTMLElement>('[contenteditable]')) {
+          editable.blur();
         }
       }
       return;
