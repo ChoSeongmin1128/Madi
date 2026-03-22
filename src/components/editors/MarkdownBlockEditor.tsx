@@ -55,7 +55,7 @@ export const MarkdownBlockEditor = forwardRef<BlockEditorHandle, MarkdownBlockEd
   const isApplyingRemoteContentRef = useRef(false);
   const isWholeBlockSelectedRef = useRef(false);
   const deleteReadyRef = useRef(false);
-  const lastSerializedMarkdownRef = useRef(normalizeMarkdownContent(content));
+  const lastSerializedMarkdownRef = useRef('');
   const resolvedTheme = useResolvedTheme(themeMode);
 
   const editor = useCreateBlockNote(

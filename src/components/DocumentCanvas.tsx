@@ -49,45 +49,17 @@ export function DocumentCanvas() {
     dragPreview == null ? null : blocks.find((block) => block.id === dragPreview.blockId) ?? null;
 
   useEffect(() => {
-    if (!allBlocksSelected) {
-      // 전체 선택 해제 시 남아있는 selection 클리어
-      const selection = window.getSelection();
-      if (selection) {
-        selection.removeAllRanges();
-      }
-      // textarea/contenteditable 내부 선택도 클리어
-      const surface = blocksSelectionRef.current;
-      if (surface) {
-        for (const textarea of surface.querySelectorAll('textarea')) {
-          textarea.blur();
-          textarea.setSelectionRange(0, 0);
-        }
-        for (const editable of surface.querySelectorAll<HTMLElement>('[contenteditable]')) {
-          editable.blur();
-        }
-      }
+    if (!allBlocksSelected && !blockSelected) {
       return;
     }
 
-    if (!blocksSelectionRef.current) {
-      return;
-    }
-
+    // 블록 선택 시 에디터에서 포커스 제거 (CSS로만 시각적 표시)
     const activeElement = document.activeElement;
     if (activeElement instanceof HTMLElement && activeElement.closest('.document-surface')) {
       activeElement.blur();
     }
-
-    const selection = window.getSelection();
-    if (!selection) {
-      return;
-    }
-
-    const range = document.createRange();
-    range.selectNodeContents(blocksSelectionRef.current);
-    selection.removeAllRanges();
-    selection.addRange(range);
-  }, [allBlocksSelected, currentDocument?.id, currentDocument?.blocks.length]);
+    window.getSelection()?.removeAllRanges();
+  }, [allBlocksSelected, blockSelected, currentDocument?.id, currentDocument?.blocks.length]);
 
   if (!currentDocument) {
     return (
