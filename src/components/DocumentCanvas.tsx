@@ -100,12 +100,24 @@ export function DocumentCanvas() {
     useDocumentSessionStore.getState().setSelectedBlockIds(ids);
   }, [surfaceRef]);
 
+  const getBlockIdAtPoint = useCallback((x: number, y: number): string | null => {
+    const surface = surfaceRef.current;
+    if (!surface) return null;
+    for (const card of surface.querySelectorAll<HTMLElement>('[data-block-card-id]')) {
+      const rect = card.getBoundingClientRect();
+      if (y >= rect.top && y <= rect.bottom && x >= rect.left && x <= rect.right) {
+        return card.getAttribute('data-block-card-id');
+      }
+    }
+    return null;
+  }, [surfaceRef]);
+
   const handleSurfaceMouseDown = useCallback((event: ReactMouseEvent) => {
     if (event.button !== 0) return;
     if ((event.target as HTMLElement).closest('.drag-handle, .block-actions, .code-language-anchor, .type-menu, .block-menu')) return;
 
     const startedInEditor = isEditableElement(event.target);
-    const originBlockId = getBlockIdFromEvent(event.target);
+    const originBlockId = getBlockIdAtPoint(event.clientX, event.clientY);
 
     const mq: MarqueeState = {
       startX: event.clientX,
@@ -138,11 +150,9 @@ export function DocumentCanvas() {
       if (!activated) {
         if (Math.abs(dx) + Math.abs(dy) < DRAG_THRESHOLD) return;
 
-        // 에디터 내부에서 시작했으면 블록 경계를 넘었는지 확인
         if (startedInEditor) {
-          const currentBlockId = getBlockIdFromEvent(e.target);
-          if (!currentBlockId || currentBlockId === originBlockId) return;
-          // 블록 경계를 넘음 → marquee 활성화
+          const currentBlockId = getBlockIdAtPoint(e.clientX, e.clientY);
+          if (currentBlockId === originBlockId) return;
           const activeEl = document.activeElement;
           if (activeEl instanceof HTMLElement) activeEl.blur();
           window.getSelection()?.removeAllRanges();
@@ -156,7 +166,6 @@ export function DocumentCanvas() {
       setMarquee({ ...mq });
       updateMarqueeSelection(mq);
 
-      // 자동 스크롤
       cancelAnimationFrame(scrollFrame);
       scrollFrame = requestAnimationFrame(() => autoScroll(e.clientY));
     };
@@ -170,7 +179,7 @@ export function DocumentCanvas() {
 
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseup', onMouseUp);
-  }, [updateMarqueeSelection, surfaceRef]);
+  }, [updateMarqueeSelection, surfaceRef, getBlockIdAtPoint]);
 
   if (!currentDocument) {
     return (
