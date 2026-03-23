@@ -62,3 +62,28 @@ export interface BlockRestoreDto {
   language: string | null;
   position: number;
 }
+
+export type ICloudSyncState = 'idle' | 'syncing' | 'error' | 'disabled';
+
+export interface ICloudSyncStatus {
+  state: ICloudSyncState;
+  lastSyncAt: number | null;
+  errorMessage: string | null;
+}
+
+// CloudKit에서 받은 원격 문서 (sidecar → frontend → Rust)
+export interface RemoteDocumentDto {
+  id: string;
+  title: string | null;
+  blockTintOverride: string | null;
+  blocksJson: string;
+  createdAt: number;
+  updatedAt: number;
+  deletedAt: number | null;
+}
+
+// sidecar → frontend 이벤트 메시지
+export type SyncEventMessage =
+  | { type: 'status'; state: string; lastSyncAt: number | null }
+  | { type: 'remote-changed'; documents: RemoteDocumentDto[] }
+  | { type: 'error'; message: string };

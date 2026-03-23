@@ -1,6 +1,6 @@
 use tauri::State;
 
-use crate::application::dto::{BlockDto, BlockRestoreDto, BootstrapPayload, DocumentDto, DocumentSummaryDto, SearchResultDto};
+use crate::application::dto::{BlockDto, BlockRestoreDto, BootstrapPayload, DocumentDto, DocumentSummaryDto, RemoteDocumentDto, SearchResultDto};
 use crate::application::services;
 use crate::domain::models::{BlockKind, BlockTintPreset, ThemeMode};
 use crate::error::AppError;
@@ -31,7 +31,9 @@ pub fn open_document(state: State<'_, AppState>, document_id: String) -> Result<
 
 #[tauri::command]
 pub fn create_document(state: State<'_, AppState>) -> Result<DocumentDto, String> {
-  with_repository(state, services::create_document)
+  let result = with_repository(state.clone(), services::create_document)?;
+  state.notify_sync_changed(&result.id);
+  Ok(result)
 }
 
 #[tauri::command]
@@ -40,17 +42,27 @@ pub fn rename_document(
   document_id: String,
   title: Option<String>,
 ) -> Result<DocumentDto, String> {
-  with_repository(state, |repository| services::rename_document(repository, &document_id, title))
+  let result = with_repository(state.clone(), |repository| {
+    services::rename_document(repository, &document_id, title)
+  })?;
+  state.notify_sync_changed(&result.id);
+  Ok(result)
 }
 
 #[tauri::command]
 pub fn delete_document(state: State<'_, AppState>, document_id: String) -> Result<BootstrapPayload, String> {
-  with_repository(state, |repository| services::delete_document(repository, &document_id))
+  let result = with_repository(state.clone(), |repository| {
+    services::delete_document(repository, &document_id)
+  })?;
+  state.notify_sync_deleted(&document_id);
+  Ok(result)
 }
 
 #[tauri::command]
 pub fn delete_all_documents(state: State<'_, AppState>) -> Result<BootstrapPayload, String> {
-  with_repository(state, services::delete_all_documents)
+  let result = with_repository(state.clone(), services::delete_all_documents)?;
+  state.notify_sync_reset();
+  Ok(result)
 }
 
 #[tauri::command]
@@ -65,9 +77,11 @@ pub fn create_block_below(
   after_block_id: Option<String>,
   kind: BlockKind,
 ) -> Result<DocumentDto, String> {
-  with_repository(state, |repository| {
+  let result = with_repository(state.clone(), |repository| {
     services::create_block_below(repository, &document_id, after_block_id.as_deref(), kind)
-  })
+  })?;
+  state.notify_sync_changed(&document_id);
+  Ok(result)
 }
 
 #[tauri::command]
@@ -76,7 +90,11 @@ pub fn change_block_kind(
   block_id: String,
   kind: BlockKind,
 ) -> Result<BlockDto, String> {
-  with_repository(state, |repository| services::change_block_kind(repository, &block_id, kind))
+  let result = with_repository(state.clone(), |repository| {
+    services::change_block_kind(repository, &block_id, kind)
+  })?;
+  state.notify_sync_changed(&result.document_id);
+  Ok(result)
 }
 
 #[tauri::command]
@@ -86,12 +104,20 @@ pub fn move_block(
   block_id: String,
   target_position: i64,
 ) -> Result<DocumentDto, String> {
-  with_repository(state, |repository| services::move_block(repository, &document_id, &block_id, target_position))
+  let result = with_repository(state.clone(), |repository| {
+    services::move_block(repository, &document_id, &block_id, target_position)
+  })?;
+  state.notify_sync_changed(&document_id);
+  Ok(result)
 }
 
 #[tauri::command]
 pub fn delete_block(state: State<'_, AppState>, block_id: String) -> Result<DocumentDto, String> {
-  with_repository(state, |repository| services::delete_block(repository, &block_id))
+  let result = with_repository(state.clone(), |repository| {
+    services::delete_block(repository, &block_id)
+  })?;
+  state.notify_sync_changed(&result.id);
+  Ok(result)
 }
 
 #[tauri::command]
@@ -124,7 +150,11 @@ pub fn update_text_block(
 
 #[tauri::command]
 pub fn flush_document(state: State<'_, AppState>, document_id: String) -> Result<i64, String> {
-  with_repository(state, |repository| services::flush_document(repository, &document_id))
+  let result = with_repository(state.clone(), |repository| {
+    services::flush_document(repository, &document_id)
+  })?;
+  state.notify_sync_changed(&document_id);
+  Ok(result)
 }
 
 #[tauri::command]
@@ -146,9 +176,11 @@ pub fn set_document_block_tint_override(
   document_id: String,
   block_tint_override: Option<BlockTintPreset>,
 ) -> Result<DocumentDto, String> {
-  with_repository(state, |repository| {
+  let result = with_repository(state.clone(), |repository| {
     services::set_document_block_tint_override(repository, &document_id, block_tint_override)
-  })
+  })?;
+  state.notify_sync_changed(&document_id);
+  Ok(result)
 }
 
 #[tauri::command]
@@ -157,9 +189,11 @@ pub fn restore_document_blocks(
   document_id: String,
   blocks: Vec<BlockRestoreDto>,
 ) -> Result<DocumentDto, String> {
-  with_repository(state, |repository| {
+  let result = with_repository(state.clone(), |repository| {
     services::restore_document_blocks(repository, &document_id, blocks)
-  })
+  })?;
+  state.notify_sync_changed(&document_id);
+  Ok(result)
 }
 
 #[tauri::command]
@@ -172,7 +206,45 @@ pub fn restore_document_from_trash(
   state: State<'_, AppState>,
   document_id: String,
 ) -> Result<BootstrapPayload, String> {
-  with_repository(state, |repository| {
+  let result = with_repository(state.clone(), |repository| {
     services::restore_document_from_trash(repository, &document_id)
+  })?;
+  state.notify_sync_changed(&document_id);
+  Ok(result)
+}
+
+#[tauri::command]
+pub fn set_icloud_sync_enabled(
+  state: State<'_, AppState>,
+  app_handle: tauri::AppHandle,
+  enabled: bool,
+) -> Result<bool, String> {
+  with_repository(state.clone(), |repository| {
+    services::set_icloud_sync_enabled(repository, enabled)
+  })?;
+
+  let mut sync = state
+    .sync_manager
+    .lock()
+    .map_err(|_| "sync manager lock failed".to_string())?;
+
+  if enabled {
+    let db_path = state.db_path.to_str().unwrap_or_default().to_string();
+    let state_path = state.sync_state_path.to_str().unwrap_or_default().to_string();
+    sync.start(&app_handle, &db_path, &state_path)?;
+  } else {
+    sync.stop();
+  }
+
+  Ok(enabled)
+}
+
+#[tauri::command]
+pub fn apply_remote_documents(
+  state: State<'_, AppState>,
+  documents: Vec<RemoteDocumentDto>,
+) -> Result<BootstrapPayload, String> {
+  with_repository(state, |repository| {
+    services::apply_remote_documents(repository, documents)
   })
 }

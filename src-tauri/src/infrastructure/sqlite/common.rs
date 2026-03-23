@@ -117,7 +117,7 @@ impl SqliteStore {
     let now = Self::now();
     if update_opened_at {
       self.connection.execute(
-        "UPDATE documents SET updated_at = ?1, last_opened_at = ?1 WHERE id = ?2",
+        "UPDATE documents SET last_opened_at = ?1 WHERE id = ?2",
         params![now, document_id],
       )?;
     } else {

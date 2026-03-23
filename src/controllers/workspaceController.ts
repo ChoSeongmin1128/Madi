@@ -88,6 +88,21 @@ export async function setDefaultBlockTintPreset(preset: BlockTintPreset) {
   }
 }
 
+export async function setIcloudSyncEnabled(enabled: boolean) {
+  try {
+    const result = await desktopApi.setIcloudSyncEnabled(enabled);
+    clearError();
+    useWorkspaceStore.getState().setIcloudSyncEnabled(result);
+    useWorkspaceStore.getState().setIcloudSyncStatus({
+      state: result ? 'idle' : 'disabled',
+      lastSyncAt: null,
+      errorMessage: null,
+    });
+  } catch (error) {
+    reportWorkspaceError(error, 'iCloud 동기화 설정을 변경하지 못했습니다.');
+  }
+}
+
 export async function deleteAllDocuments() {
   try {
     const payload = await desktopApi.deleteAllDocuments();

@@ -1,6 +1,6 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::application::dto::{BlockDto, BlockRestoreDto, BootstrapPayload, DocumentDto, DocumentSummaryDto, SearchResultDto};
+use crate::application::dto::{BlockDto, BlockRestoreDto, BootstrapPayload, DocumentDto, DocumentSummaryDto, RemoteBlockJson, RemoteDocumentDto, SearchResultDto};
 use crate::domain::models::{BlockKind, BlockTintPreset, ThemeMode};
 use crate::error::AppError;
 use crate::ports::repositories::AppRepository;
@@ -272,6 +272,60 @@ pub fn restore_document_blocks(
 ) -> Result<DocumentDto, AppError> {
   repository.restore_blocks(document_id, &blocks)?;
   hydrate_document(repository, document_id, None)
+}
+
+pub fn set_icloud_sync_enabled(
+  repository: &mut impl AppRepository,
+  enabled: bool,
+) -> Result<bool, AppError> {
+  repository.set_icloud_sync_enabled(enabled)?;
+  Ok(enabled)
+}
+
+pub fn apply_remote_documents(
+  repository: &mut impl AppRepository,
+  documents: Vec<RemoteDocumentDto>,
+) -> Result<BootstrapPayload, AppError> {
+  for remote in documents {
+    let block_tint = remote
+      .block_tint_override
+      .as_deref()
+      .map(crate::domain::models::BlockTintPreset::from_str);
+
+    let document = repository.upsert_document_from_remote(
+      &remote.id,
+      remote.title,
+      block_tint,
+      remote.created_at,
+      remote.updated_at,
+      remote.deleted_at,
+    )?;
+
+    // deleted_at이 없는 문서만 블록을 복원
+    if document.deleted_at.is_none() {
+      let remote_blocks: Vec<RemoteBlockJson> =
+        serde_json::from_str(&remote.blocks_json).unwrap_or_default();
+
+      let restore_dtos: Vec<BlockRestoreDto> = remote_blocks
+        .into_iter()
+        .map(|b| BlockRestoreDto {
+          id: b.id,
+          kind: crate::domain::models::BlockKind::from_str(&b.kind),
+          content: b.content,
+          language: b.language,
+          position: b.position,
+        })
+        .collect();
+
+      if !restore_dtos.is_empty() {
+        repository.restore_blocks(&remote.id, &restore_dtos)?;
+      }
+
+      repository.rebuild_search_index_for_document(&remote.id)?;
+    }
+  }
+
+  bootstrap_app(repository)
 }
 
 fn hydrate_document(

@@ -56,8 +56,22 @@ pub trait AppStateRepository {
   fn get_app_settings(&self) -> Result<AppSettings, AppError>;
   fn set_theme_mode(&mut self, theme_mode: ThemeMode) -> Result<(), AppError>;
   fn set_default_block_tint_preset(&mut self, preset: BlockTintPreset) -> Result<(), AppError>;
+  fn set_icloud_sync_enabled(&mut self, enabled: bool) -> Result<(), AppError>;
 }
 
-pub trait AppRepository: DocumentRepository + BlockRepository + AppStateRepository {}
+pub trait RemoteSyncRepository {
+  fn upsert_document_from_remote(
+    &mut self,
+    id: &str,
+    title: Option<String>,
+    block_tint_override: Option<crate::domain::models::BlockTintPreset>,
+    created_at: i64,
+    updated_at: i64,
+    deleted_at: Option<i64>,
+  ) -> Result<crate::domain::models::Document, AppError>;
+  fn rebuild_search_index_for_document(&self, document_id: &str) -> Result<(), AppError>;
+}
 
-impl<T> AppRepository for T where T: DocumentRepository + BlockRepository + AppStateRepository {}
+pub trait AppRepository: DocumentRepository + BlockRepository + AppStateRepository + RemoteSyncRepository {}
+
+impl<T> AppRepository for T where T: DocumentRepository + BlockRepository + AppStateRepository + RemoteSyncRepository {}

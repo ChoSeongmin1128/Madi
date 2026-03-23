@@ -7,6 +7,7 @@ import type {
   BootstrapPayload,
   DocumentDto,
   DocumentSummaryDto,
+  RemoteDocumentDto,
   SearchResultDto,
   ThemeMode,
 } from './types';
@@ -113,5 +114,11 @@ export const desktopApi = {
   },
   restoreDocumentFromTrash(documentId: string) {
     return call<BootstrapPayload>('restore_document_from_trash', { documentId });
+  },
+  setIcloudSyncEnabled(enabled: boolean) {
+    return call<boolean>('set_icloud_sync_enabled', { enabled });
+  },
+  applyRemoteDocuments(documents: RemoteDocumentDto[]) {
+    return call<BootstrapPayload>('apply_remote_documents', { documents });
   },
 };

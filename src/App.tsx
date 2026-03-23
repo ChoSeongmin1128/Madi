@@ -5,6 +5,7 @@ import { DocumentCanvas } from './components/DocumentCanvas';
 import { SettingsModal } from './components/SettingsModal';
 import { bootstrapApp, createDocument } from './controllers/appController';
 import { useAppShortcuts } from './hooks/useAppShortcuts';
+import { useSyncEventListener } from './hooks/useSyncEventListener';
 import { useWorkspaceStore } from './stores/workspaceStore';
 import { useDocumentSessionStore } from './stores/documentSessionStore';
 
@@ -37,6 +38,7 @@ function App() {
   const setSidebarOpen = useWorkspaceStore((state) => state.setSidebarOpen);
 
   useAppShortcuts();
+  useSyncEventListener();
 
   useEffect(() => {
     void bootstrapApp();

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { BlockTintPreset, ThemeMode } from '../lib/types';
+import type { BlockTintPreset, ICloudSyncStatus, ThemeMode } from '../lib/types';
 import type { DocumentSummaryVm, SearchResultVm } from '../adapters/documentAdapter';
 import type { CodeLanguageId } from '../lib/blockOptions';
 
@@ -13,6 +13,7 @@ interface WorkspaceState {
   defaultBlockTintPreset: BlockTintPreset;
   themeMode: ThemeMode;
   icloudSyncEnabled: boolean;
+  icloudSyncStatus: ICloudSyncStatus;
   isSettingsOpen: boolean;
   isSidebarOpen: boolean;
   lastCodeLanguage: CodeLanguageId;
@@ -27,6 +28,7 @@ interface WorkspaceState {
   setDefaultBlockTintPreset: (preset: BlockTintPreset) => void;
   setThemeMode: (themeMode: ThemeMode) => void;
   setIcloudSyncEnabled: (value: boolean) => void;
+  setIcloudSyncStatus: (status: ICloudSyncStatus) => void;
   setSettingsOpen: (isOpen: boolean) => void;
   setSidebarOpen: (isOpen: boolean) => void;
   setLastCodeLanguage: (language: CodeLanguageId) => void;
@@ -46,6 +48,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   defaultBlockTintPreset: 'mist',
   themeMode: 'system',
   icloudSyncEnabled: false,
+  icloudSyncStatus: { state: 'disabled', lastSyncAt: null, errorMessage: null },
   isSettingsOpen: false,
   isSidebarOpen: false,
   lastCodeLanguage: 'javascript' as CodeLanguageId,
@@ -70,6 +73,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   setDefaultBlockTintPreset: (defaultBlockTintPreset) => set({ defaultBlockTintPreset }),
   setThemeMode: (themeMode) => set({ themeMode }),
   setIcloudSyncEnabled: (icloudSyncEnabled) => set({ icloudSyncEnabled }),
+  setIcloudSyncStatus: (icloudSyncStatus) => set({ icloudSyncStatus }),
   setSettingsOpen: (isSettingsOpen) => set({ isSettingsOpen }),
   setSidebarOpen: (isSidebarOpen) => set({ isSidebarOpen }),
   setLastCodeLanguage: (lastCodeLanguage) => set({ lastCodeLanguage }),

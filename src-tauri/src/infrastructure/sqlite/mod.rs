@@ -8,12 +8,13 @@ use crate::domain::models::{
   AppSettings, Block, BlockKind, BlockTintPreset, Document, DocumentSummary, SearchResult, ThemeMode,
 };
 use crate::error::AppError;
-use crate::ports::repositories::{AppStateRepository, BlockRepository, DocumentRepository};
+use crate::ports::repositories::{AppStateRepository, BlockRepository, DocumentRepository, RemoteSyncRepository};
 
 mod app_state;
 mod blocks;
 mod common;
 mod documents;
+mod remote_sync;
 mod schema;
 mod search;
 

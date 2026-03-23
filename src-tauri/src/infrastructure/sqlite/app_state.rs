@@ -40,4 +40,9 @@ impl AppStateRepository for SqliteStore {
     self.set_state_value("default_block_tint_preset", preset.as_str())?;
     Ok(())
   }
+
+  fn set_icloud_sync_enabled(&mut self, enabled: bool) -> Result<(), AppError> {
+    self.set_state_value("icloud_sync_enabled", if enabled { "true" } else { "false" })?;
+    Ok(())
+  }
 }

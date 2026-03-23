@@ -69,6 +69,30 @@ pub struct BlockRestoreDto {
   pub position: i64,
 }
 
+// CloudKit에서 받은 원격 문서 (sidecar → Tauri)
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteDocumentDto {
+  pub id: String,
+  pub title: Option<String>,
+  pub block_tint_override: Option<String>,
+  pub blocks_json: String,
+  pub created_at: i64,
+  pub updated_at: i64,
+  pub deleted_at: Option<i64>,
+}
+
+// blocks_json 내부 블록 항목 (JSON 파싱용)
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoteBlockJson {
+  pub id: String,
+  pub kind: String,
+  pub content: String,
+  pub language: Option<String>,
+  pub position: i64,
+}
+
 impl TryFrom<Block> for BlockDto {
   type Error = AppError;
 

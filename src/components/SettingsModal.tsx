@@ -5,6 +5,7 @@ import { BLOCK_TINT_PRESETS } from '../lib/blockTint';
 import {
   deleteAllDocuments,
   setDefaultBlockTintPreset,
+  setIcloudSyncEnabled,
   setThemeMode,
 } from '../controllers/appController';
 import type { ThemeMode } from '../lib/types';
@@ -25,6 +26,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const themeMode = useWorkspaceStore((state) => state.themeMode);
   const defaultBlockTintPreset = useWorkspaceStore((state) => state.defaultBlockTintPreset);
   const icloudSyncEnabled = useWorkspaceStore((state) => state.icloudSyncEnabled);
+  const icloudSyncStatus = useWorkspaceStore((state) => state.icloudSyncStatus);
   const [isConfirmOpen, setConfirmOpen] = useState(false);
 
   if (!isOpen) {
@@ -95,11 +97,35 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         <div className="settings-section">
           <div className="settings-section-header">
             <span className="settings-section-title">iCloud 동기화</span>
-            <span className="document-menu-option-description">향후 선택적으로 켤 수 있도록 구조만 준비된 상태입니다.</span>
+            <span className="document-menu-option-description">
+              {icloudSyncEnabled
+                ? icloudSyncStatus.state === 'syncing'
+                  ? '동기화 중...'
+                  : icloudSyncStatus.lastSyncAt
+                    ? `마지막 동기화: ${new Date(icloudSyncStatus.lastSyncAt).toLocaleString('ko-KR')}`
+                    : '대기 중'
+                : 'iCloud를 통해 모든 기기에서 노트를 동기화합니다.'}
+            </span>
           </div>
-          <button className="settings-segmented-option" type="button" disabled>
-            {icloudSyncEnabled ? '켜짐' : '꺼짐'}
-          </button>
+          <div className="settings-segmented">
+            <button
+              className={`settings-segmented-option${!icloudSyncEnabled ? ' is-active' : ''}`}
+              type="button"
+              onClick={() => void setIcloudSyncEnabled(false)}
+            >
+              꺼짐
+            </button>
+            <button
+              className={`settings-segmented-option${icloudSyncEnabled ? ' is-active' : ''}`}
+              type="button"
+              onClick={() => void setIcloudSyncEnabled(true)}
+            >
+              켜짐
+            </button>
+          </div>
+          {icloudSyncStatus.state === 'error' && icloudSyncStatus.errorMessage && (
+            <span className="settings-error-message">{icloudSyncStatus.errorMessage}</span>
+          )}
         </div>
 
         <div className="settings-section danger-zone">
