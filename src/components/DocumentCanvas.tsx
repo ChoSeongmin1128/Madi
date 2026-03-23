@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import { BlockCard } from './BlockCard';
 import { BlockGhostPreview } from './BlockGhostPreview';
 import { DocumentMenu } from './DocumentMenu';
@@ -29,10 +29,18 @@ function DocumentTitleInput({ title }: { title: string | null }) {
   );
 }
 
-function getBlockIdFromEvent(target: EventTarget | null): string | null {
-  if (!(target instanceof HTMLElement)) return null;
-  const card = target.closest('[data-block-card-id]');
-  return card?.getAttribute('data-block-card-id') ?? null;
+function isEditableElement(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return Boolean(
+    target.closest('input, textarea, [contenteditable="true"], [contenteditable=""], .ProseMirror'),
+  );
+}
+
+interface MarqueeState {
+  startX: number;
+  startY: number;
+  currentX: number;
+  currentY: number;
 }
 
 export function DocumentCanvas() {
@@ -43,7 +51,7 @@ export function DocumentCanvas() {
   const allBlocksSelected = useDocumentSessionStore((state) => state.allBlocksSelected);
   const defaultBlockTintPreset = useWorkspaceStore((state) => state.defaultBlockTintPreset);
   const blocksSelectionRef = useRef<HTMLDivElement | null>(null);
-  const dragSelectStartRef = useRef<string | null>(null);
+  const [marquee, setMarquee] = useState<MarqueeState | null>(null);
 
   const blocks = useMemo(() => currentDocument?.blocks ?? [], [currentDocument?.blocks]);
   const blockTintPreset = currentDocument?.blockTintOverride ?? defaultBlockTintPreset;
@@ -57,17 +65,77 @@ export function DocumentCanvas() {
     dragPreview == null ? null : blocks.find((block) => block.id === dragPreview.blockId) ?? null;
 
   useEffect(() => {
-    if (!allBlocksSelected && !blockSelected) {
+    if (!allBlocksSelected && !blockSelected && selectedBlockIds.length === 0) {
       return;
     }
 
-    // 블록 선택 시 에디터에서 포커스 제거 (CSS로만 시각적 표시)
     const activeElement = document.activeElement;
     if (activeElement instanceof HTMLElement && activeElement.closest('.document-surface')) {
       activeElement.blur();
     }
     window.getSelection()?.removeAllRanges();
-  }, [allBlocksSelected, blockSelected, currentDocument?.id, currentDocument?.blocks.length]);
+  }, [allBlocksSelected, blockSelected, selectedBlockIds.length, currentDocument?.id]);
+
+  // Marquee 선택: 블록과 교차하는 영역 계산
+  const updateMarqueeSelection = useCallback((mq: MarqueeState) => {
+    const surface = surfaceRef.current;
+    if (!surface) return;
+
+    const left = Math.min(mq.startX, mq.currentX);
+    const top = Math.min(mq.startY, mq.currentY);
+    const right = Math.max(mq.startX, mq.currentX);
+    const bottom = Math.max(mq.startY, mq.currentY);
+
+    const ids: string[] = [];
+    for (const card of surface.querySelectorAll<HTMLElement>('[data-block-card-id]')) {
+      const rect = card.getBoundingClientRect();
+      const intersects = rect.bottom > top && rect.top < bottom && rect.right > left && rect.left < right;
+      if (intersects) {
+        const id = card.getAttribute('data-block-card-id');
+        if (id) ids.push(id);
+      }
+    }
+
+    useDocumentSessionStore.getState().setSelectedBlockIds(ids);
+  }, [surfaceRef]);
+
+  const handleSurfaceMouseDown = useCallback((event: ReactMouseEvent) => {
+    if (event.button !== 0 || isEditableElement(event.target)) return;
+    // grip 핸들 드래그는 무시
+    if ((event.target as HTMLElement).closest('.drag-handle')) return;
+
+    const mq: MarqueeState = {
+      startX: event.clientX,
+      startY: event.clientY,
+      currentX: event.clientX,
+      currentY: event.clientY,
+    };
+
+    const DRAG_THRESHOLD = 5;
+    let activated = false;
+
+    const onMouseMove = (e: MouseEvent) => {
+      const dx = e.clientX - mq.startX;
+      const dy = e.clientY - mq.startY;
+
+      if (!activated && Math.abs(dx) + Math.abs(dy) < DRAG_THRESHOLD) return;
+      activated = true;
+
+      mq.currentX = e.clientX;
+      mq.currentY = e.clientY;
+      setMarquee({ ...mq });
+      updateMarqueeSelection(mq);
+    };
+
+    const onMouseUp = () => {
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      setMarquee(null);
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  }, [updateMarqueeSelection]);
 
   if (!currentDocument) {
     return (
@@ -78,40 +146,20 @@ export function DocumentCanvas() {
     );
   }
 
+  const marqueeStyle = marquee ? {
+    left: Math.min(marquee.startX, marquee.currentX),
+    top: Math.min(marquee.startY, marquee.currentY),
+    width: Math.abs(marquee.currentX - marquee.startX),
+    height: Math.abs(marquee.currentY - marquee.startY),
+  } : null;
+
   return (
     <section className="document-canvas">
       <div
         ref={surfaceRef}
         className="document-surface"
         data-block-preset={blockTintPreset}
-        onMouseDown={(event) => {
-          if (event.button !== 0) return;
-          const blockId = getBlockIdFromEvent(event.target);
-          if (blockId) {
-            dragSelectStartRef.current = blockId;
-          }
-        }}
-        onMouseMove={(event) => {
-          if (event.buttons !== 1 || !dragSelectStartRef.current) return;
-          const currentBlockId = getBlockIdFromEvent(event.target);
-          if (!currentBlockId || currentBlockId === dragSelectStartRef.current) {
-            if (selectedBlockIds.length > 0) {
-              useDocumentSessionStore.getState().setSelectedBlockIds([]);
-            }
-            return;
-          }
-          // 두 블록 사이의 모든 블록을 선택
-          const startIdx = blocks.findIndex((b) => b.id === dragSelectStartRef.current);
-          const endIdx = blocks.findIndex((b) => b.id === currentBlockId);
-          if (startIdx < 0 || endIdx < 0) return;
-          const from = Math.min(startIdx, endIdx);
-          const to = Math.max(startIdx, endIdx);
-          const ids = blocks.slice(from, to + 1).map((b) => b.id);
-          useDocumentSessionStore.getState().setSelectedBlockIds(ids);
-        }}
-        onMouseUp={() => {
-          dragSelectStartRef.current = null;
-        }}
+        onMouseDown={handleSurfaceMouseDown}
       >
         <div className="document-head">
           <DocumentTitleInput key={`${currentDocument.id}:${currentDocument.title ?? ''}`} title={currentDocument.title} />
@@ -146,6 +194,11 @@ export function DocumentCanvas() {
           ))}
         </div>
       </div>
+
+      {marqueeStyle ? (
+        <div className="marquee-selection" style={marqueeStyle} />
+      ) : null}
+
       {dragState && dragPreview && activePreviewBlock ? (
         <div
           className="drag-preview"

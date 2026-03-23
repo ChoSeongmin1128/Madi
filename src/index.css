@@ -325,6 +325,15 @@ button {
   box-shadow: 0 0 0 3px color-mix(in srgb, Highlight 14%, transparent);
 }
 
+.marquee-selection {
+  position: fixed;
+  z-index: 50;
+  border: 1.5px solid color-mix(in srgb, Highlight 50%, transparent);
+  border-radius: 4px;
+  background: color-mix(in srgb, Highlight 10%, transparent);
+  pointer-events: none;
+}
+
 .drag-preview {
   position: fixed;
   top: 0;
