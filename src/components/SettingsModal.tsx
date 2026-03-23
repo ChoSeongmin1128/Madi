@@ -5,7 +5,6 @@ import { BLOCK_TINT_PRESETS } from '../lib/blockTint';
 import {
   deleteAllDocuments,
   setDefaultBlockTintPreset,
-  setIcloudSyncEnabled,
   setThemeMode,
 } from '../controllers/appController';
 import type { ThemeMode } from '../lib/types';
@@ -26,8 +25,6 @@ interface SettingsModalProps {
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const themeMode = useWorkspaceStore((state) => state.themeMode);
   const defaultBlockTintPreset = useWorkspaceStore((state) => state.defaultBlockTintPreset);
-  const icloudSyncEnabled = useWorkspaceStore((state) => state.icloudSyncEnabled);
-  const icloudSyncStatus = useWorkspaceStore((state) => state.icloudSyncStatus);
   const [isConfirmOpen, setConfirmOpen] = useState(false);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>({ state: 'idle' });
   const installerRef = useRef<{ install(): Promise<void>; relaunch(): Promise<void> } | null>(null);
