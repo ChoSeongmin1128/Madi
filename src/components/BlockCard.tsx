@@ -1,4 +1,4 @@
-import { GripVertical } from 'lucide-react';
+import { Copy, GripVertical, Trash2 } from 'lucide-react';
 import {
   Suspense,
   useCallback,
@@ -11,6 +11,7 @@ import {
 import type { BlockVm } from '../adapters/documentAdapter';
 import {
   changeBlockKind,
+  copySingleBlock,
   createBlockBelow,
   deleteBlock,
   updateCodeBlock,
@@ -215,6 +216,30 @@ export function BlockCard({
             <GripVertical size={14} />
           </button>
         </div>
+      </div>
+
+      <div className="block-actions">
+        <button
+          type="button"
+          aria-label="블록 복사"
+          onClick={(event) => {
+            event.stopPropagation();
+            void copySingleBlock(block.id);
+          }}
+        >
+          <Copy size={14} />
+        </button>
+        <button
+          type="button"
+          className="is-danger"
+          aria-label="블록 삭제"
+          onClick={(event) => {
+            event.stopPropagation();
+            void deleteBlock(block.id);
+          }}
+        >
+          <Trash2 size={14} />
+        </button>
       </div>
 
       {block.kind === 'markdown' || block.kind === 'text' ? (

@@ -100,9 +100,11 @@ export function DocumentCanvas() {
   }, [surfaceRef]);
 
   const handleSurfaceMouseDown = useCallback((event: ReactMouseEvent) => {
-    if (event.button !== 0 || isEditableElement(event.target)) return;
-    // grip 핸들 드래그는 무시
-    if ((event.target as HTMLElement).closest('.drag-handle')) return;
+    if (event.button !== 0) return;
+    if ((event.target as HTMLElement).closest('.drag-handle, .block-actions, .code-language-anchor, .type-menu, .block-menu')) return;
+
+    const startedInEditor = isEditableElement(event.target);
+    const originBlockId = getBlockIdFromEvent(event.target);
 
     const mq: MarqueeState = {
       startX: event.clientX,
@@ -111,31 +113,63 @@ export function DocumentCanvas() {
       currentY: event.clientY,
     };
 
-    const DRAG_THRESHOLD = 5;
+    const DRAG_THRESHOLD = 8;
     let activated = false;
+    let scrollFrame = 0;
+
+    const canvas = surfaceRef.current?.closest('.document-canvas') as HTMLElement | null;
+
+    const autoScroll = (mouseY: number) => {
+      if (!canvas) return;
+      const rect = canvas.getBoundingClientRect();
+      const EDGE = 40;
+      if (mouseY < rect.top + EDGE) {
+        canvas.scrollTop -= Math.max(1, (EDGE - (mouseY - rect.top)) / 5);
+      } else if (mouseY > rect.bottom - EDGE) {
+        canvas.scrollTop += Math.max(1, (EDGE - (rect.bottom - mouseY)) / 5);
+      }
+    };
 
     const onMouseMove = (e: MouseEvent) => {
       const dx = e.clientX - mq.startX;
       const dy = e.clientY - mq.startY;
 
-      if (!activated && Math.abs(dx) + Math.abs(dy) < DRAG_THRESHOLD) return;
-      activated = true;
+      if (!activated) {
+        if (Math.abs(dx) + Math.abs(dy) < DRAG_THRESHOLD) return;
+
+        // 에디터 내부에서 시작했으면 블록 경계를 넘었는지 확인
+        if (startedInEditor) {
+          const currentBlockId = getBlockIdFromEvent(e.target);
+          if (!currentBlockId || currentBlockId === originBlockId) return;
+          // 블록 경계를 넘음 → marquee 활성화
+          const activeEl = document.activeElement;
+          if (activeEl instanceof HTMLElement) activeEl.blur();
+          window.getSelection()?.removeAllRanges();
+        }
+
+        activated = true;
+      }
 
       mq.currentX = e.clientX;
       mq.currentY = e.clientY;
       setMarquee({ ...mq });
       updateMarqueeSelection(mq);
+
+      // 자동 스크롤
+      cancelAnimationFrame(scrollFrame);
+      scrollFrame = requestAnimationFrame(() => autoScroll(e.clientY));
     };
 
     const onMouseUp = () => {
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseup', onMouseUp);
+      cancelAnimationFrame(scrollFrame);
       setMarquee(null);
     };
 
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseup', onMouseUp);
-  }, [updateMarqueeSelection]);
+  }, [updateMarqueeSelection, surfaceRef]);
 
   if (!currentDocument) {
     return (
