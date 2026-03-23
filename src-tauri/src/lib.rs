@@ -51,7 +51,8 @@ pub fn run() {
       commands::flush_document,
       commands::set_theme_mode,
       commands::set_default_block_tint_preset,
-      commands::set_document_block_tint_override
+      commands::set_document_block_tint_override,
+      commands::restore_document_blocks
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

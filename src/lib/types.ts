@@ -53,3 +53,11 @@ export interface BootstrapPayload {
 export interface SearchResultDto extends DocumentSummaryDto {
   score: number;
 }
+
+export interface BlockRestoreDto {
+  id: string;
+  kind: BlockKind;
+  content: string;
+  language: string | null;
+  position: number;
+}

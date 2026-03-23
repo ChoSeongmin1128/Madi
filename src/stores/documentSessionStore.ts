@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { DocumentVm } from '../adapters/documentAdapter';
+import type { BlockEditorHandle } from '../lib/editorHandle';
 import type { BlockCaretPlacement } from '../lib/types';
 
 export interface BlockFocusRequest {
@@ -17,6 +18,7 @@ interface DocumentSessionState {
   isFlushing: boolean;
   lastSavedAt: number | null;
   focusRequest: BlockFocusRequest | null;
+  activeEditorRef: { current: BlockEditorHandle | null } | null;
   setCurrentDocument: (document: DocumentVm | null) => void;
   setSelectedBlockId: (blockId: string | null) => void;
   setSelectedBlockIds: (blockIds: string[]) => void;
@@ -26,6 +28,7 @@ interface DocumentSessionState {
   setLastSavedAt: (value: number | null) => void;
   requestBlockFocus: (blockId: string, caret: BlockCaretPlacement) => void;
   setFocusRequest: (focusRequest: BlockFocusRequest | null) => void;
+  setActiveEditorRef: (ref: { current: BlockEditorHandle | null } | null) => void;
   focusPreviousBlock: (fromBlockId: string, caret?: BlockCaretPlacement) => void;
   focusNextBlock: (fromBlockId: string, caret?: BlockCaretPlacement) => void;
 }
@@ -38,6 +41,17 @@ function createFocusRequest(blockId: string, caret: BlockCaretPlacement): BlockF
   };
 }
 
+function normalizeSelectedBlockIds(document: DocumentVm | null, blockIds: string[]) {
+  if (!document) {
+    return [];
+  }
+
+  const requestedIds = new Set(blockIds);
+  return document.blocks
+    .map((block) => block.id)
+    .filter((blockId) => requestedIds.has(blockId));
+}
+
 export const useDocumentSessionStore = create<DocumentSessionState>((set, get) => ({
   currentDocument: null,
   selectedBlockId: null,
@@ -47,6 +61,7 @@ export const useDocumentSessionStore = create<DocumentSessionState>((set, get) =
   isFlushing: false,
   lastSavedAt: null,
   focusRequest: null,
+  activeEditorRef: null,
   setCurrentDocument: (currentDocument) =>
     set({
       currentDocument,
@@ -60,19 +75,39 @@ export const useDocumentSessionStore = create<DocumentSessionState>((set, get) =
       lastSavedAt: currentDocument?.updatedAt ?? null,
     }),
   setSelectedBlockId: (selectedBlockId) => set({ selectedBlockId, selectedBlockIds: [], blockSelected: false, allBlocksSelected: false }),
-  setSelectedBlockIds: (selectedBlockIds) => set({ selectedBlockIds, blockSelected: selectedBlockIds.length > 0, allBlocksSelected: false }),
-  setBlockSelected: (blockSelected) => set({ blockSelected, allBlocksSelected: false }),
-  setAllBlocksSelected: (allBlocksSelected) => set({ allBlocksSelected, selectedBlockIds: allBlocksSelected ? [] : get().selectedBlockIds }),
+  setSelectedBlockIds: (blockIds) => {
+    const normalizedIds = normalizeSelectedBlockIds(get().currentDocument, blockIds);
+    set({
+      selectedBlockId: normalizedIds[0] ?? null,
+      selectedBlockIds: normalizedIds,
+      blockSelected: normalizedIds.length > 0,
+      allBlocksSelected: false,
+    });
+  },
+  setBlockSelected: (blockSelected) =>
+    set({
+      blockSelected,
+      selectedBlockIds: blockSelected ? [] : get().selectedBlockIds,
+      allBlocksSelected: false,
+    }),
+  setAllBlocksSelected: (allBlocksSelected) =>
+    set({
+      allBlocksSelected,
+      selectedBlockIds: allBlocksSelected ? [] : get().selectedBlockIds,
+      blockSelected: allBlocksSelected ? false : get().blockSelected,
+    }),
   setIsFlushing: (isFlushing) => set({ isFlushing }),
   setLastSavedAt: (lastSavedAt) => set({ lastSavedAt }),
   requestBlockFocus: (blockId, caret) =>
     set({
       selectedBlockId: blockId,
       selectedBlockIds: [],
+      blockSelected: false,
       allBlocksSelected: false,
       focusRequest: createFocusRequest(blockId, caret),
     }),
   setFocusRequest: (focusRequest) => set({ focusRequest }),
+  setActiveEditorRef: (activeEditorRef) => set({ activeEditorRef }),
   focusPreviousBlock: (fromBlockId, caret = 'end') => {
     const currentDocument = get().currentDocument;
     if (!currentDocument) {
@@ -88,6 +123,7 @@ export const useDocumentSessionStore = create<DocumentSessionState>((set, get) =
     set({
       selectedBlockId: target.id,
       selectedBlockIds: [],
+      blockSelected: false,
       allBlocksSelected: false,
       focusRequest: createFocusRequest(target.id, caret),
     });
@@ -107,6 +143,7 @@ export const useDocumentSessionStore = create<DocumentSessionState>((set, get) =
     set({
       selectedBlockId: target.id,
       selectedBlockIds: [],
+      blockSelected: false,
       allBlocksSelected: false,
       focusRequest: createFocusRequest(target.id, caret),
     });

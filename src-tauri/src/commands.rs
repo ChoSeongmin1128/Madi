@@ -1,6 +1,6 @@
 use tauri::State;
 
-use crate::application::dto::{BlockDto, BootstrapPayload, DocumentDto, DocumentSummaryDto, SearchResultDto};
+use crate::application::dto::{BlockDto, BlockRestoreDto, BootstrapPayload, DocumentDto, DocumentSummaryDto, SearchResultDto};
 use crate::application::services;
 use crate::domain::models::{BlockKind, BlockTintPreset, ThemeMode};
 use crate::error::AppError;
@@ -148,5 +148,16 @@ pub fn set_document_block_tint_override(
 ) -> Result<DocumentDto, String> {
   with_repository(state, |repository| {
     services::set_document_block_tint_override(repository, &document_id, block_tint_override)
+  })
+}
+
+#[tauri::command]
+pub fn restore_document_blocks(
+  state: State<'_, AppState>,
+  document_id: String,
+  blocks: Vec<BlockRestoreDto>,
+) -> Result<DocumentDto, String> {
+  with_repository(state, |repository| {
+    services::restore_document_blocks(repository, &document_id, blocks)
   })
 }

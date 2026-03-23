@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use crate::domain::models::{Block, BlockKind, BlockTintPreset, Document, DocumentSummary, SearchResult, ThemeMode};
 use crate::error::AppError;
 
@@ -56,6 +56,16 @@ pub struct BootstrapPayload {
   pub theme_mode: ThemeMode,
   pub default_block_tint_preset: BlockTintPreset,
   pub icloud_sync_enabled: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BlockRestoreDto {
+  pub id: String,
+  pub kind: BlockKind,
+  pub content: String,
+  pub language: Option<String>,
+  pub position: i64,
 }
 
 impl TryFrom<Block> for BlockDto {

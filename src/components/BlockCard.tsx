@@ -11,8 +11,10 @@ import {
 import type { BlockVm } from '../adapters/documentAdapter';
 import {
   changeBlockKind,
+  copySelectedBlocks,
   copySingleBlock,
   createBlockBelow,
+  deleteSelectedBlocks,
   deleteBlock,
   updateCodeBlock,
   updateMarkdownBlock,
@@ -78,9 +80,12 @@ export function BlockCard({
   const focusPreviousBlock = useDocumentSessionStore((state) => state.focusPreviousBlock);
   const focusNextBlock = useDocumentSessionStore((state) => state.focusNextBlock);
   const focusRequest = useDocumentSessionStore((state) => state.focusRequest);
+  const selectedBlockIds = useDocumentSessionStore((state) => state.selectedBlockIds);
   const editorRef = useRef<BlockEditorHandle | null>(null);
 
   const isEmpty = isEffectivelyEmpty(block);
+  const hasSubsetSelection = selectedBlockIds.length > 0;
+  const shouldActOnSelectedSet = isAllSelected || (hasSubsetSelection && selectedBlockIds.includes(block.id));
   const focusPlacement: BlockCaretPlacement | null =
     focusRequest?.blockId === block.id ? focusRequest.caret : null;
   const focusNonce = focusRequest?.blockId === block.id ? focusRequest.nonce : 0;
@@ -122,8 +127,12 @@ export function BlockCard({
 
   const handleDeleteBlock = useCallback(() => {
     setContextMenuPosition(null);
+    if (shouldActOnSelectedSet) {
+      void deleteSelectedBlocks();
+      return;
+    }
     void deleteBlock(block.id);
-  }, [block.id]);
+  }, [block.id, shouldActOnSelectedSet]);
 
   const handleDeleteIfEmpty = handleDeleteBlock;
 
@@ -140,15 +149,25 @@ export function BlockCard({
   const handleBlockFocus = () => {
     setSelectedBlockId(block.id);
     setAllBlocksSelected(false);
+    useDocumentSessionStore.getState().setActiveEditorRef(editorRef);
   };
 
   const handleCut = useCallback(async () => {
+    if (shouldActOnSelectedSet) {
+      await copySelectedBlocks();
+      await deleteSelectedBlocks();
+      return;
+    }
     await editorRef.current?.cut();
-  }, []);
+  }, [shouldActOnSelectedSet]);
 
   const handleCopy = useCallback(async () => {
+    if (shouldActOnSelectedSet) {
+      await copySelectedBlocks();
+      return;
+    }
     await editorRef.current?.copy();
-  }, []);
+  }, [shouldActOnSelectedSet]);
 
   const handlePaste = useCallback(async () => {
     await editorRef.current?.paste();
@@ -192,7 +211,9 @@ export function BlockCard({
       }}
       onContextMenu={(event) => {
         event.preventDefault();
-        handleBlockFocus();
+        if (!shouldActOnSelectedSet) {
+          handleBlockFocus();
+        }
         setTypeMenuAnchor(null);
         onMenuClose();
         setContextMenuPosition({ x: event.clientX, y: event.clientY });
@@ -226,6 +247,10 @@ export function BlockCard({
           aria-label="블록 복사"
           onClick={(event) => {
             event.stopPropagation();
+            if (shouldActOnSelectedSet) {
+              void copySelectedBlocks();
+              return;
+            }
             void copySingleBlock(block.id);
           }}
         >

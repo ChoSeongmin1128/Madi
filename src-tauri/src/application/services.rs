@@ -1,4 +1,4 @@
-use crate::application::dto::{BlockDto, BootstrapPayload, DocumentDto, DocumentSummaryDto, SearchResultDto};
+use crate::application::dto::{BlockDto, BlockRestoreDto, BootstrapPayload, DocumentDto, DocumentSummaryDto, SearchResultDto};
 use crate::domain::models::{BlockKind, BlockTintPreset, ThemeMode};
 use crate::error::AppError;
 use crate::ports::repositories::AppRepository;
@@ -214,6 +214,15 @@ pub fn update_text_block(
 
 pub fn flush_document(repository: &mut impl AppRepository, document_id: &str) -> Result<i64, AppError> {
   repository.touch_document(document_id)
+}
+
+pub fn restore_document_blocks(
+  repository: &mut impl AppRepository,
+  document_id: &str,
+  blocks: Vec<BlockRestoreDto>,
+) -> Result<DocumentDto, AppError> {
+  repository.restore_blocks(document_id, &blocks)?;
+  hydrate_document(repository, document_id, None)
 }
 
 fn hydrate_document(

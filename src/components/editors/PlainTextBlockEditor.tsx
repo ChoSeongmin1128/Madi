@@ -65,6 +65,8 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const overlayRef = useRef<HTMLPreElement | null>(null);
   const currentValueRef = useRef(value);
+  const undoStackRef = useRef<string[]>([]);
+  const redoStackRef = useRef<string[]>([]);
   const [highlightSource, setHighlightSource] = useState(value);
   const [loadedLanguage, setLoadedLanguage] = useState<{ id: CodeLanguageId; key: string | null } | null>(null);
 
@@ -92,6 +94,8 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
   // 외부에서 value가 변경된 경우만 textarea DOM을 직접 업데이트
   useEffect(() => {
     if (value !== currentValueRef.current) {
+      undoStackRef.current = [];
+      redoStackRef.current = [];
       currentValueRef.current = value;
       setHighlightSource(value);
       if (textareaRef.current) {
@@ -135,7 +139,12 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
     overlay.scrollLeft = textarea.scrollLeft;
   };
 
-  const emitChange = useCallback((nextValue: string) => {
+  const emitChange = useCallback((nextValue: string, skipHistory = false) => {
+    if (!skipHistory && nextValue !== currentValueRef.current) {
+      undoStackRef.current.push(currentValueRef.current);
+      if (undoStackRef.current.length > 50) undoStackRef.current.shift();
+      redoStackRef.current = [];
+    }
     currentValueRef.current = nextValue;
     setHighlightSource(nextValue);
     onChange(nextValue, mode === 'code' ? resolvedLanguage : null);
@@ -197,6 +206,34 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
         textarea.focus();
         textarea.setSelectionRange(0, textarea.value.length);
         return true;
+      },
+      canUndo() {
+        return undoStackRef.current.length > 0;
+      },
+      undo() {
+        const prev = undoStackRef.current.pop();
+        if (prev === undefined) return;
+        redoStackRef.current.push(currentValueRef.current);
+        emitChange(prev, true);
+        const textarea = textareaRef.current;
+        if (textarea) {
+          textarea.value = prev;
+          syncTextareaHeight(textarea);
+        }
+      },
+      canRedo() {
+        return redoStackRef.current.length > 0;
+      },
+      redo() {
+        const next = redoStackRef.current.pop();
+        if (next === undefined) return;
+        undoStackRef.current.push(currentValueRef.current);
+        emitChange(next, true);
+        const textarea = textareaRef.current;
+        if (textarea) {
+          textarea.value = next;
+          syncTextareaHeight(textarea);
+        }
       },
     }),
     [emitChange, getVal],

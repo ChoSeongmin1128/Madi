@@ -14,7 +14,6 @@ import {
   executeWithErrorHandling,
   findBlock,
   getCurrentDocument,
-  normalizeErrorMessage,
   reportError,
   setDocumentWithFocus,
   toDocumentVm,
@@ -22,14 +21,14 @@ import {
 } from '../services/documentStateService';
 import {
   type ClipboardBlockData,
-  hasBlockDataInClipboard,
-  clearBlockClipboard,
+  isBlockClipboardText,
+  parseBlockClipboardText,
   readBlocksFromClipboard,
   writeBlocksToClipboard,
 } from '../services/clipboardService';
 import { enqueueSyncMutation } from '../services/syncBoundary';
 import { useDocumentSessionStore } from '../stores/documentSessionStore';
-import { useWorkspaceStore } from '../stores/workspaceStore';
+import { useBlockHistoryStore } from '../stores/blockHistoryStore';
 import { flushCurrentDocument } from './documentController';
 
 function findEditableBlock<K extends BlockKind>(
@@ -63,9 +62,73 @@ function queueAndApplyBlockUpdate(blockId: string, nextBlock: BlockVm, payload: 
   applyUpdatedBlock(nextBlock);
 }
 
+function clearBlockSelectionState() {
+  useDocumentSessionStore.setState({
+    selectedBlockId: null,
+    selectedBlockIds: [],
+    blockSelected: false,
+    allBlocksSelected: false,
+    activeEditorRef: null,
+  });
+}
+
+function getSelectedBlocks(document = getCurrentDocument()) {
+  if (!document) {
+    return [];
+  }
+
+  const session = useDocumentSessionStore.getState();
+  if (session.allBlocksSelected) {
+    return document.blocks;
+  }
+
+  if (session.selectedBlockIds.length > 0) {
+    const selectedIds = new Set(session.selectedBlockIds);
+    return document.blocks.filter((block) => selectedIds.has(block.id));
+  }
+
+  if (session.blockSelected && session.selectedBlockId) {
+    const block = findBlock(document, session.selectedBlockId);
+    return block ? [block] : [];
+  }
+
+  return [];
+}
+
+function getSelectionInsertAfterBlockId(document: NonNullable<ReturnType<typeof getCurrentDocument>>) {
+  const session = useDocumentSessionStore.getState();
+  if (session.allBlocksSelected) {
+    return document.blocks.at(-1)?.id ?? null;
+  }
+
+  if (session.selectedBlockIds.length > 0) {
+    return session.selectedBlockIds.at(-1) ?? document.blocks.at(-1)?.id ?? null;
+  }
+
+  return session.selectedBlockId ?? document.blocks.at(-1)?.id ?? null;
+}
+
+async function clearBlockContent(block: BlockVm) {
+  if (block.kind === 'markdown') {
+    await desktopApi.updateMarkdownBlock(block.id, createEmptyMarkdownContent());
+    return;
+  }
+
+  if (block.kind === 'text') {
+    await desktopApi.updateTextBlock(block.id, '');
+    return;
+  }
+
+  await desktopApi.updateCodeBlock(block.id, '', block.language);
+}
+
 // --- Block CRUD ---
 
 export async function createBlockBelow(afterBlockId: string | null, kind: BlockKind = 'markdown') {
+  const snapshotDoc = getCurrentDocument();
+  if (snapshotDoc) useBlockHistoryStore.getState().pushUndo(snapshotDoc);
+  useDocumentSessionStore.getState().setActiveEditorRef(null);
+
   await executeWithErrorHandling(async () => {
     const currentDocument = getCurrentDocument();
     if (!currentDocument) return;
@@ -90,6 +153,10 @@ export async function createBlockBelow(afterBlockId: string | null, kind: BlockK
 }
 
 export async function changeBlockKind(blockId: string, kind: BlockKind) {
+  const snapshotDoc = getCurrentDocument();
+  if (snapshotDoc) useBlockHistoryStore.getState().pushUndo(snapshotDoc);
+  useDocumentSessionStore.getState().setActiveEditorRef(null);
+
   await executeWithErrorHandling(async () => {
     const currentDocument = getCurrentDocument();
     if (!currentDocument) return;
@@ -105,6 +172,8 @@ export async function changeBlockKind(blockId: string, kind: BlockKind) {
 export async function moveBlock(blockId: string, targetPosition: number) {
   const currentDocument = getCurrentDocument();
   if (!currentDocument) return;
+  useBlockHistoryStore.getState().pushUndo(currentDocument);
+  useDocumentSessionStore.getState().setActiveEditorRef(null);
 
   const sourceIndex = currentDocument.blocks.findIndex((block) => block.id === blockId);
   if (sourceIndex < 0 || sourceIndex === targetPosition) return;
@@ -132,6 +201,11 @@ export async function moveBlock(blockId: string, targetPosition: number) {
 }
 
 export async function deleteBlock(blockId: string) {
+
+  const snapshotDoc = getCurrentDocument();
+  if (snapshotDoc && snapshotDoc.blocks.length > 1) useBlockHistoryStore.getState().pushUndo(snapshotDoc);
+  useDocumentSessionStore.getState().setActiveEditorRef(null);
+
   await executeWithErrorHandling(async () => {
     const currentDocument = getCurrentDocument();
     if (!currentDocument || currentDocument.blocks.length <= 1) return;
@@ -175,13 +249,15 @@ export function updateTextBlock(blockId: string, content: string) {
 
 // --- Clipboard Operations ---
 
-export { hasBlockDataInClipboard, clearBlockClipboard };
+export { isBlockClipboardText };
 
 export async function copySelectedBlocks() {
-  const currentDocument = getCurrentDocument();
-  if (!currentDocument || !useDocumentSessionStore.getState().allBlocksSelected) return;
+  const blocks = getSelectedBlocks();
+  if (blocks.length === 0) {
+    return;
+  }
 
-  await writeBlocksToClipboard(currentDocument.blocks.map((b) => ({
+  await writeBlocksToClipboard(blocks.map((b) => ({
     kind: b.kind, content: b.content, language: b.kind === 'code' ? b.language : null,
   })));
 }
@@ -203,26 +279,34 @@ async function writeBlockContent(blockId: string, data: ClipboardBlockData) {
   else if (data.kind === 'code') await desktopApi.updateCodeBlock(blockId, data.content, data.language ?? null);
 }
 
-export async function pasteBlocks() {
+export async function pasteBlocks(clipboardText?: string) {
+  const snapshotDoc = getCurrentDocument();
+  if (snapshotDoc) useBlockHistoryStore.getState().pushUndo(snapshotDoc);
+
   await executeWithErrorHandling(async () => {
     const currentDocument = getCurrentDocument();
     if (!currentDocument) return;
 
-    const blocksToInsert = await readBlocksFromClipboard();
+    const blocksToInsert = clipboardText != null
+      ? parseBlockClipboardText(clipboardText)
+      : await readBlocksFromClipboard();
     if (!blocksToInsert) return;
 
-    const selectedBlockId = useDocumentSessionStore.getState().selectedBlockId;
+    const session = useDocumentSessionStore.getState();
+    const selectedBlockId = session.selectedBlockId;
     const selectedBlock = selectedBlockId ? findBlock(currentDocument, selectedBlockId) : null;
+    const hasSubsetSelection = session.selectedBlockIds.length > 0;
+    const canOverwriteSelectedBlock = !session.allBlocksSelected && !hasSubsetSelection && session.blockSelected && selectedBlock != null;
     const isSelectedEmpty = selectedBlock
       ? (selectedBlock.kind === 'code' ? !selectedBlock.content.trim() : isMarkdownContentEmpty(selectedBlock.content))
       : false;
 
     await flushCurrentDocument();
-    let afterBlockId = selectedBlockId ?? currentDocument.blocks.at(-1)?.id ?? null;
+    let afterBlockId = getSelectionInsertAfterBlockId(currentDocument);
     let firstNewBlockId: string | null = null;
 
     const firstData = blocksToInsert[0];
-    if (isSelectedEmpty && selectedBlock && firstData) {
+    if (canOverwriteSelectedBlock && isSelectedEmpty && selectedBlock && firstData) {
       if (firstData.kind !== selectedBlock.kind) await desktopApi.changeBlockKind(selectedBlock.id, firstData.kind);
       await writeBlockContent(selectedBlock.id, firstData);
       firstNewBlockId = selectedBlock.id;
@@ -253,7 +337,7 @@ export async function pasteBlocks() {
 
     const finalDoc = toDocumentVm(await desktopApi.openDocument(currentDocument.id));
     updateDocumentState(finalDoc);
-    useDocumentSessionStore.setState({ blockSelected: false, allBlocksSelected: false });
+    clearBlockSelectionState();
     if (firstNewBlockId) {
       useDocumentSessionStore.getState().requestBlockFocus(firstNewBlockId, 'start');
     }
@@ -261,42 +345,132 @@ export async function pasteBlocks() {
 }
 
 export async function deleteSelectedBlocks() {
-  const session = useDocumentSessionStore.getState();
-  const currentDocument = session.currentDocument;
-  if (!currentDocument || !session.allBlocksSelected || currentDocument.blocks.length === 0) return;
+  const currentDocument = getCurrentDocument();
+  const selectedBlocks = getSelectedBlocks(currentDocument);
+  if (!currentDocument || selectedBlocks.length === 0) return;
+  useBlockHistoryStore.getState().pushUndo(currentDocument);
 
   useDocumentSessionStore.getState().setIsFlushing(true);
   try {
     await flushDocumentSaves(currentDocument.id);
     let workingDocument = currentDocument;
-    const survivorId = currentDocument.blocks[0]?.id ?? null;
+    const selectedIds = new Set(selectedBlocks.map((block) => block.id));
+    const selectedIndices = currentDocument.blocks
+      .map((block, index) => (selectedIds.has(block.id) ? index : -1))
+      .filter((index) => index >= 0);
+    const firstSelectedIndex = selectedIndices[0] ?? -1;
+    const lastSelectedIndex = selectedIndices.at(-1) ?? -1;
+    const previousBlockId = firstSelectedIndex > 0 ? currentDocument.blocks[firstSelectedIndex - 1]?.id ?? null : null;
+    const nextBlockId =
+      lastSelectedIndex >= 0 && lastSelectedIndex < currentDocument.blocks.length - 1
+        ? currentDocument.blocks[lastSelectedIndex + 1]?.id ?? null
+        : null;
+    const isWholeDocumentSelection = selectedBlocks.length === currentDocument.blocks.length;
 
-    for (const block of currentDocument.blocks.slice(1)) {
-      clearBlockSync(currentDocument.id, block.id);
-      workingDocument = toDocumentVm(await desktopApi.deleteBlock(block.id));
-      enqueueSyncMutation({ kind: 'block-deleted', documentId: currentDocument.id, blockId: block.id });
-    }
+    if (isWholeDocumentSelection) {
+      const survivorId = selectedBlocks[0]?.id ?? null;
+      for (const block of selectedBlocks.slice(1).reverse()) {
+        clearBlockSync(currentDocument.id, block.id);
+        workingDocument = toDocumentVm(await desktopApi.deleteBlock(block.id));
+        enqueueSyncMutation({ kind: 'block-deleted', documentId: currentDocument.id, blockId: block.id });
+      }
 
-    const survivor = survivorId
-      ? workingDocument.blocks.find((b) => b.id === survivorId) ?? workingDocument.blocks[0] ?? null
-      : null;
-    if (survivor) {
-      if ((survivor.kind === 'markdown' || survivor.kind === 'text') && !isMarkdownContentEmpty(survivor.content)) {
-        await desktopApi.updateMarkdownBlock(survivor.id, createEmptyMarkdownContent());
-      } else if (survivor.kind === 'code' && survivor.content.length > 0) {
-        await desktopApi.updateCodeBlock(survivor.id, '', survivor.language);
+      const survivor = survivorId
+        ? workingDocument.blocks.find((block) => block.id === survivorId) ?? workingDocument.blocks[0] ?? null
+        : null;
+      if (survivor) {
+        await clearBlockContent(survivor);
+        enqueueSyncMutation({ kind: 'block-updated', documentId: currentDocument.id, blockId: survivor.id });
+      }
+    } else {
+      for (const block of selectedBlocks.slice().reverse()) {
+        clearBlockSync(currentDocument.id, block.id);
+        workingDocument = toDocumentVm(await desktopApi.deleteBlock(block.id));
+        enqueueSyncMutation({ kind: 'block-deleted', documentId: currentDocument.id, blockId: block.id });
       }
     }
 
     const nextDocument = toDocumentVm(await desktopApi.openDocument(currentDocument.id));
     updateDocumentState(nextDocument);
-    useDocumentSessionStore.getState().setAllBlocksSelected(false);
-    if (nextDocument.blocks[0]) {
-      useDocumentSessionStore.getState().requestBlockFocus(nextDocument.blocks[0].id, 'start');
+    clearBlockSelectionState();
+
+    const focusTargetId =
+      (previousBlockId && nextDocument.blocks.some((block) => block.id === previousBlockId) ? previousBlockId : null)
+      ?? (nextBlockId && nextDocument.blocks.some((block) => block.id === nextBlockId) ? nextBlockId : null)
+      ?? nextDocument.blocks[0]?.id
+      ?? null;
+
+    if (focusTargetId) {
+      const caret = focusTargetId === previousBlockId ? 'end' : 'start';
+      useDocumentSessionStore.getState().requestBlockFocus(focusTargetId, caret);
     }
   } catch (error) {
     reportError(error, '선택한 블록을 삭제하지 못했습니다.');
   } finally {
     useDocumentSessionStore.getState().setIsFlushing(false);
   }
+}
+
+// --- Block Undo / Redo ---
+
+export async function undoBlockOperation() {
+  const currentDocument = getCurrentDocument();
+  if (!currentDocument) return;
+
+  const previousDoc = useBlockHistoryStore.getState().popUndo();
+  if (!previousDoc) return;
+
+  await executeWithErrorHandling(async () => {
+    useBlockHistoryStore.getState().pushRedo(currentDocument);
+    await flushDocumentSaves(currentDocument.id);
+    const restored = toDocumentVm(
+      await desktopApi.restoreDocumentBlocks(
+        currentDocument.id,
+        previousDoc.blocks.map((b) => ({
+          id: b.id,
+          kind: b.kind,
+          content: b.content,
+          language: b.kind === 'code' ? b.language : null,
+          position: b.position,
+        })),
+      ),
+    );
+    updateDocumentState(restored);
+    clearBlockSelectionState();
+    const focusId = restored.blocks[0]?.id ?? null;
+    if (focusId) {
+      useDocumentSessionStore.getState().requestBlockFocus(focusId, 'start');
+    }
+  }, '되돌리기에 실패했습니다.');
+}
+
+export async function redoBlockOperation() {
+  const currentDocument = getCurrentDocument();
+  if (!currentDocument) return;
+
+  const nextDoc = useBlockHistoryStore.getState().popRedo();
+  if (!nextDoc) return;
+
+  await executeWithErrorHandling(async () => {
+    useBlockHistoryStore.getState().pushUndo(currentDocument);
+    await flushDocumentSaves(currentDocument.id);
+    const restored = toDocumentVm(
+      await desktopApi.restoreDocumentBlocks(
+        currentDocument.id,
+        nextDoc.blocks.map((b) => ({
+          id: b.id,
+          kind: b.kind,
+          content: b.content,
+          language: b.kind === 'code' ? b.language : null,
+          position: b.position,
+        })),
+      ),
+    );
+    updateDocumentState(restored);
+    clearBlockSelectionState();
+    const focusId = restored.blocks[0]?.id ?? null;
+    if (focusId) {
+      useDocumentSessionStore.getState().requestBlockFocus(focusId, 'start');
+    }
+  }, '다시 실행에 실패했습니다.');
 }

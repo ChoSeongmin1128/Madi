@@ -1,13 +1,12 @@
 import { useEffect, useRef } from 'react';
 import {
-  clearBlockClipboard,
   copySelectedBlocks,
-  copySingleBlock,
-  deleteBlock,
   deleteSelectedBlocks,
   flushCurrentDocument,
-  hasBlockDataInClipboard,
+  isBlockClipboardText,
   pasteBlocks,
+  undoBlockOperation,
+  redoBlockOperation,
 } from '../controllers/appController';
 import { useDocumentSessionStore } from '../stores/documentSessionStore';
 
@@ -28,6 +27,7 @@ export function useAppShortcuts() {
   const blockSelected = useDocumentSessionStore((state) => state.blockSelected);
   const allBlocksSelected = useDocumentSessionStore((state) => state.allBlocksSelected);
   const selectedBlockId = useDocumentSessionStore((state) => state.selectedBlockId);
+  const selectedBlockIds = useDocumentSessionStore((state) => state.selectedBlockIds);
   const setBlockSelected = useDocumentSessionStore((state) => state.setBlockSelected);
   const setAllBlocksSelected = useDocumentSessionStore((state) => state.setAllBlocksSelected);
 
@@ -40,15 +40,14 @@ export function useAppShortcuts() {
         return;
       }
 
-      if ((event.key === 'Backspace' || event.key === 'Delete') && allBlocksSelected && !isEditableTarget(event.target)) {
+      const hasBlockSelection =
+        allBlocksSelected
+        || selectedBlockIds.length > 0
+        || (blockSelected && selectedBlockId != null);
+
+      if ((event.key === 'Backspace' || event.key === 'Delete') && hasBlockSelection && !isEditableTarget(event.target)) {
         event.preventDefault();
         void deleteSelectedBlocks();
-        return;
-      }
-
-      if ((event.key === 'Backspace' || event.key === 'Delete') && blockSelected && selectedBlockId && !isEditableTarget(event.target)) {
-        event.preventDefault();
-        void deleteBlock(selectedBlockId);
         return;
       }
 
@@ -60,6 +59,26 @@ export function useAppShortcuts() {
       if (event.key.toLowerCase() === 's') {
         event.preventDefault();
         void flushCurrentDocument();
+        return;
+      }
+
+      if (event.key.toLowerCase() === 'z') {
+        const activeEditor = useDocumentSessionStore.getState().activeEditorRef?.current;
+        if (event.shiftKey) {
+          if (activeEditor?.canRedo()) {
+            activeEditor.redo();
+          } else {
+            event.preventDefault();
+            void redoBlockOperation();
+          }
+        } else {
+          if (activeEditor?.canUndo()) {
+            activeEditor.undo();
+          } else {
+            event.preventDefault();
+            void undoBlockOperation();
+          }
+        }
         return;
       }
 
@@ -95,37 +114,29 @@ export function useAppShortcuts() {
 
       // 복사
       if (event.key.toLowerCase() === 'c') {
-        if (allBlocksSelected || blockSelected) {
+        if (hasBlockSelection) {
           event.preventDefault();
-          if (allBlocksSelected) {
-            void copySelectedBlocks();
-          } else if (blockSelected && selectedBlockId) {
-            void copySingleBlock(selectedBlockId);
-          }
-        } else {
-          // 일반 텍스트 복사 → 블록 클립보드 해제
-          clearBlockClipboard();
+          void copySelectedBlocks();
         }
         return;
       }
 
       // 블록 선택 상태에서 잘라내기
-      if (event.key.toLowerCase() === 'x' && (allBlocksSelected || blockSelected)) {
+      if (event.key.toLowerCase() === 'x' && hasBlockSelection) {
         event.preventDefault();
-        if (allBlocksSelected) {
-          void copySelectedBlocks().then(() => deleteSelectedBlocks());
-        } else if (blockSelected && selectedBlockId) {
-          void copySingleBlock(selectedBlockId).then(() => deleteBlock(selectedBlockId));
-        }
+        void copySelectedBlocks().then(() => deleteSelectedBlocks());
+      }
+    };
+
+    const onPaste = (event: ClipboardEvent) => {
+      const text = event.clipboardData?.getData('text/plain') ?? '';
+      if (!text || !isBlockClipboardText(text)) {
         return;
       }
 
-      // 붙여넣기: 블록 데이터가 있으면 블록 붙여넣기
-      if (event.key.toLowerCase() === 'v' && hasBlockDataInClipboard()) {
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        void pasteBlocks();
-      }
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      void pasteBlocks(text);
     };
 
     const onBeforeUnload = () => {
@@ -133,10 +144,20 @@ export function useAppShortcuts() {
     };
 
     window.addEventListener('keydown', onKeyDown, true);
+    window.addEventListener('paste', onPaste, true);
     window.addEventListener('beforeunload', onBeforeUnload);
     return () => {
       window.removeEventListener('keydown', onKeyDown, true);
+      window.removeEventListener('paste', onPaste, true);
       window.removeEventListener('beforeunload', onBeforeUnload);
     };
-  }, [allBlocksSelected, blockSelected, currentDocument, selectedBlockId, setAllBlocksSelected, setBlockSelected]);
+  }, [
+    allBlocksSelected,
+    blockSelected,
+    currentDocument,
+    selectedBlockId,
+    selectedBlockIds.length,
+    setAllBlocksSelected,
+    setBlockSelected,
+  ]);
 }

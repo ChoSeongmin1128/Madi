@@ -14,12 +14,13 @@ export {
   updateMarkdownBlock,
   updateCodeBlock,
   updateTextBlock,
-  clearBlockClipboard,
   copySelectedBlocks,
   copySingleBlock,
   deleteSelectedBlocks,
-  hasBlockDataInClipboard,
+  isBlockClipboardText,
   pasteBlocks,
+  undoBlockOperation,
+  redoBlockOperation,
 } from './blockController';
 export {
   bootstrapApp,

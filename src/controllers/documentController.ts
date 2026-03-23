@@ -17,6 +17,7 @@ import {
   setCurrentDocument,
   updateTouchedDocument,
 } from './controllerSupport';
+import { useBlockHistoryStore } from '../stores/blockHistoryStore';
 
 export async function flushCurrentDocument() {
   const currentDocument = getCurrentDocument();
@@ -42,6 +43,7 @@ export async function createDocument() {
 
     const document = toDocumentVm(await desktopApi.createDocument());
     clearError();
+    useBlockHistoryStore.getState().clear();
     useWorkspaceStore.getState().upsertDocumentSummary(summarizeDocument(document));
     setCurrentDocument(document);
     useWorkspaceStore.getState().setSettingsOpen(false);
@@ -64,6 +66,7 @@ export async function openDocument(documentId: string) {
 
     const document = toDocumentVm(await desktopApi.openDocument(documentId));
     clearError();
+    useBlockHistoryStore.getState().clear();
     useWorkspaceStore.getState().upsertDocumentSummary(summarizeDocument(document));
     setCurrentDocument(document);
     useWorkspaceStore.getState().setSettingsOpen(false);

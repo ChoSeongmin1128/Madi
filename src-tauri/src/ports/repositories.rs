@@ -39,6 +39,11 @@ pub trait BlockRepository {
     language: Option<String>,
   ) -> Result<Block, AppError>;
   fn update_text_block(&mut self, block_id: &str, content: String) -> Result<Block, AppError>;
+  fn restore_blocks(
+    &mut self,
+    document_id: &str,
+    blocks: &[crate::application::dto::BlockRestoreDto],
+  ) -> Result<Vec<Block>, AppError>;
 }
 
 pub trait AppStateRepository {

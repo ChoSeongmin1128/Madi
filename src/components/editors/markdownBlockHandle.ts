@@ -71,5 +71,17 @@ export function createMarkdownEditorHandle({
       emitSelectionVisualState();
       return true;
     },
+    canUndo() {
+      return editor._tiptapEditor.can().undo();
+    },
+    undo() {
+      editor._tiptapEditor.commands.undo();
+    },
+    canRedo() {
+      return editor._tiptapEditor.can().redo();
+    },
+    redo() {
+      editor._tiptapEditor.commands.redo();
+    },
   };
 }

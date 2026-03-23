@@ -210,4 +210,54 @@ impl BlockRepository for SqliteStore {
     self.touch_document_internal(&document_id, false)?;
     self.fetch_block(block_id)
   }
+
+  fn restore_blocks(
+    &mut self,
+    document_id: &str,
+    blocks: &[crate::application::dto::BlockRestoreDto],
+  ) -> Result<Vec<Block>, AppError> {
+    let now = Self::now();
+    let transaction = self.connection.transaction()?;
+
+    transaction.execute("DELETE FROM blocks WHERE document_id = ?1", params![document_id])?;
+
+    if blocks.is_empty() {
+      Self::insert_empty_block(&transaction, document_id, 0, BlockKind::Markdown)?;
+    } else {
+      let mut ordered: Vec<_> = blocks.iter().collect();
+      ordered.sort_by_key(|b| b.position);
+
+      for (i, block) in ordered.iter().enumerate() {
+        let (content, search_text) = match block.kind {
+          BlockKind::Markdown => {
+            let (c, s, _) = Self::normalize_markdown_storage(&block.content);
+            (c, s)
+          }
+          BlockKind::Code | BlockKind::Text => (block.content.clone(), block.content.clone()),
+        };
+
+        transaction.execute(
+          "INSERT INTO blocks (id, document_id, kind, position, content, search_text, language, created_at, updated_at)
+           VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
+          params![
+            block.id,
+            document_id,
+            block.kind.as_str(),
+            i as i64,
+            content,
+            search_text,
+            block.language,
+            now,
+            now
+          ],
+        )?;
+      }
+    }
+
+    transaction.commit()?;
+
+    self.rebuild_search_index(document_id)?;
+    self.touch_document_internal(document_id, false)?;
+    self.list_blocks(document_id)
+  }
 }

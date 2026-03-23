@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type {
   BlockDto,
   BlockKind,
+  BlockRestoreDto,
   BlockTintPreset,
   BootstrapPayload,
   DocumentDto,
@@ -103,5 +104,8 @@ export const desktopApi = {
   },
   setDocumentBlockTintOverride(documentId: string, blockTintOverride: BlockTintPreset | null) {
     return call<DocumentDto>('set_document_block_tint_override', { documentId, blockTintOverride });
+  },
+  restoreDocumentBlocks(documentId: string, blocks: BlockRestoreDto[]) {
+    return call<DocumentDto>('restore_document_blocks', { documentId, blocks });
   },
 };

@@ -3,4 +3,8 @@ export interface BlockEditorHandle {
   copy: () => Promise<boolean>;
   paste: () => Promise<boolean>;
   selectAll: () => boolean;
+  canUndo: () => boolean;
+  undo: () => void;
+  canRedo: () => boolean;
+  redo: () => void;
 }
