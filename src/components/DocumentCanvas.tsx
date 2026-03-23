@@ -1,4 +1,5 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react';
+import { AnimatePresence, motion } from 'framer-motion';
 import { BlockCard } from './BlockCard';
 import { BlockGhostPreview } from './BlockGhostPreview';
 import { DocumentMenu } from './DocumentMenu';
@@ -205,27 +206,40 @@ export function DocumentCanvas() {
             className={`block-drop-slot${dragState?.targetSlotIndex === 0 ? ' is-active' : ''}`}
             data-drop-slot-index={0}
           />
-          {blocks.map((block, index) => (
-            <Fragment key={block.id}>
-              <BlockCard
-                block={block}
-                isSelected={selectedBlockId === block.id}
-                isBlockSelected={(blockSelected && selectedBlockId === block.id) || selectedBlockIds.includes(block.id)}
-                isAllSelected={allBlocksSelected}
-                isAlternate={index % 2 === 1}
-                isDragging={dragState?.activeId === block.id}
-                isMenuOpen={openBlockMenuId === block.id}
-                onGripPointerDown={handleGripPointerDown}
-                onMenuClose={() =>
-                  setOpenBlockMenuId((current) => (current === block.id ? null : current))
-                }
-              />
-              <div
-                className={`block-drop-slot${dragState?.targetSlotIndex === index + 1 ? ' is-active' : ''}`}
-                data-drop-slot-index={index + 1}
-              />
-            </Fragment>
-          ))}
+          <AnimatePresence mode="popLayout">
+            {blocks.map((block, index) => (
+              <motion.div
+                key={block.id}
+                layout
+                initial={{ opacity: 0, scale: 0.97, y: -4 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.96 }}
+                transition={{
+                  layout: { duration: 0.2, ease: [0.2, 0.9, 0.3, 1] },
+                  opacity: { duration: 0.18 },
+                  scale: { duration: 0.18 },
+                }}
+              >
+                <BlockCard
+                  block={block}
+                  isSelected={selectedBlockId === block.id}
+                  isBlockSelected={(blockSelected && selectedBlockId === block.id) || selectedBlockIds.includes(block.id)}
+                  isAllSelected={allBlocksSelected}
+                  isAlternate={index % 2 === 1}
+                  isDragging={dragState?.activeId === block.id}
+                  isMenuOpen={openBlockMenuId === block.id}
+                  onGripPointerDown={handleGripPointerDown}
+                  onMenuClose={() =>
+                    setOpenBlockMenuId((current) => (current === block.id ? null : current))
+                  }
+                />
+                <div
+                  className={`block-drop-slot${dragState?.targetSlotIndex === index + 1 ? ' is-active' : ''}`}
+                  data-drop-slot-index={index + 1}
+                />
+              </motion.div>
+            ))}
+          </AnimatePresence>
         </div>
       </div>
 
