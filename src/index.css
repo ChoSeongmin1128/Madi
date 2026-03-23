@@ -851,7 +851,8 @@ button {
 
 .settings-modal-header,
 .settings-section-header,
-.danger-confirm-actions {
+.danger-confirm-actions,
+.settings-update-actions {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;

@@ -8,7 +8,7 @@ import {
 } from '../../lib/blocknoteBridge';
 import { shouldReplaceMarkdownArrow } from '../../lib/markdownEditorBehavior';
 import { isMarkdownContentEmpty } from '../../lib/markdown';
-import { canSkipPause, scheduleBlockDeletion } from '../../lib/backspaceHoldState';
+import { scheduleBlockDeletion } from '../../lib/backspaceHoldState';
 import type { BlockCaretPlacement } from '../../lib/types';
 
 interface MarkdownKeydownParams {
@@ -97,20 +97,17 @@ export function createMarkdownKeydownHandler({
 
     if (event.key === 'Backspace' && isMarkdownContentEmpty(getCurrentMarkdown())) {
       if (isBlockNoteSelectionEmpty(editor)) {
-        if (editor.document.length <= 1) {
-          event.preventDefault();
-          isWholeBlockSelectedRef.current = false;
-          if (!event.repeat || canSkipPause()) {
+        event.preventDefault();
+        isWholeBlockSelectedRef.current = false;
+        if (!event.repeat) {
+          onDeleteIfEmpty();
+          emitSelectionVisualState();
+        } else {
+          scheduleBlockDeletion(() => {
             onDeleteIfEmpty();
             emitSelectionVisualState();
-          } else {
-            scheduleBlockDeletion(() => {
-              onDeleteIfEmpty();
-              emitSelectionVisualState();
-            });
-          }
+          });
         }
-        // 빈 paragraph가 여러 개면 BlockNote가 자체적으로 병합하도록 허용
       }
       return;
     }
