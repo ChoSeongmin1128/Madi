@@ -95,6 +95,7 @@ pub struct Document {
   pub created_at: i64,
   pub updated_at: i64,
   pub last_opened_at: i64,
+  pub deleted_at: Option<i64>,
 }
 
 #[derive(Debug, Clone)]

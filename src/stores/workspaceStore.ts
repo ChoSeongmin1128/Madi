@@ -5,6 +5,7 @@ import type { CodeLanguageId } from '../lib/blockOptions';
 
 interface WorkspaceState {
   documents: DocumentSummaryVm[];
+  trashDocuments: DocumentSummaryVm[];
   searchResults: SearchResultVm[];
   searchQuery: string;
   isBootstrapping: boolean;
@@ -16,6 +17,7 @@ interface WorkspaceState {
   isSidebarOpen: boolean;
   lastCodeLanguage: CodeLanguageId;
   setDocuments: (documents: DocumentSummaryVm[]) => void;
+  setTrashDocuments: (documents: DocumentSummaryVm[]) => void;
   upsertDocumentSummary: (document: DocumentSummaryVm) => void;
   removeDocument: (documentId: string) => void;
   setSearchResults: (results: SearchResultVm[]) => void;
@@ -36,6 +38,7 @@ function sortDocuments(documents: DocumentSummaryVm[]) {
 
 export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   documents: [],
+  trashDocuments: [],
   searchResults: [],
   searchQuery: '',
   isBootstrapping: true,
@@ -47,6 +50,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   isSidebarOpen: false,
   lastCodeLanguage: 'javascript' as CodeLanguageId,
   setDocuments: (documents) => set({ documents: sortDocuments(documents) }),
+  setTrashDocuments: (trashDocuments) => set({ trashDocuments }),
   upsertDocumentSummary: (document) =>
     set((state) => ({
       documents: sortDocuments([

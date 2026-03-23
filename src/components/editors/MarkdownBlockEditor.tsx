@@ -54,6 +54,7 @@ export const MarkdownBlockEditor = forwardRef<BlockEditorHandle, MarkdownBlockEd
   const editorRootRef = useRef<HTMLDivElement | null>(null);
   const isApplyingRemoteContentRef = useRef(false);
   const isWholeBlockSelectedRef = useRef(false);
+  const hasUserEditedRef = useRef(false);
   const deleteReadyRef = useRef(false);
   const lastSerializedMarkdownRef = useRef('');
   const resolvedTheme = useResolvedTheme(themeMode);
@@ -99,6 +100,7 @@ export const MarkdownBlockEditor = forwardRef<BlockEditorHandle, MarkdownBlockEd
     }
 
     isApplyingRemoteContentRef.current = true;
+    hasUserEditedRef.current = false;
     replaceBlockNoteMarkdown(editor, nextMarkdown, createEmptyMarkdownBlocks);
     lastSerializedMarkdownRef.current = nextMarkdown;
     requestAnimationFrame(() => {
@@ -116,6 +118,7 @@ export const MarkdownBlockEditor = forwardRef<BlockEditorHandle, MarkdownBlockEd
         return;
       }
 
+      hasUserEditedRef.current = true;
       isWholeBlockSelectedRef.current = false;
       const nextMarkdown = getCurrentMarkdown();
       lastSerializedMarkdownRef.current = nextMarkdown;
@@ -205,6 +208,7 @@ export const MarkdownBlockEditor = forwardRef<BlockEditorHandle, MarkdownBlockEd
       createMarkdownEditorHandle({
         editor,
         isWholeBlockSelectedRef,
+        hasUserEditedRef,
         emitSelectionVisualState,
         getCurrentMarkdown,
       }),

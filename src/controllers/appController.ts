@@ -3,6 +3,7 @@ export {
   openDocument,
   commitDocumentTitle,
   deleteDocument,
+  restoreDocumentFromTrash,
   setDocumentBlockTintOverride,
   flushCurrentDocument,
 } from './documentController';

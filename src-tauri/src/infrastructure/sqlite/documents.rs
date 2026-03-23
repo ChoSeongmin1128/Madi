@@ -1,10 +1,29 @@
 use super::*;
 
+const DOCUMENT_COLUMNS: &str =
+  "id, title, block_tint_override, created_at, updated_at, last_opened_at, deleted_at";
+
+fn map_document(row: &rusqlite::Row<'_>) -> rusqlite::Result<Document> {
+  Ok(Document {
+    id: row.get(0)?,
+    title: row.get(1)?,
+    block_tint_override: row
+      .get::<_, Option<String>>(2)?
+      .map(|value| BlockTintPreset::from_str(&value)),
+    created_at: row.get(3)?,
+    updated_at: row.get(4)?,
+    last_opened_at: row.get(5)?,
+    deleted_at: row.get(6)?,
+  })
+}
+
 impl DocumentRepository for SqliteStore {
   fn ensure_initial_document(&mut self) -> Result<(), AppError> {
     let count = self
       .connection
-      .query_row("SELECT COUNT(*) FROM documents", [], |row| row.get::<_, i64>(0))?;
+      .query_row("SELECT COUNT(*) FROM documents WHERE deleted_at IS NULL", [], |row| {
+        row.get::<_, i64>(0)
+      })?;
     if count > 0 {
       return Ok(());
     }
@@ -14,23 +33,47 @@ impl DocumentRepository for SqliteStore {
   }
 
   fn list_documents(&self) -> Result<Vec<DocumentSummary>, AppError> {
-    let mut statement = self.connection.prepare(
-      "SELECT id, title, block_tint_override, created_at, updated_at, last_opened_at FROM documents ORDER BY updated_at DESC",
-    )?;
+    let mut statement = self.connection.prepare(&format!(
+      "SELECT {DOCUMENT_COLUMNS} FROM documents WHERE deleted_at IS NULL ORDER BY updated_at DESC"
+    ))?;
 
     let documents = statement
-      .query_map([], |row| {
-        Ok(Document {
-          id: row.get(0)?,
-          title: row.get(1)?,
-          block_tint_override: row
-            .get::<_, Option<String>>(2)?
-            .map(|value| BlockTintPreset::from_str(&value)),
-          created_at: row.get(3)?,
-          updated_at: row.get(4)?,
-          last_opened_at: row.get(5)?,
+      .query_map([], map_document)?
+      .collect::<Result<Vec<_>, _>>()?;
+
+    documents
+      .into_iter()
+      .map(|document| {
+        let block_count = self
+          .connection
+          .query_row(
+            "SELECT COUNT(*) FROM blocks WHERE document_id = ?1",
+            params![document.id],
+            |row| row.get::<_, i64>(0),
+          )
+          .unwrap_or(0) as usize;
+        let preview = self.document_preview(&document.id)?;
+
+        Ok(DocumentSummary {
+          id: document.id,
+          title: document.title,
+          block_tint_override: document.block_tint_override,
+          preview,
+          updated_at: document.updated_at,
+          last_opened_at: document.last_opened_at,
+          block_count,
         })
-      })?
+      })
+      .collect()
+  }
+
+  fn list_trash_documents(&self) -> Result<Vec<DocumentSummary>, AppError> {
+    let mut statement = self.connection.prepare(&format!(
+      "SELECT {DOCUMENT_COLUMNS} FROM documents WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC"
+    ))?;
+
+    let documents = statement
+      .query_map([], map_document)?
       .collect::<Result<Vec<_>, _>>()?;
 
     documents
@@ -60,22 +103,12 @@ impl DocumentRepository for SqliteStore {
   }
 
   fn get_document(&self, document_id: &str) -> Result<Option<Document>, AppError> {
-    self.connection
+    self
+      .connection
       .query_row(
-        "SELECT id, title, block_tint_override, created_at, updated_at, last_opened_at FROM documents WHERE id = ?1",
+        &format!("SELECT {DOCUMENT_COLUMNS} FROM documents WHERE id = ?1"),
         params![document_id],
-        |row| {
-          Ok(Document {
-            id: row.get(0)?,
-            title: row.get(1)?,
-            block_tint_override: row
-              .get::<_, Option<String>>(2)?
-              .map(|value| BlockTintPreset::from_str(&value)),
-            created_at: row.get(3)?,
-            updated_at: row.get(4)?,
-            last_opened_at: row.get(5)?,
-          })
-        },
+        map_document,
       )
       .optional()
       .map_err(AppError::from)
@@ -91,6 +124,7 @@ impl DocumentRepository for SqliteStore {
       created_at: now,
       updated_at: now,
       last_opened_at: now,
+      deleted_at: None,
     };
 
     self.connection.execute(
@@ -122,11 +156,43 @@ impl DocumentRepository for SqliteStore {
   }
 
   fn delete_document(&mut self, document_id: &str) -> Result<(), AppError> {
+    let now = Self::now();
     self.connection.execute(
-      &format!("DELETE FROM {SEARCH_INDEX_TABLE} WHERE document_id = ?1"),
+      "UPDATE documents SET deleted_at = ?1 WHERE id = ?2",
+      params![now, document_id],
+    )?;
+    Ok(())
+  }
+
+  fn restore_document_from_trash(&mut self, document_id: &str) -> Result<Document, AppError> {
+    self.connection.execute(
+      "UPDATE documents SET deleted_at = NULL WHERE id = ?1",
       params![document_id],
     )?;
-    self.connection.execute("DELETE FROM documents WHERE id = ?1", params![document_id])?;
+    self
+      .get_document(document_id)?
+      .ok_or_else(|| AppError::validation("문서를 찾을 수 없습니다."))
+  }
+
+  fn purge_expired_trash(&mut self, cutoff_ms: i64) -> Result<(), AppError> {
+    let expired_ids: Vec<String> = self
+      .connection
+      .prepare("SELECT id FROM documents WHERE deleted_at IS NOT NULL AND deleted_at < ?1")?
+      .query_map(params![cutoff_ms], |row| row.get::<_, String>(0))?
+      .collect::<Result<Vec<_>, _>>()?;
+
+    for id in &expired_ids {
+      self.connection.execute(
+        &format!("DELETE FROM {SEARCH_INDEX_TABLE} WHERE document_id = ?1"),
+        params![id],
+      )?;
+    }
+
+    self.connection.execute(
+      "DELETE FROM documents WHERE deleted_at IS NOT NULL AND deleted_at < ?1",
+      params![cutoff_ms],
+    )?;
+
     Ok(())
   }
 
@@ -169,10 +235,11 @@ impl DocumentRepository for SqliteStore {
       .query_map(params![query], |row| Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)?)))?
       .collect::<Result<Vec<_>, _>>()?;
 
-    ids.into_iter()
+    ids
+      .into_iter()
       .filter_map(|(document_id, score)| match self.get_document(&document_id) {
-        Ok(Some(document)) => Some(Ok((document, score))),
-        Ok(None) => None,
+        Ok(Some(document)) if document.deleted_at.is_none() => Some(Ok((document, score))),
+        Ok(_) => None,
         Err(error) => Some(Err(error)),
       })
       .map(|entry| {

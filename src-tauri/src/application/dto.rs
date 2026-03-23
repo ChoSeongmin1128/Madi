@@ -52,6 +52,7 @@ pub struct SearchResultDto {
 #[serde(rename_all = "camelCase")]
 pub struct BootstrapPayload {
   pub documents: Vec<DocumentSummaryDto>,
+  pub trash_documents: Vec<DocumentSummaryDto>,
   pub current_document: Option<DocumentDto>,
   pub theme_mode: ThemeMode,
   pub default_block_tint_preset: BlockTintPreset,

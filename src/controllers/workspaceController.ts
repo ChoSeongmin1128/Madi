@@ -22,6 +22,7 @@ export async function bootstrapApp() {
   try {
     const payload = await desktopApi.bootstrapApp();
     workspace.setDocuments(payload.documents.map(toDocumentSummaryVm));
+    workspace.setTrashDocuments(payload.trashDocuments.map(toDocumentSummaryVm));
     workspace.setSearchResults([]);
     workspace.setSearchQuery('');
     workspace.setThemeMode(payload.themeMode);
@@ -93,6 +94,7 @@ export async function deleteAllDocuments() {
     clearError();
     clearAllDocumentSync();
     useWorkspaceStore.getState().setDocuments(payload.documents.map(toDocumentSummaryVm));
+    useWorkspaceStore.getState().setTrashDocuments([]);
     useWorkspaceStore.getState().setThemeMode(payload.themeMode);
     useWorkspaceStore.getState().setDefaultBlockTintPreset(payload.defaultBlockTintPreset);
     useWorkspaceStore.getState().setIcloudSyncEnabled(payload.icloudSyncEnabled);

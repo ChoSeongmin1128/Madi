@@ -161,3 +161,13 @@ pub fn restore_document_blocks(
     services::restore_document_blocks(repository, &document_id, blocks)
   })
 }
+
+#[tauri::command]
+pub fn restore_document_from_trash(
+  state: State<'_, AppState>,
+  document_id: String,
+) -> Result<BootstrapPayload, String> {
+  with_repository(state, |repository| {
+    services::restore_document_from_trash(repository, &document_id)
+  })
+}

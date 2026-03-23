@@ -42,6 +42,7 @@ impl SqliteStore {
     )?;
 
     self.ensure_document_column("block_tint_override", "TEXT NULL")?;
+    self.ensure_document_column("deleted_at", "INTEGER NULL")?;
     self.ensure_app_state_value("theme_mode", DEFAULT_THEME_MODE)?;
     self.ensure_app_state_value("default_block_tint_preset", DEFAULT_BLOCK_TINT_PRESET)?;
     self.ensure_app_state_value("icloud_sync_enabled", DEFAULT_ICLOUD_SYNC_ENABLED)?;

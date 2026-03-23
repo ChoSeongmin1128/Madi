@@ -11,6 +11,7 @@ import { createEmptyMarkdownBlocks } from './markdownBlockSchema';
 interface MarkdownEditorHandleParams {
   editor: BlockNoteEditorLike;
   isWholeBlockSelectedRef: MutableRefObject<boolean>;
+  hasUserEditedRef: MutableRefObject<boolean>;
   emitSelectionVisualState: () => void;
   getCurrentMarkdown: () => string;
 }
@@ -18,6 +19,7 @@ interface MarkdownEditorHandleParams {
 export function createMarkdownEditorHandle({
   editor,
   isWholeBlockSelectedRef,
+  hasUserEditedRef,
   emitSelectionVisualState,
   getCurrentMarkdown,
 }: MarkdownEditorHandleParams): BlockEditorHandle {
@@ -72,7 +74,7 @@ export function createMarkdownEditorHandle({
       return true;
     },
     canUndo() {
-      return editor._tiptapEditor.can().undo();
+      return hasUserEditedRef.current && editor._tiptapEditor.can().undo();
     },
     undo() {
       editor._tiptapEditor.commands.undo();

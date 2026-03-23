@@ -4,8 +4,6 @@ import type { BlockKind } from '../lib/types';
 const BLOCK_CLIPBOARD_PREFIX = '<!--minnote-block:';
 const BLOCK_CLIPBOARD_SUFFIX = '-->';
 
-let hasBlockData = false;
-
 export interface ClipboardBlockData {
   kind: BlockKind;
   content: string;
@@ -18,7 +16,7 @@ function encodeBlockClipboard(blocks: ClipboardBlockData[]): string {
   return `${meta}${text}`;
 }
 
-function decodeBlockClipboard(text: string): ClipboardBlockData[] | null {
+export function parseBlockClipboardText(text: string): ClipboardBlockData[] | null {
   if (!text.startsWith(BLOCK_CLIPBOARD_PREFIX)) return null;
   const endIndex = text.indexOf(BLOCK_CLIPBOARD_SUFFIX);
   if (endIndex < 0) return null;
@@ -29,21 +27,16 @@ function decodeBlockClipboard(text: string): ClipboardBlockData[] | null {
   }
 }
 
-export function hasBlockDataInClipboard() {
-  return hasBlockData;
-}
-
-export function clearBlockClipboard() {
-  hasBlockData = false;
+export function isBlockClipboardText(text: string) {
+  return parseBlockClipboardText(text) != null;
 }
 
 export async function writeBlocksToClipboard(blocks: ClipboardBlockData[]) {
-  hasBlockData = true;
   await navigator.clipboard.writeText(encodeBlockClipboard(blocks));
 }
 
 export async function readBlocksFromClipboard(): Promise<ClipboardBlockData[] | null> {
   const text = await navigator.clipboard.readText();
   if (!text.trim()) return null;
-  return decodeBlockClipboard(text) ?? [{ kind: 'markdown', content: text }];
+  return parseBlockClipboardText(text);
 }

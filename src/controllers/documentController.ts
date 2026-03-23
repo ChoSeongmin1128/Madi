@@ -98,6 +98,7 @@ export async function deleteDocument(documentId: string) {
     const payload = await desktopApi.deleteDocument(documentId);
     clearError();
     useWorkspaceStore.getState().setDocuments(payload.documents.map(toDocumentSummaryVm));
+    useWorkspaceStore.getState().setTrashDocuments(payload.trashDocuments.map(toDocumentSummaryVm));
     useWorkspaceStore.getState().setThemeMode(payload.themeMode);
     useWorkspaceStore.getState().setDefaultBlockTintPreset(payload.defaultBlockTintPreset);
     useWorkspaceStore.getState().setIcloudSyncEnabled(payload.icloudSyncEnabled);
@@ -107,6 +108,24 @@ export async function deleteDocument(documentId: string) {
     enqueueSyncMutation({ kind: 'document-deleted', documentId });
   } catch (error) {
     reportWorkspaceError(error, '문서를 삭제하지 못했습니다.');
+  }
+}
+
+export async function restoreDocumentFromTrash(documentId: string) {
+  try {
+    const payload = await desktopApi.restoreDocumentFromTrash(documentId);
+    clearError();
+    useWorkspaceStore.getState().setDocuments(payload.documents.map(toDocumentSummaryVm));
+    useWorkspaceStore.getState().setTrashDocuments(payload.trashDocuments.map(toDocumentSummaryVm));
+    useWorkspaceStore.getState().setThemeMode(payload.themeMode);
+    useWorkspaceStore.getState().setDefaultBlockTintPreset(payload.defaultBlockTintPreset);
+    useWorkspaceStore.getState().setIcloudSyncEnabled(payload.icloudSyncEnabled);
+    const current = getCurrentDocument();
+    if (!current) {
+      setCurrentDocument(payload.currentDocument ? toDocumentVm(payload.currentDocument) : null);
+    }
+  } catch (error) {
+    reportWorkspaceError(error, '문서를 복원하지 못했습니다.');
   }
 }
 

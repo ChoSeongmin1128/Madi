@@ -1,7 +1,7 @@
-import { FileSearch, Plus, Search, Settings2, X } from 'lucide-react';
+import { FileSearch, Plus, RotateCcw, Search, Settings2, Trash2, X } from 'lucide-react';
 import { useMemo } from 'react';
 import { SidebarDocumentMenu } from './SidebarDocumentMenu';
-import { createDocument, openDocument, setSearchQuery } from '../controllers/appController';
+import { createDocument, openDocument, restoreDocumentFromTrash, setSearchQuery } from '../controllers/appController';
 import { getVisibleDocumentTitle } from '../lib/documentTitle';
 import { useDocumentSessionStore } from '../stores/documentSessionStore';
 import { useWorkspaceStore } from '../stores/workspaceStore';
@@ -22,6 +22,7 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const documents = useWorkspaceStore((state) => state.documents);
+  const trashDocuments = useWorkspaceStore((state) => state.trashDocuments);
   const searchResults = useWorkspaceStore((state) => state.searchResults);
   const searchQuery = useWorkspaceStore((state) => state.searchQuery);
   const currentDocument = useDocumentSessionStore((state) => state.currentDocument);
@@ -93,16 +94,40 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             >
               <div className="document-card-header">
                 <span className="document-card-title">{getVisibleDocumentTitle(document.title)}</span>
-                <SidebarDocumentMenu documentId={document.id} />
               </div>
               <div className="document-card-sub">
                 <span className="document-meta">{formatTimestamp(document.updatedAt)}</span>
                 <span className="document-preview">{document.preview || ''}</span>
               </div>
+              <SidebarDocumentMenu documentId={document.id} />
             </div>
           ))
         )}
       </div>
+
+      {trashDocuments.length > 0 && (
+        <div className="trash-section">
+          <div className="trash-section-header">
+            <Trash2 size={12} />
+            <span>휴지통</span>
+          </div>
+          {trashDocuments.map((document) => (
+            <div key={document.id} className="trash-card">
+              <div className="trash-card-info">
+                <span className="trash-card-title">{getVisibleDocumentTitle(document.title)}</span>
+              </div>
+              <button
+                className="icon-button trash-restore-button"
+                type="button"
+                aria-label="복원"
+                onClick={() => void restoreDocumentFromTrash(document.id)}
+              >
+                <RotateCcw size={13} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="sidebar-footer">
         <button

@@ -464,14 +464,14 @@ impl SqliteStore {
       Some(document_id) => self
         .connection
         .query_row(
-          "SELECT EXISTS(SELECT 1 FROM documents WHERE title = ?1 AND id != ?2)",
+          "SELECT EXISTS(SELECT 1 FROM documents WHERE title = ?1 AND id != ?2 AND deleted_at IS NULL)",
           params![title, document_id],
           |row| row.get::<_, i64>(0),
         )?,
       None => self
         .connection
         .query_row(
-          "SELECT EXISTS(SELECT 1 FROM documents WHERE title = ?1)",
+          "SELECT EXISTS(SELECT 1 FROM documents WHERE title = ?1 AND deleted_at IS NULL)",
           params![title],
           |row| row.get::<_, i64>(0),
         )?,

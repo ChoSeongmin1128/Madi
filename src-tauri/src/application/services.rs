@@ -1,13 +1,26 @@
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use crate::application::dto::{BlockDto, BlockRestoreDto, BootstrapPayload, DocumentDto, DocumentSummaryDto, SearchResultDto};
 use crate::domain::models::{BlockKind, BlockTintPreset, ThemeMode};
 use crate::error::AppError;
 use crate::ports::repositories::AppRepository;
 
+fn now_ms() -> i64 {
+  SystemTime::now()
+    .duration_since(UNIX_EPOCH)
+    .map(|d| d.as_millis() as i64)
+    .unwrap_or(0)
+}
+
+const TRASH_TTL_MS: i64 = 86_400_000; // 24시간
+
 pub fn bootstrap_app(repository: &mut impl AppRepository) -> Result<BootstrapPayload, AppError> {
+  repository.purge_expired_trash(now_ms() - TRASH_TTL_MS)?;
   repository.ensure_initial_document()?;
   repository.migrate_legacy_markdown_blocks()?;
   let settings = repository.get_app_settings()?;
   let documents = repository.list_documents()?;
+  let trash_documents = repository.list_trash_documents()?;
   let document_summaries = documents
     .clone()
     .into_iter()
@@ -25,6 +38,7 @@ pub fn bootstrap_app(repository: &mut impl AppRepository) -> Result<BootstrapPay
 
   Ok(BootstrapPayload {
     documents: document_summaries,
+    trash_documents: trash_documents.into_iter().map(DocumentSummaryDto::from).collect(),
     current_document,
     theme_mode: settings.theme_mode,
     default_block_tint_preset: settings.default_block_tint_preset,
@@ -73,6 +87,7 @@ pub fn delete_document(
   let settings = repository.get_app_settings()?;
 
   let documents = repository.list_documents()?;
+  let trash_documents = repository.list_trash_documents()?;
   let current_document_id = repository
     .get_last_opened_document_id()?
     .filter(|stored| stored != document_id)
@@ -89,6 +104,35 @@ pub fn delete_document(
 
   Ok(BootstrapPayload {
     documents: documents.into_iter().map(DocumentSummaryDto::from).collect(),
+    trash_documents: trash_documents.into_iter().map(DocumentSummaryDto::from).collect(),
+    current_document,
+    theme_mode: settings.theme_mode,
+    default_block_tint_preset: settings.default_block_tint_preset,
+    icloud_sync_enabled: settings.icloud_sync_enabled,
+  })
+}
+
+pub fn restore_document_from_trash(
+  repository: &mut impl AppRepository,
+  document_id: &str,
+) -> Result<BootstrapPayload, AppError> {
+  repository.restore_document_from_trash(document_id)?;
+  let settings = repository.get_app_settings()?;
+  let documents = repository.list_documents()?;
+  let trash_documents = repository.list_trash_documents()?;
+
+  let current_document_id = repository
+    .get_last_opened_document_id()?
+    .or_else(|| documents.first().map(|d| d.id.clone()));
+
+  let current_document = current_document_id
+    .as_deref()
+    .map(|id| open_document(repository, id))
+    .transpose()?;
+
+  Ok(BootstrapPayload {
+    documents: documents.into_iter().map(DocumentSummaryDto::from).collect(),
+    trash_documents: trash_documents.into_iter().map(DocumentSummaryDto::from).collect(),
     current_document,
     theme_mode: settings.theme_mode,
     default_block_tint_preset: settings.default_block_tint_preset,
@@ -112,6 +156,7 @@ pub fn delete_all_documents(repository: &mut impl AppRepository) -> Result<Boots
 
   Ok(BootstrapPayload {
     documents: documents.into_iter().map(DocumentSummaryDto::from).collect(),
+    trash_documents: vec![],
     current_document: Some(current_document),
     theme_mode: settings.theme_mode,
     default_block_tint_preset: settings.default_block_tint_preset,

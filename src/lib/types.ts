@@ -44,6 +44,7 @@ export interface DocumentDto extends DocumentSummaryDto {
 
 export interface BootstrapPayload {
   documents: DocumentSummaryDto[];
+  trashDocuments: DocumentSummaryDto[];
   currentDocument: DocumentDto | null;
   themeMode: ThemeMode;
   defaultBlockTintPreset: BlockTintPreset;

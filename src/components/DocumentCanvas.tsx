@@ -50,6 +50,7 @@ export function DocumentCanvas() {
   const selectedBlockIds = useDocumentSessionStore((state) => state.selectedBlockIds);
   const blockSelected = useDocumentSessionStore((state) => state.blockSelected);
   const allBlocksSelected = useDocumentSessionStore((state) => state.allBlocksSelected);
+  const setSelectedBlockId = useDocumentSessionStore((state) => state.setSelectedBlockId);
   const defaultBlockTintPreset = useWorkspaceStore((state) => state.defaultBlockTintPreset);
   const blocksSelectionRef = useRef<HTMLDivElement | null>(null);
   const [marquee, setMarquee] = useState<MarqueeState | null>(null);
@@ -118,6 +119,9 @@ export function DocumentCanvas() {
 
     const startedInEditor = isEditableElement(event.target);
     const originBlockId = getBlockIdAtPoint(event.clientX, event.clientY);
+    if (!originBlockId && selectedBlockIds.length > 0) {
+      setSelectedBlockId(null);
+    }
 
     const mq: MarqueeState = {
       startX: event.clientX,
@@ -131,6 +135,7 @@ export function DocumentCanvas() {
     let scrollFrame = 0;
 
     const canvas = surfaceRef.current?.closest('.document-canvas') as HTMLElement | null;
+    let lastScrollTop = canvas?.scrollTop ?? 0;
 
     const autoScroll = (mouseY: number) => {
       if (!canvas) return;
@@ -143,7 +148,27 @@ export function DocumentCanvas() {
       }
     };
 
+    // 스크롤 시 mq.startY를 보정해 선택 영역이 문서 기준으로 고정되도록 유지
+    const onCanvasScroll = () => {
+      if (!canvas) return;
+      const currentScrollTop = canvas.scrollTop;
+      const delta = currentScrollTop - lastScrollTop;
+      lastScrollTop = currentScrollTop;
+      if (delta === 0) return;
+      mq.startY -= delta;
+      if (activated) {
+        setMarquee({ ...mq });
+        updateMarqueeSelection(mq);
+      }
+    };
+
     const onMouseMove = (e: MouseEvent) => {
+      // 앱 밖에서 마우스를 놓았을 때 mouseup이 잡히지 않는 경우 드래그를 종료
+      if (e.buttons === 0) {
+        onMouseUp();
+        return;
+      }
+
       const dx = e.clientX - mq.startX;
       const dy = e.clientY - mq.startY;
 
@@ -171,15 +196,20 @@ export function DocumentCanvas() {
     };
 
     const onMouseUp = () => {
+      canvas?.removeEventListener('scroll', onCanvasScroll);
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseup', onMouseUp);
       cancelAnimationFrame(scrollFrame);
       setMarquee(null);
+      if (!activated) {
+        useDocumentSessionStore.getState().setSelectedBlockIds([]);
+      }
     };
 
+    canvas?.addEventListener('scroll', onCanvasScroll);
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseup', onMouseUp);
-  }, [updateMarqueeSelection, surfaceRef, getBlockIdAtPoint]);
+  }, [getBlockIdAtPoint, selectedBlockIds.length, setSelectedBlockId, surfaceRef, updateMarqueeSelection]);
 
   if (!currentDocument) {
     return (
@@ -232,7 +262,10 @@ export function DocumentCanvas() {
                 <BlockCard
                   block={block}
                   isSelected={selectedBlockId === block.id}
-                  isBlockSelected={(blockSelected && selectedBlockId === block.id) || selectedBlockIds.includes(block.id)}
+                  isBlockSelected={
+                    selectedBlockIds.includes(block.id)
+                    || (selectedBlockIds.length === 0 && blockSelected && selectedBlockId === block.id)
+                  }
                   isAllSelected={allBlocksSelected}
                   isAlternate={index % 2 === 1}
                   isDragging={dragState?.activeId === block.id}

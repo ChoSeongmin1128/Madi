@@ -4,10 +4,13 @@ use crate::error::AppError;
 pub trait DocumentRepository {
   fn ensure_initial_document(&mut self) -> Result<(), AppError>;
   fn list_documents(&self) -> Result<Vec<DocumentSummary>, AppError>;
+  fn list_trash_documents(&self) -> Result<Vec<DocumentSummary>, AppError>;
   fn get_document(&self, document_id: &str) -> Result<Option<Document>, AppError>;
   fn create_document(&mut self, title: Option<String>) -> Result<Document, AppError>;
   fn rename_document(&mut self, document_id: &str, title: Option<String>) -> Result<Document, AppError>;
   fn delete_document(&mut self, document_id: &str) -> Result<(), AppError>;
+  fn restore_document_from_trash(&mut self, document_id: &str) -> Result<Document, AppError>;
+  fn purge_expired_trash(&mut self, cutoff_ms: i64) -> Result<(), AppError>;
   fn delete_all_documents(&mut self) -> Result<(), AppError>;
   fn set_document_block_tint_override(
     &mut self,
