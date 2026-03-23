@@ -36,9 +36,6 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "externalBin": [
-      "binaries/minnote-sync"
-    ],
     "macOS": {
       "entitlements": "Entitlements.plist",
       "minimumSystemVersion": "14.0"
