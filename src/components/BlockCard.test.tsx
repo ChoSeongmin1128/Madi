@@ -9,7 +9,7 @@ const { createBlockBelow } = vi.hoisted(() => ({
   createBlockBelow: vi.fn(),
 }));
 
-vi.mock('../controllers/appController', () => ({
+vi.mock('../app/actions', () => ({
   createBlockBelow,
   changeBlockKind: vi.fn(),
   copySelectedBlocks: vi.fn(),

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { DocumentVm } from '../adapters/documentAdapter';
+import type { DocumentVm } from '../application/models/document';
 import type { BlockEditorHandle } from '../lib/editorHandle';
 import type { BlockCaretPlacement } from '../lib/types';
 

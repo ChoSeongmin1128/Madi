@@ -8,7 +8,7 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
-import type { BlockVm } from '../adapters/documentAdapter';
+import type { BlockVm } from '../application/models/document';
 import {
   changeBlockKind,
   copySelectedBlocks,
@@ -19,7 +19,7 @@ import {
   updateCodeBlock,
   updateMarkdownBlock,
   updateTextBlock,
-} from '../controllers/appController';
+} from '../app/actions';
 import { createEmptyMarkdownContent } from '../lib/markdown';
 import { useWorkspaceStore } from '../stores/workspaceStore';
 import type { BlockEditorHandle } from '../lib/editorHandle';

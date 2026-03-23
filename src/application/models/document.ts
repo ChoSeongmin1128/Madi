@@ -1,13 +1,6 @@
-import { normalizeCodeLanguage, type CodeLanguageId } from '../lib/codeLanguageRegistry';
-import { getBlockPlainText } from '../lib/markdown';
-import type {
-  BlockDto,
-  BlockKind,
-  BlockTintPreset,
-  DocumentDto,
-  DocumentSummaryDto,
-  SearchResultDto,
-} from '../lib/types';
+import type { CodeLanguageId } from '../../lib/codeLanguageRegistry';
+import { getBlockPlainText } from '../../lib/markdown';
+import type { BlockKind, BlockTintPreset } from '../../lib/types';
 
 interface BlockVmBase {
   id: string;
@@ -56,70 +49,12 @@ export interface SearchResultVm extends DocumentSummaryVm {
   score: number;
 }
 
-export function toBlockVm(block: BlockDto): BlockVm {
-  const base = {
-    id: block.id,
-    documentId: block.documentId,
-    kind: block.kind,
-    position: block.position,
-    createdAt: block.createdAt,
-    updatedAt: block.updatedAt,
-  } satisfies BlockVmBase;
-
-  if (block.kind === 'markdown') {
-    return {
-      ...base,
-      kind: 'markdown',
-      content: block.content,
-      language: null,
-    };
-  }
-
-  if (block.kind === 'code') {
-    return {
-      ...base,
-      kind: 'code',
-      content: typeof block.content === 'string' ? block.content : '',
-      language: normalizeCodeLanguage(block.language),
-    };
-  }
-
-  return {
-    ...base,
-    kind: 'text',
-    content: typeof block.content === 'string' ? block.content : '',
-    language: null,
-  };
-}
-
-export function toDocumentSummaryVm(document: DocumentSummaryDto): DocumentSummaryVm {
-  return {
-    id: document.id,
-    title: document.title,
-    blockTintOverride: document.blockTintOverride,
-    preview: document.preview,
-    updatedAt: document.updatedAt,
-    lastOpenedAt: document.lastOpenedAt,
-    blockCount: document.blockCount,
-  };
-}
-
-export function toDocumentVm(document: DocumentDto): DocumentVm {
-  const blocks = document.blocks
-    .map(toBlockVm)
-    .sort((left, right) => left.position - right.position);
-
-  return {
-    ...toDocumentSummaryVm(document),
-    blocks,
-  };
-}
-
-export function toSearchResultVm(result: SearchResultDto): SearchResultVm {
-  return {
-    ...toDocumentSummaryVm(result),
-    score: result.score,
-  };
+export interface RestoreBlockInput {
+  id: string;
+  kind: BlockKind;
+  content: string;
+  language: string | null;
+  position: number;
 }
 
 export function summarizeDocument(document: DocumentVm): DocumentSummaryVm {

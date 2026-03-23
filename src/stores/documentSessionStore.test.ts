@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import type { DocumentVm } from '../adapters/documentAdapter';
+import type { DocumentVm } from '../application/models/document';
 import { useDocumentSessionStore } from './documentSessionStore';
 
 function createDocument(): DocumentVm {

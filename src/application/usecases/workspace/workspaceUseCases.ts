@@ -1,4 +1,3 @@
-import { toSearchResultVm } from '../../../adapters/documentAdapter';
 import type { SyncEventMessage } from '../../../lib/types';
 import type { BackendPort } from '../../ports/backendPort';
 import type { DocumentSyncPort } from '../../ports/documentSyncPort';
@@ -64,7 +63,7 @@ export function createWorkspaceUseCases({
             return;
           }
           workspace.clearError();
-          workspace.setSearchResults(results.map(toSearchResultVm));
+          workspace.setSearchResults(results);
         } catch (error) {
           if (token !== searchRequestToken) {
             return;

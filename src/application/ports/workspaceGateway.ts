@@ -1,5 +1,5 @@
-import type { DocumentSummaryVm, SearchResultVm } from '../../adapters/documentAdapter';
 import type { BlockKind, BlockTintPreset, ICloudSyncStatus, ThemeMode } from '../../lib/types';
+import type { DocumentSummaryVm, SearchResultVm } from '../models/document';
 
 export interface WorkspaceGateway {
   setDocuments(documents: DocumentSummaryVm[]): void;

@@ -1,5 +1,5 @@
 import { Trash2 } from 'lucide-react';
-import { deleteDocument } from '../controllers/appController';
+import { deleteDocument } from '../app/actions';
 
 interface SidebarDocumentMenuProps {
   documentId: string;

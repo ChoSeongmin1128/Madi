@@ -1,10 +1,10 @@
 import { useEffect } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { AlertCircle, LoaderCircle, PanelLeft, Plus } from 'lucide-react';
+import { bootstrapApp, createDocument } from './app/actions';
 import { Sidebar } from './components/Sidebar';
 import { DocumentCanvas } from './components/DocumentCanvas';
 import { SettingsModal } from './components/SettingsModal';
-import { bootstrapApp, createDocument } from './controllers/appController';
 import { useAppShortcuts } from './hooks/useAppShortcuts';
 import { useSyncEventListener } from './hooks/useSyncEventListener';
 import { useWorkspaceStore } from './stores/workspaceStore';

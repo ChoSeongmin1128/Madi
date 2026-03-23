@@ -1,6 +1,6 @@
 import { Check, Trash2 } from 'lucide-react';
 import { useEffect, useRef } from 'react';
-import type { BlockVm } from '../adapters/documentAdapter';
+import type { BlockVm } from '../application/models/document';
 import { BLOCK_KIND_OPTIONS } from '../lib/blockOptions';
 import type { BlockKind } from '../lib/types';
 

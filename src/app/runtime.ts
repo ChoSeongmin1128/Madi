@@ -7,10 +7,10 @@ import { sessionGateway } from '../adapters/sessionGateway';
 import { syncEventPort } from '../adapters/syncEventPort';
 import { syncMutationPort } from '../adapters/syncMutationPort';
 import { workspaceGateway } from '../adapters/workspaceGateway';
-import { createBlockUseCases } from './usecases/block/blockUseCases';
-import { createDocumentUseCases } from './usecases/document/documentUseCases';
-import { normalizeErrorMessage } from './usecases/shared/errors';
-import { createWorkspaceUseCases } from './usecases/workspace/workspaceUseCases';
+import { createBlockUseCases } from '../application/usecases/block/blockUseCases';
+import { createDocumentUseCases } from '../application/usecases/document/documentUseCases';
+import { normalizeErrorMessage } from '../application/usecases/shared/errors';
+import { createWorkspaceUseCases } from '../application/usecases/workspace/workspaceUseCases';
 
 const documentUseCases = createDocumentUseCases({
   backend: backendPort,

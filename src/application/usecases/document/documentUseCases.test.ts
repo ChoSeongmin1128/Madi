@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { DocumentVm } from '../../models/document';
+import type { WorkspaceBootstrapState } from '../../models/workspace';
 import { createDocumentUseCases } from './documentUseCases';
-import type { DocumentVm } from '../../../adapters/documentAdapter';
-import type { BootstrapPayload } from '../../../lib/types';
 
-function createPayload(defaultBlockKind: BootstrapPayload['defaultBlockKind']): BootstrapPayload {
+function createPayload(defaultBlockKind: WorkspaceBootstrapState['defaultBlockKind']): WorkspaceBootstrapState {
   return {
     documents: [],
     trashDocuments: [],

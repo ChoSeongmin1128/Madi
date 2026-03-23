@@ -1,0 +1,94 @@
+import type { WorkspaceBootstrapState } from '../application/models/workspace';
+import type {
+  BlockVm,
+  DocumentSummaryVm,
+  DocumentVm,
+  SearchResultVm,
+} from '../application/models/document';
+import { normalizeCodeLanguage } from '../lib/codeLanguageRegistry';
+import type {
+  BlockDto,
+  BootstrapPayload,
+  DocumentDto,
+  DocumentSummaryDto,
+  SearchResultDto,
+} from '../lib/types';
+
+export function mapBlockDtoToVm(block: BlockDto): BlockVm {
+  const base = {
+    id: block.id,
+    documentId: block.documentId,
+    kind: block.kind,
+    position: block.position,
+    createdAt: block.createdAt,
+    updatedAt: block.updatedAt,
+  } as const;
+
+  if (block.kind === 'markdown') {
+    return {
+      ...base,
+      kind: 'markdown',
+      content: block.content,
+      language: null,
+    };
+  }
+
+  if (block.kind === 'code') {
+    return {
+      ...base,
+      kind: 'code',
+      content: typeof block.content === 'string' ? block.content : '',
+      language: normalizeCodeLanguage(block.language),
+    };
+  }
+
+  return {
+    ...base,
+    kind: 'text',
+    content: typeof block.content === 'string' ? block.content : '',
+    language: null,
+  };
+}
+
+export function mapDocumentSummaryDtoToVm(document: DocumentSummaryDto): DocumentSummaryVm {
+  return {
+    id: document.id,
+    title: document.title,
+    blockTintOverride: document.blockTintOverride,
+    preview: document.preview,
+    updatedAt: document.updatedAt,
+    lastOpenedAt: document.lastOpenedAt,
+    blockCount: document.blockCount,
+  };
+}
+
+export function mapDocumentDtoToVm(document: DocumentDto): DocumentVm {
+  const blocks = document.blocks
+    .map(mapBlockDtoToVm)
+    .sort((left, right) => left.position - right.position);
+
+  return {
+    ...mapDocumentSummaryDtoToVm(document),
+    blocks,
+  };
+}
+
+export function mapSearchResultDtoToVm(result: SearchResultDto): SearchResultVm {
+  return {
+    ...mapDocumentSummaryDtoToVm(result),
+    score: result.score,
+  };
+}
+
+export function mapBootstrapPayloadToState(payload: BootstrapPayload): WorkspaceBootstrapState {
+  return {
+    documents: payload.documents.map(mapDocumentSummaryDtoToVm),
+    trashDocuments: payload.trashDocuments.map(mapDocumentSummaryDtoToVm),
+    currentDocument: payload.currentDocument ? mapDocumentDtoToVm(payload.currentDocument) : null,
+    themeMode: payload.themeMode,
+    defaultBlockTintPreset: payload.defaultBlockTintPreset,
+    defaultBlockKind: payload.defaultBlockKind,
+    icloudSyncEnabled: payload.icloudSyncEnabled,
+    menuBarIconEnabled: payload.menuBarIconEnabled,
+  };
+}

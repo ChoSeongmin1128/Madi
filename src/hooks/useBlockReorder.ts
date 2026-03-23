@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
-import type { BlockVm } from '../adapters/documentAdapter';
+import type { BlockVm } from '../application/models/document';
 
 interface DragState {
   activeId: string;

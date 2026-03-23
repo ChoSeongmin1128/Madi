@@ -40,9 +40,19 @@ export const sessionGateway: SessionGateway = {
     useDocumentSessionStore.getState().setCurrentDocument(document);
   },
   setCurrentDocumentState(document) {
+    const state = useDocumentSessionStore.getState();
+    const blockIds = new Set(document.blocks.map((b) => b.id));
+    const normalizedSelectedBlockId =
+      state.selectedBlockId && blockIds.has(state.selectedBlockId) ? state.selectedBlockId : null;
+    const normalizedSelectedBlockIds = state.selectedBlockIds.filter((id) => blockIds.has(id));
+
     useDocumentSessionStore.setState({
       currentDocument: document,
       lastSavedAt: document.updatedAt,
+      selectedBlockId: normalizedSelectedBlockId,
+      selectedBlockIds: normalizedSelectedBlockIds,
+      blockSelected: normalizedSelectedBlockId !== null ? state.blockSelected : false,
+      allBlocksSelected: state.allBlocksSelected,
     });
   },
   setDocumentWithFocus(document, focusBlockId, caret = 'start') {

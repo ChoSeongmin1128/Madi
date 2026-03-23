@@ -1,10 +1,7 @@
-import {
-  summarizeDocument,
-  toDocumentSummaryVm,
-  toDocumentVm,
-  type DocumentVm,
-} from '../../../adapters/documentAdapter';
-import type { BlockCaretPlacement, BootstrapPayload } from '../../../lib/types';
+import type { BlockCaretPlacement } from '../../../lib/types';
+import type { DocumentVm } from '../../models/document';
+import type { WorkspaceBootstrapState } from '../../models/workspace';
+import { summarizeDocument } from '../../models/document';
 import type { SessionGateway } from '../../ports/sessionGateway';
 import type { WorkspaceGateway } from '../../ports/workspaceGateway';
 
@@ -37,18 +34,18 @@ export function setDocumentWithFocus(
 export function applyBootstrapPayloadState(
   workspace: WorkspaceGateway,
   session: SessionGateway,
-  payload: BootstrapPayload,
+  payload: WorkspaceBootstrapState,
   currentDocumentStrategy: CurrentDocumentStrategy = 'always',
 ) {
-  workspace.setDocuments(payload.documents.map(toDocumentSummaryVm));
-  workspace.setTrashDocuments(payload.trashDocuments.map(toDocumentSummaryVm));
+  workspace.setDocuments(payload.documents);
+  workspace.setTrashDocuments(payload.trashDocuments);
   workspace.setThemeMode(payload.themeMode);
   workspace.setDefaultBlockTintPreset(payload.defaultBlockTintPreset);
   workspace.setDefaultBlockKind(payload.defaultBlockKind);
   workspace.setIcloudSyncEnabled(payload.icloudSyncEnabled);
   workspace.setMenuBarIconEnabled(payload.menuBarIconEnabled);
 
-  const nextDocument = payload.currentDocument ? toDocumentVm(payload.currentDocument) : null;
+  const nextDocument = payload.currentDocument;
   if (currentDocumentStrategy === 'always') {
     session.setCurrentDocument(nextDocument);
     return;
@@ -62,7 +59,19 @@ export function applyBootstrapPayloadState(
   }
 
   const currentDocument = session.getCurrentDocument();
-  if (currentDocument && nextDocument && currentDocument.id === nextDocument.id) {
+
+  if (!currentDocument) {
+    session.setCurrentDocument(nextDocument);
+    return;
+  }
+
+  if (nextDocument && currentDocument.id === nextDocument.id) {
+    session.setCurrentDocument(nextDocument);
+    return;
+  }
+
+  const currentStillExists = payload.documents.some((doc) => doc.id === currentDocument.id);
+  if (!currentStillExists) {
     session.setCurrentDocument(nextDocument);
   }
 }

@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { DocumentVm } from '../../../adapters/documentAdapter';
+import type { DocumentSummaryVm, DocumentVm } from '../../models/document';
+import type { WorkspaceBootstrapState } from '../../models/workspace';
 import { createWorkspaceUseCases } from './workspaceUseCases';
-import type { BootstrapPayload } from '../../../lib/types';
 
-function createPayload(defaultBlockKind: BootstrapPayload['defaultBlockKind']): BootstrapPayload {
+function createPayload(defaultBlockKind: WorkspaceBootstrapState['defaultBlockKind']): WorkspaceBootstrapState {
   return {
     documents: [],
     trashDocuments: [],
@@ -120,5 +120,70 @@ describe('workspace usecases', () => {
     expect(workspace.setDefaultBlockKind).toHaveBeenCalledWith('text');
     expect(workspace.setSettingsOpen).toHaveBeenCalledWith(false);
     expect(syncMutation.enqueue).toHaveBeenCalledWith({ kind: 'documents-reset' });
+  });
+});
+
+describe('handleSyncEventMessage (remote-changed)', () => {
+  function createDocument(id: string): DocumentVm {
+    return { id, title: null, blockTintOverride: null, preview: '', updatedAt: 0, lastOpenedAt: 0, blockCount: 0, blocks: [] };
+  }
+
+  function createSummary(id: string): DocumentSummaryVm {
+    return { id, title: null, blockTintOverride: null, preview: '', updatedAt: 0, lastOpenedAt: 0, blockCount: 0 };
+  }
+
+  function createUseCasesWithRemote(currentDocument: DocumentVm | null, payload: WorkspaceBootstrapState) {
+    const workspace = createWorkspaceGateway();
+    const session = createSessionGateway(currentDocument);
+    const useCases = createWorkspaceUseCases({
+      backend: {
+        bootstrapApp: vi.fn(),
+        searchDocuments: vi.fn(),
+        setThemeMode: vi.fn(),
+        setDefaultBlockTintPreset: vi.fn(),
+        setIcloudSyncEnabled: vi.fn(),
+        setDefaultBlockKind: vi.fn(),
+        setMenuBarIconEnabled: vi.fn(),
+        deleteAllDocuments: vi.fn(),
+        applyRemoteDocuments: vi.fn(async () => payload),
+      } as never,
+      documentSync: { clearAllDocumentSync: vi.fn() } as never,
+      scheduler: { setTimeout: vi.fn(), clearTimeout: vi.fn() },
+      session,
+      syncMutation: { enqueue: vi.fn() },
+      workspace,
+    });
+    return { useCases, session };
+  }
+
+  it('clears current document when it is absent from a remote-changed payload', async () => {
+    const currentDoc = createDocument('doc-1');
+    const payload = { ...createPayload('markdown'), documents: [], currentDocument: null };
+    const { useCases, session } = createUseCasesWithRemote(currentDoc, payload);
+
+    await useCases.handleSyncEventMessage({ type: 'remote-changed', documents: [] });
+
+    expect(session.setCurrentDocument).toHaveBeenCalledWith(null);
+  });
+
+  it('switches to next document when current is absent from a remote-changed payload', async () => {
+    const currentDoc = createDocument('doc-1');
+    const nextDoc = createDocument('doc-2');
+    const payload = { ...createPayload('markdown'), documents: [createSummary('doc-2')], currentDocument: nextDoc };
+    const { useCases, session } = createUseCasesWithRemote(currentDoc, payload);
+
+    await useCases.handleSyncEventMessage({ type: 'remote-changed', documents: [] });
+
+    expect(session.setCurrentDocument).toHaveBeenCalledWith(nextDoc);
+  });
+
+  it('does not change current document when it still exists in a remote-changed payload', async () => {
+    const currentDoc = createDocument('doc-1');
+    const payload = { ...createPayload('markdown'), documents: [createSummary('doc-1')], currentDocument: null };
+    const { useCases, session } = createUseCasesWithRemote(currentDoc, payload);
+
+    await useCases.handleSyncEventMessage({ type: 'remote-changed', documents: [] });
+
+    expect(session.setCurrentDocument).not.toHaveBeenCalled();
   });
 });

@@ -1,6 +1,6 @@
-import { summarizeDocument, toDocumentVm, touchDocument } from '../../../adapters/documentAdapter';
 import type { BackendPort } from '../../ports/backendPort';
 import type { DocumentSyncPort } from '../../ports/documentSyncPort';
+import { summarizeDocument, touchDocument } from '../../models/document';
 import type { HistoryGateway } from '../../ports/historyGateway';
 import type { SessionGateway } from '../../ports/sessionGateway';
 import type { SyncMutationPort } from '../../ports/syncMutationPort';
@@ -53,7 +53,7 @@ export function createDocumentUseCases({
         await flushCurrentDocument();
       }
 
-      const document = toDocumentVm(await backend.createDocument());
+      const document = await backend.createDocument();
       workspace.clearError();
       history.clear();
       workspace.upsertDocumentSummary(summarizeDocument(document));
@@ -76,7 +76,7 @@ export function createDocumentUseCases({
         await flushCurrentDocument();
       }
 
-      const document = toDocumentVm(await backend.openDocument(documentId));
+      const document = await backend.openDocument(documentId);
       workspace.clearError();
       history.clear();
       workspace.upsertDocumentSummary(summarizeDocument(document));
@@ -94,9 +94,7 @@ export function createDocumentUseCases({
         return;
       }
 
-      const document = toDocumentVm(
-        await backend.renameDocument(currentDocument.id, title.trim() ? title : null),
-      );
+      const document = await backend.renameDocument(currentDocument.id, title.trim() ? title : null);
       workspace.clearError();
       updateDocumentState(session, workspace, document);
       syncMutation.enqueue({ kind: 'document-renamed', documentId: document.id });
@@ -145,9 +143,7 @@ export function createDocumentUseCases({
         return;
       }
 
-      const nextDocument = toDocumentVm(
-        await backend.setDocumentBlockTintOverride(currentDocument.id, preset),
-      );
+      const nextDocument = await backend.setDocumentBlockTintOverride(currentDocument.id, preset);
       workspace.clearError();
       updateDocumentState(session, workspace, nextDocument);
     } catch (error) {

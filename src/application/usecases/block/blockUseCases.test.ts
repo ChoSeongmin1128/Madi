@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { DocumentVm } from '../../../adapters/documentAdapter';
+import type { DocumentVm } from '../../models/document';
 import { createBlockUseCases } from './blockUseCases';
 
 function createCurrentDocument(): DocumentVm {

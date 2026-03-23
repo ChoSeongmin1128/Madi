@@ -1,14 +1,14 @@
 import { AlertTriangle, Check, MoonStar, MonitorCog, RefreshCw, SunMedium, X } from 'lucide-react';
 import { useRef, useState } from 'react';
-import { BlockTintPreview } from './BlockTintPreview';
-import { BLOCK_TINT_PRESETS } from '../lib/blockTint';
 import {
   deleteAllDocuments,
   setDefaultBlockKind,
   setDefaultBlockTintPreset,
   setMenuBarIconEnabled,
   setThemeMode,
-} from '../controllers/appController';
+} from '../app/actions';
+import { BlockTintPreview } from './BlockTintPreview';
+import { BLOCK_TINT_PRESETS } from '../lib/blockTint';
 import type { BlockKind, ThemeMode } from '../lib/types';
 import { useWorkspaceStore } from '../stores/workspaceStore';
 import { checkForUpdate, type UpdateStatus } from '../lib/appUpdater';

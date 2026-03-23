@@ -1,4 +1,4 @@
-import type { BlockVm } from '../adapters/documentAdapter';
+import type { BlockVm } from '../application/models/document';
 import { getCodeLanguageLabel } from '../lib/blockOptions';
 import { getBlockPreviewText } from '../lib/markdown';
 import type { BlockTintPreset } from '../lib/types';

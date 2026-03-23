@@ -1,41 +1,36 @@
 import type {
-  BlockDto,
   BlockKind,
-  BlockRestoreDto,
   BlockTintPreset,
-  BootstrapPayload,
-  DocumentDto,
-  DocumentSummaryDto,
   RemoteDocumentDto,
-  SearchResultDto,
   ThemeMode,
 } from '../../lib/types';
+import type { BlockVm, DocumentVm, RestoreBlockInput, SearchResultVm } from '../models/document';
+import type { WorkspaceBootstrapState } from '../models/workspace';
 
 export interface BackendPort {
-  bootstrapApp(): Promise<BootstrapPayload>;
-  listDocuments(): Promise<DocumentSummaryDto[]>;
-  searchDocuments(query: string): Promise<SearchResultDto[]>;
-  openDocument(documentId: string): Promise<DocumentDto>;
-  createDocument(): Promise<DocumentDto>;
-  renameDocument(documentId: string, title: string | null): Promise<DocumentDto>;
-  deleteDocument(documentId: string): Promise<BootstrapPayload>;
-  deleteAllDocuments(): Promise<BootstrapPayload>;
-  createBlockBelow(documentId: string, afterBlockId: string | null, kind?: BlockKind): Promise<DocumentDto>;
-  changeBlockKind(blockId: string, kind: BlockKind): Promise<BlockDto>;
-  moveBlock(documentId: string, blockId: string, targetPosition: number): Promise<DocumentDto>;
-  deleteBlock(blockId: string): Promise<DocumentDto>;
-  updateMarkdownBlock(blockId: string, content: string): Promise<BlockDto>;
-  updateCodeBlock(blockId: string, content: string, language: string | null): Promise<BlockDto>;
-  updateTextBlock(blockId: string, content: string): Promise<BlockDto>;
+  bootstrapApp(): Promise<WorkspaceBootstrapState>;
+  searchDocuments(query: string): Promise<SearchResultVm[]>;
+  openDocument(documentId: string): Promise<DocumentVm>;
+  createDocument(): Promise<DocumentVm>;
+  renameDocument(documentId: string, title: string | null): Promise<DocumentVm>;
+  deleteDocument(documentId: string): Promise<WorkspaceBootstrapState>;
+  deleteAllDocuments(): Promise<WorkspaceBootstrapState>;
+  createBlockBelow(documentId: string, afterBlockId: string | null, kind?: BlockKind): Promise<DocumentVm>;
+  changeBlockKind(blockId: string, kind: BlockKind): Promise<BlockVm>;
+  moveBlock(documentId: string, blockId: string, targetPosition: number): Promise<DocumentVm>;
+  deleteBlock(blockId: string): Promise<DocumentVm>;
+  updateMarkdownBlock(blockId: string, content: string): Promise<BlockVm>;
+  updateCodeBlock(blockId: string, content: string, language: string | null): Promise<BlockVm>;
+  updateTextBlock(blockId: string, content: string): Promise<BlockVm>;
   flushDocument(documentId: string): Promise<number>;
   setThemeMode(themeMode: ThemeMode): Promise<ThemeMode>;
   setDefaultBlockTintPreset(preset: BlockTintPreset): Promise<BlockTintPreset>;
-  setDocumentBlockTintOverride(documentId: string, blockTintOverride: BlockTintPreset | null): Promise<DocumentDto>;
-  restoreDocumentBlocks(documentId: string, blocks: BlockRestoreDto[]): Promise<DocumentDto>;
+  setDocumentBlockTintOverride(documentId: string, blockTintOverride: BlockTintPreset | null): Promise<DocumentVm>;
+  restoreDocumentBlocks(documentId: string, blocks: RestoreBlockInput[]): Promise<DocumentVm>;
   emptyTrash(): Promise<void>;
-  restoreDocumentFromTrash(documentId: string): Promise<BootstrapPayload>;
+  restoreDocumentFromTrash(documentId: string): Promise<WorkspaceBootstrapState>;
   setIcloudSyncEnabled(enabled: boolean): Promise<boolean>;
   setMenuBarIconEnabled(enabled: boolean): Promise<boolean>;
   setDefaultBlockKind(kind: BlockKind): Promise<BlockKind>;
-  applyRemoteDocuments(documents: RemoteDocumentDto[]): Promise<BootstrapPayload>;
+  applyRemoteDocuments(documents: RemoteDocumentDto[]): Promise<WorkspaceBootstrapState>;
 }

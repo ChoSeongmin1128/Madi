@@ -1,4 +1,4 @@
-import type { DocumentVm } from '../../adapters/documentAdapter';
+import type { DocumentVm } from '../models/document';
 
 export interface HistoryGateway {
   clear(): void;

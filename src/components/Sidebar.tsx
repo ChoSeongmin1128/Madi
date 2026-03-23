@@ -1,7 +1,7 @@
 import { FileSearch, Plus, RotateCcw, Search, Settings2, Trash2, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { createDocument, emptyTrash, openDocument, restoreDocumentFromTrash, setSearchQuery } from '../app/actions';
 import { SidebarDocumentMenu } from './SidebarDocumentMenu';
-import { createDocument, emptyTrash, openDocument, restoreDocumentFromTrash, setSearchQuery } from '../controllers/appController';
 import { getVisibleDocumentTitle } from '../lib/documentTitle';
 import { useDocumentSessionStore } from '../stores/documentSessionStore';
 import { useWorkspaceStore } from '../stores/workspaceStore';

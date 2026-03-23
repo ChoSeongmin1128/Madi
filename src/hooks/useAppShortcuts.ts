@@ -7,7 +7,7 @@ import {
   pasteBlocks,
   undoBlockOperation,
   redoBlockOperation,
-} from '../controllers/appController';
+} from '../app/actions';
 import { useDocumentSessionStore } from '../stores/documentSessionStore';
 import { resetHoldState } from '../lib/backspaceHoldState';
 

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { DocumentVm } from '../adapters/documentAdapter';
+import type { DocumentVm } from '../application/models/document';
 
 const MAX_HISTORY = 50;
 

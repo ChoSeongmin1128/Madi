@@ -1,8 +1,8 @@
 import { Check, MoreHorizontal, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { deleteDocument, setDocumentBlockTintOverride } from '../app/actions';
 import { BlockTintPreview } from './BlockTintPreview';
 import { BLOCK_TINT_PRESETS } from '../lib/blockTint';
-import { deleteDocument, setDocumentBlockTintOverride } from '../controllers/appController';
 import { useDocumentSessionStore } from '../stores/documentSessionStore';
 import { useWorkspaceStore } from '../stores/workspaceStore';
 

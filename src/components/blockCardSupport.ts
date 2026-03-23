@@ -1,4 +1,4 @@
-import type { BlockVm } from '../adapters/documentAdapter';
+import type { BlockVm } from '../application/models/document';
 import { isMarkdownContentEmpty } from '../lib/markdown';
 import type { BlockKind } from '../lib/types';
 import type { ContextMenuItem } from './ContextMenu';

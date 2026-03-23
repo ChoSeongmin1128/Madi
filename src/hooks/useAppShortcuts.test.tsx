@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render } from '@testing-library/react';
-import type { DocumentVm } from '../adapters/documentAdapter';
+import type { DocumentVm } from '../application/models/document';
 import { useAppShortcuts } from './useAppShortcuts';
 import { useDocumentSessionStore } from '../stores/documentSessionStore';
 
@@ -12,7 +12,7 @@ const controllerMocks = vi.hoisted(() => ({
   pasteBlocks: vi.fn().mockResolvedValue(undefined),
 }));
 
-vi.mock('../controllers/appController', () => controllerMocks);
+vi.mock('../app/actions', () => controllerMocks);
 
 function Harness() {
   useAppShortcuts();

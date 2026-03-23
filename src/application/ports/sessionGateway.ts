@@ -1,5 +1,5 @@
-import type { DocumentVm } from '../../adapters/documentAdapter';
 import type { BlockCaretPlacement } from '../../lib/types';
+import type { DocumentVm } from '../models/document';
 
 export interface SessionSelectionState {
   selectedBlockId: string | null;

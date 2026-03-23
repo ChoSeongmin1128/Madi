@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
+import { commitDocumentTitle, moveBlock } from '../app/actions';
 import { BlockCard } from './BlockCard';
 import { BlockGhostPreview } from './BlockGhostPreview';
 import { DocumentMenu } from './DocumentMenu';
 import { getEditableDocumentTitle } from '../lib/documentTitle';
-import { commitDocumentTitle, moveBlock } from '../controllers/appController';
 import { useDocumentSessionStore } from '../stores/documentSessionStore';
 import { useWorkspaceStore } from '../stores/workspaceStore';
 import { useBlockReorder } from '../hooks/useBlockReorder';
