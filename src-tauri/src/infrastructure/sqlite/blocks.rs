@@ -214,7 +214,7 @@ impl BlockRepository for SqliteStore {
   fn restore_blocks(
     &mut self,
     document_id: &str,
-    blocks: &[crate::application::dto::BlockRestoreDto],
+    blocks: &[crate::ports::models::RestoreBlockInput],
   ) -> Result<Vec<Block>, AppError> {
     let now = Self::now();
     let transaction = self.connection.transaction()?;

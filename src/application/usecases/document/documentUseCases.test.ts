@@ -1,0 +1,114 @@
+import { describe, expect, it, vi } from 'vitest';
+import { createDocumentUseCases } from './documentUseCases';
+import type { DocumentVm } from '../../../adapters/documentAdapter';
+import type { BootstrapPayload } from '../../../lib/types';
+
+function createPayload(defaultBlockKind: BootstrapPayload['defaultBlockKind']): BootstrapPayload {
+  return {
+    documents: [],
+    trashDocuments: [],
+    currentDocument: null,
+    themeMode: 'light',
+    defaultBlockTintPreset: 'mist',
+    defaultBlockKind,
+    icloudSyncEnabled: false,
+    menuBarIconEnabled: false,
+  };
+}
+
+function createSessionGateway(currentDocument: DocumentVm | null = null) {
+  let current = currentDocument;
+
+  return {
+    getCurrentDocument: vi.fn(() => current),
+    getSelectionState: vi.fn(() => ({
+      selectedBlockId: null,
+      selectedBlockIds: [],
+      blockSelected: false,
+      allBlocksSelected: false,
+    })),
+    setCurrentDocument: vi.fn((document) => {
+      current = document;
+    }),
+    setCurrentDocumentState: vi.fn(),
+    setDocumentWithFocus: vi.fn(),
+    clearBlockSelection: vi.fn(),
+    requestBlockFocus: vi.fn(),
+    clearActiveEditorRef: vi.fn(),
+    setIsFlushing: vi.fn(),
+  };
+}
+
+function createWorkspaceGateway() {
+  return {
+    setDocuments: vi.fn(),
+    setTrashDocuments: vi.fn(),
+    upsertDocumentSummary: vi.fn(),
+    setSearchResults: vi.fn(),
+    setSearchQuery: vi.fn(),
+    setIsBootstrapping: vi.fn(),
+    clearError: vi.fn(),
+    setError: vi.fn(),
+    setDefaultBlockTintPreset: vi.fn(),
+    setDefaultBlockKind: vi.fn(),
+    setThemeMode: vi.fn(),
+    setIcloudSyncEnabled: vi.fn(),
+    getIcloudSyncStatus: vi.fn(() => ({ state: 'idle' as const, lastSyncAt: null, errorMessage: null })),
+    setIcloudSyncStatus: vi.fn(),
+    setMenuBarIconEnabled: vi.fn(),
+    setSettingsOpen: vi.fn(),
+  };
+}
+
+describe('document usecases', () => {
+  it('syncs default block kind when deleting a document', async () => {
+    const workspace = createWorkspaceGateway();
+    const session = createSessionGateway();
+    const documentSync = { clearDocumentSync: vi.fn(), flushDocumentSaves: vi.fn() };
+    const useCases = createDocumentUseCases({
+      backend: {
+        deleteDocument: vi.fn(async () => createPayload('code')),
+      } as never,
+      documentSync: documentSync as never,
+      history: { clear: vi.fn() } as never,
+      session,
+      syncMutation: { enqueue: vi.fn() },
+      workspace,
+    });
+
+    await useCases.deleteDocument('doc-1');
+
+    expect(documentSync.clearDocumentSync).toHaveBeenCalledWith('doc-1');
+    expect(workspace.setDefaultBlockKind).toHaveBeenCalledWith('code');
+  });
+
+  it('keeps current document while still syncing default block kind during restore', async () => {
+    const currentDocument = {
+      id: 'current-doc',
+      title: null,
+      blockTintOverride: null,
+      preview: '',
+      updatedAt: 1,
+      lastOpenedAt: 1,
+      blockCount: 1,
+      blocks: [],
+    } satisfies DocumentVm;
+    const workspace = createWorkspaceGateway();
+    const session = createSessionGateway(currentDocument);
+    const useCases = createDocumentUseCases({
+      backend: {
+        restoreDocumentFromTrash: vi.fn(async () => createPayload('text')),
+      } as never,
+      documentSync: { flushDocumentSaves: vi.fn() } as never,
+      history: { clear: vi.fn() } as never,
+      session,
+      syncMutation: { enqueue: vi.fn() },
+      workspace,
+    });
+
+    await useCases.restoreDocumentFromTrash('trash-doc');
+
+    expect(workspace.setDefaultBlockKind).toHaveBeenCalledWith('text');
+    expect(session.setCurrentDocument).not.toHaveBeenCalled();
+  });
+});

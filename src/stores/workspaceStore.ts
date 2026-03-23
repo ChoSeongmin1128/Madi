@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { BlockKind, BlockTintPreset, ICloudSyncStatus, ThemeMode } from '../lib/types';
 import type { DocumentSummaryVm, SearchResultVm } from '../adapters/documentAdapter';
-import type { CodeLanguageId } from '../lib/blockOptions';
+import type { CodeLanguageId } from '../lib/codeLanguageRegistry';
 
 interface WorkspaceState {
   documents: DocumentSummaryVm[];

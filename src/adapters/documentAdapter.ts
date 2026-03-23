@@ -1,4 +1,4 @@
-import { normalizeCodeLanguage, type CodeLanguageId } from '../lib/blockOptions';
+import { normalizeCodeLanguage, type CodeLanguageId } from '../lib/codeLanguageRegistry';
 import { getBlockPlainText } from '../lib/markdown';
 import type {
   BlockDto,

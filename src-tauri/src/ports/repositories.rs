@@ -1,5 +1,6 @@
 use crate::domain::models::{AppSettings, Block, BlockKind, BlockTintPreset, Document, DocumentSummary, SearchResult, ThemeMode};
 use crate::error::AppError;
+use crate::ports::models::RestoreBlockInput;
 
 pub trait DocumentRepository {
   fn ensure_initial_document(&mut self) -> Result<(), AppError>;
@@ -46,7 +47,7 @@ pub trait BlockRepository {
   fn restore_blocks(
     &mut self,
     document_id: &str,
-    blocks: &[crate::application::dto::BlockRestoreDto],
+    blocks: &[RestoreBlockInput],
   ) -> Result<Vec<Block>, AppError>;
 }
 

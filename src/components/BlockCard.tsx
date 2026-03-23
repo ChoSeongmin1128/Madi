@@ -23,7 +23,7 @@ import {
 import { createEmptyMarkdownContent } from '../lib/markdown';
 import { useWorkspaceStore } from '../stores/workspaceStore';
 import type { BlockEditorHandle } from '../lib/editorHandle';
-import type { CodeLanguageId } from '../lib/blockOptions';
+import type { CodeLanguageId } from '../lib/codeLanguageRegistry';
 import type { BlockCaretPlacement, BlockKind } from '../lib/types';
 import { useDocumentSessionStore } from '../stores/documentSessionStore';
 import { BlockMenu } from './BlockMenu';
