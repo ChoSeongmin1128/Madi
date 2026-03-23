@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { canSkipPause, scheduleBlockDeletion } from '../../lib/backspaceHoldState';
 import {
   highlightCodeToHtml,
   loadCodeLanguageRegistration,
@@ -321,7 +322,11 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
 
             if (event.key === 'Backspace' && val.length === 0 && isCollapsed) {
               event.preventDefault();
-              onDeleteIfEmpty();
+              if (!event.repeat || canSkipPause()) {
+                onDeleteIfEmpty();
+              } else {
+                scheduleBlockDeletion(onDeleteIfEmpty);
+              }
               return;
             }
 

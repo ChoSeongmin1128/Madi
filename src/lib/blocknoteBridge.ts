@@ -52,8 +52,9 @@ export function getBlockNoteTextBoundaries(editor: BlockNoteEditorLike) {
   let lastCursorPos: number | null = null;
   let prevLastCursorPos: number | null = null;
   let lastNodeSize = 0;
+  let lastNodeTypeName: string | null = null;
 
-  doc.descendants((node: { isTextblock: boolean; nodeSize: number; textContent: string }, pos: number) => {
+  doc.descendants((node: { isTextblock: boolean; nodeSize: number; textContent: string; type: { name: string } }, pos: number) => {
     if (!node.isTextblock) {
       return;
     }
@@ -65,6 +66,7 @@ export function getBlockNoteTextBoundaries(editor: BlockNoteEditorLike) {
     prevLastCursorPos = lastCursorPos;
     lastCursorPos = pos + node.nodeSize - 1;
     lastNodeSize = node.nodeSize;
+    lastNodeTypeName = node.type.name;
   });
 
   if (firstCursorPos === null || lastCursorPos === null) {
@@ -72,8 +74,11 @@ export function getBlockNoteTextBoundaries(editor: BlockNoteEditorLike) {
   }
 
   // 마지막 textblock이 빈 trailing paragraph(nodeSize <= 2)이고 다른 블록이 있으면 건너뛰기
+  // paragraph 타입만 건너뜀 — 빈 listItem/taskItem은 의도한 내용이므로 제외
   const effectiveLastCursorPos =
-    lastNodeSize <= 2 && prevLastCursorPos !== null ? prevLastCursorPos : lastCursorPos;
+    lastNodeSize <= 2 && lastNodeTypeName === 'paragraph' && prevLastCursorPos !== null
+      ? prevLastCursorPos
+      : lastCursorPos;
 
   return {
     firstCursorPos,

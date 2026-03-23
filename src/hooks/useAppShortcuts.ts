@@ -9,6 +9,7 @@ import {
   redoBlockOperation,
 } from '../controllers/appController';
 import { useDocumentSessionStore } from '../stores/documentSessionStore';
+import { resetHoldState } from '../lib/backspaceHoldState';
 
 function isEditableTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) {
@@ -143,11 +144,19 @@ export function useAppShortcuts() {
       void flushCurrentDocument();
     };
 
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.key === 'Backspace') {
+        resetHoldState();
+      }
+    };
+
     window.addEventListener('keydown', onKeyDown, true);
+    window.addEventListener('keyup', onKeyUp, true);
     window.addEventListener('paste', onPaste, true);
     window.addEventListener('beforeunload', onBeforeUnload);
     return () => {
       window.removeEventListener('keydown', onKeyDown, true);
+      window.removeEventListener('keyup', onKeyUp, true);
       window.removeEventListener('paste', onPaste, true);
       window.removeEventListener('beforeunload', onBeforeUnload);
     };

@@ -15,8 +15,8 @@
         "title": "MinNote",
         "width": 1440,
         "height": 920,
-        "minWidth": 980,
-        "minHeight": 720,
+        "minWidth": 450,
+        "minHeight": 400,
         "resizable": true,
         "fullscreen": false
       }

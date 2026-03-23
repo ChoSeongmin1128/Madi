@@ -8,12 +8,12 @@ import {
 } from '../../lib/blocknoteBridge';
 import { shouldReplaceMarkdownArrow } from '../../lib/markdownEditorBehavior';
 import { isMarkdownContentEmpty } from '../../lib/markdown';
+import { canSkipPause, scheduleBlockDeletion } from '../../lib/backspaceHoldState';
 import type { BlockCaretPlacement } from '../../lib/types';
 
 interface MarkdownKeydownParams {
   editor: BlockNoteEditorLike;
   isWholeBlockSelectedRef: MutableRefObject<boolean>;
-  deleteReadyRef: MutableRefObject<boolean>;
   emitSelectionVisualState: () => void;
   getCurrentMarkdown: () => string;
   onCreateBelow: () => void;
@@ -25,7 +25,6 @@ interface MarkdownKeydownParams {
 export function createMarkdownKeydownHandler({
   editor,
   isWholeBlockSelectedRef,
-  deleteReadyRef,
   emitSelectionVisualState,
   getCurrentMarkdown,
   onCreateBelow,
@@ -99,15 +98,16 @@ export function createMarkdownKeydownHandler({
     if (event.key === 'Backspace' && isMarkdownContentEmpty(getCurrentMarkdown())) {
       if (isBlockNoteSelectionEmpty(editor)) {
         if (editor.document.length <= 1) {
-          if (deleteReadyRef.current) {
-            event.preventDefault();
-            isWholeBlockSelectedRef.current = false;
-            deleteReadyRef.current = false;
+          event.preventDefault();
+          isWholeBlockSelectedRef.current = false;
+          if (!event.repeat || canSkipPause()) {
             onDeleteIfEmpty();
             emitSelectionVisualState();
           } else {
-            event.preventDefault();
-            deleteReadyRef.current = true;
+            scheduleBlockDeletion(() => {
+              onDeleteIfEmpty();
+              emitSelectionVisualState();
+            });
           }
         }
         // 빈 paragraph가 여러 개면 BlockNote가 자체적으로 병합하도록 허용
@@ -117,7 +117,6 @@ export function createMarkdownKeydownHandler({
 
     if (event.key.length === 1 || event.key === 'Enter' || event.key === 'Tab') {
       isWholeBlockSelectedRef.current = false;
-      deleteReadyRef.current = false;
       emitSelectionVisualState();
     }
   };

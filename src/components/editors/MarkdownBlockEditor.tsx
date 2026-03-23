@@ -55,7 +55,6 @@ export const MarkdownBlockEditor = forwardRef<BlockEditorHandle, MarkdownBlockEd
   const isApplyingRemoteContentRef = useRef(false);
   const isWholeBlockSelectedRef = useRef(false);
   const hasUserEditedRef = useRef(false);
-  const deleteReadyRef = useRef(false);
   const lastSerializedMarkdownRef = useRef('');
   const resolvedTheme = useResolvedTheme(themeMode);
 
@@ -150,7 +149,6 @@ export const MarkdownBlockEditor = forwardRef<BlockEditorHandle, MarkdownBlockEd
       createMarkdownKeydownHandler({
         editor,
         isWholeBlockSelectedRef,
-        deleteReadyRef,
         emitSelectionVisualState,
         getCurrentMarkdown,
         onCreateBelow,

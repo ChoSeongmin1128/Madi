@@ -1306,6 +1306,16 @@ button {
   background: color-mix(in srgb, Highlight 28%, transparent);
 }
 
+/* trailing empty paragraph만 숨김 — 빈 listItem/taskItem은 의도한 내용이므로 제외 */
+.markdown-blocknote-shell .bn-block-group:not(.bn-block .bn-block-group) > .bn-block-outer:last-child:not(:first-child) .bn-block-content[data-content-type='paragraph'] .bn-inline-content:has(> .ProseMirror-trailingBreak:only-child)::before {
+  display: none;
+}
+
+.markdown-blocknote-shell .bn-block-group:not(.bn-block .bn-block-group) > .bn-block-outer:last-child:not(:first-child) .bn-block-content[data-content-type='paragraph'] .bn-inline-content:has(> .ProseMirror-trailingBreak:only-child) {
+  min-height: 0;
+  line-height: 0;
+  padding: 0;
+}
 
 .plain-editor {
   position: relative;
