@@ -106,7 +106,11 @@ git diff --cached --quiet
 git push origin main
 git tag -f "$TAG"
 git push origin "$TAG" --force
-gh release edit "$TAG" --title "MinNote $TAG" --notes "MinNote $TAG 업데이트"
+if gh release view "$TAG" >/dev/null 2>&1; then
+  gh release edit "$TAG" --title "MinNote $TAG" --notes "MinNote $TAG 업데이트"
+else
+  gh release create "$TAG" --title "MinNote $TAG" --notes "MinNote $TAG 업데이트"
+fi
 gh release upload "$TAG" \
   "$RELEASE_DIR/MinNote_${VERSION}_aarch64.dmg#MinNote_${VERSION}_aarch64.dmg" \
   "$RELEASE_DIR/MinNote_aarch64.app.tar.gz#MinNote_aarch64.app.tar.gz" \
