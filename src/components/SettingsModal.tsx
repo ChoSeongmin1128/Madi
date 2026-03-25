@@ -1,5 +1,5 @@
 import { AlertTriangle, MoonStar, MonitorCog, RefreshCw, SunMedium, X } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import {
   deleteAllDocuments,
   setAlwaysOnTopEnabled,
@@ -18,7 +18,7 @@ import { DocumentSurfacePreview } from './DocumentSurfacePreview';
 import { SegmentedSelector } from './SegmentedSelector';
 import type { BlockKind, ThemeMode } from '../lib/types';
 import { useWorkspaceStore } from '../stores/workspaceStore';
-import { checkForUpdate, type UpdateStatus } from '../lib/appUpdater';
+import { applyPreparedUpdate, formatUpdateStatusMessage, runUpdateCheck } from '../lib/appUpdater';
 import { ShortcutCaptureField } from './ShortcutCaptureField';
 import {
   MAX_WINDOW_OPACITY_PERCENT,
@@ -97,11 +97,11 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const alwaysOnTopEnabled = useWorkspaceStore((state) => state.alwaysOnTopEnabled);
   const globalToggleShortcut = useWorkspaceStore((state) => state.globalToggleShortcut);
   const globalShortcutError = useWorkspaceStore((state) => state.globalShortcutError);
+  const appUpdateStatus = useWorkspaceStore((state) => state.appUpdateStatus);
   const { draftOpacity, previewOpacity, commitOpacity } = useWindowOpacityControl();
   const [isConfirmOpen, setConfirmOpen] = useState(false);
-  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>({ state: 'idle' });
-  const installerRef = useRef<{ install(): Promise<void>; relaunch(): Promise<void> } | null>(null);
   const icloudSyncDescription = formatIcloudSyncDescription(icloudSyncEnabled, icloudSyncStatus);
+  const appUpdateMessage = formatUpdateStatusMessage(appUpdateStatus);
 
   if (!isOpen) {
     return null;
@@ -296,49 +296,33 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         <div className="settings-section">
           <div className="settings-section-header">
             <span className="settings-section-title">업데이트</span>
-            {updateStatus.state !== 'idle' && (
+            {appUpdateMessage && (
               <span className="document-menu-option-description">
-                {updateStatus.state === 'checking' && '확인 중...'}
-                {updateStatus.state === 'up-to-date' && '최신 버전입니다.'}
-                {updateStatus.state === 'available' && `새 버전 ${updateStatus.version}이 있습니다.`}
-                {updateStatus.state === 'downloading' && `다운로드 중... ${updateStatus.percent}%`}
-                {updateStatus.state === 'ready' && '설치 완료. 재시작하면 적용됩니다.'}
-                {updateStatus.state === 'error' && updateStatus.message}
+                {appUpdateMessage}
               </span>
             )}
           </div>
           <div className="settings-update-actions">
-            {updateStatus.state !== 'ready' && (
+            <button
+              className="ghost-button"
+              type="button"
+              disabled={appUpdateStatus.state === 'checking' || appUpdateStatus.state === 'available_downloading'}
+              onClick={() => {
+                void runUpdateCheck();
+              }}
+            >
+              <RefreshCw size={14} />
+              업데이트 확인
+            </button>
+            {appUpdateStatus.state === 'ready_to_install' && (
               <button
                 className="ghost-button"
                 type="button"
-                disabled={updateStatus.state === 'checking' || updateStatus.state === 'downloading'}
                 onClick={() => {
-                  void checkForUpdate(setUpdateStatus).then((installer) => {
-                    if (installer) installerRef.current = installer;
-                  });
+                  void applyPreparedUpdate();
                 }}
               >
-                <RefreshCw size={14} />
-                업데이트 확인
-              </button>
-            )}
-            {updateStatus.state === 'available' && (
-              <button
-                className="ghost-button"
-                type="button"
-                onClick={() => void installerRef.current?.install()}
-              >
-                지금 설치
-              </button>
-            )}
-            {updateStatus.state === 'ready' && (
-              <button
-                className="ghost-button"
-                type="button"
-                onClick={() => void installerRef.current?.relaunch()}
-              >
-                재시작
+                재시작하여 적용
               </button>
             )}
           </div>

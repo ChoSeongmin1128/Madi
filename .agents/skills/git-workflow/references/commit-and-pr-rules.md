@@ -17,6 +17,7 @@
 - `summary`는 한국어로 짧게 씁니다.
 - 제목 끝에 마침표는 붙이지 않습니다.
 - 한 커밋에는 한 가지 의도만 담는 것을 우선합니다.
+- 커밋 전에는 최소한 `pnpm exec tsc -b --pretty false`, `pnpm test:run`, `cargo check --no-default-features` 결과를 확인합니다.
 
 예시:
 
@@ -59,3 +60,17 @@ docs: 초기 Codex 문서 구조 추가
 - 사용자에게 최종 보고할 때는 파일 목록 나열보다 의도 중심으로 정리합니다.
 - 테스트를 하지 못했으면 명확히 적습니다.
 - 문서/skill 구조를 손댈 때는 사용자가 알아야 할 운영 변화가 있는지 같이 언급합니다.
+
+## 태그와 릴리스
+
+- 릴리스 태그는 검증이 끝난 커밋에서만 생성합니다.
+- 태그 형식은 `vX.Y.Z`를 사용합니다.
+- 태그 생성 전에는 워크트리가 clean인지 확인합니다.
+- 버전 변경 시 아래 4개 파일을 같은 버전으로 맞춥니다.
+  - `package.json`
+  - `src-tauri/tauri.conf.json`
+  - `src-tauri/Cargo.toml`
+  - `src-tauri/Cargo.lock`의 `name = "minnote"` 항목
+- GitHub hosted runner는 공증된 `.app`과 updater 산출물(`.app.tar.gz`, `.sig`, `latest.json`)만 릴리스에 올립니다.
+- self-hosted macOS runner는 DMG 생성, DMG 서명/공증/검증, release publish를 담당합니다.
+- DMG가 release에 첨부되기 전까지는 배포 완료로 간주하지 않습니다.

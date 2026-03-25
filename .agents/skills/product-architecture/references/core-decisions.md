@@ -25,7 +25,8 @@
 ## 블록 종류 및 에디터
 
 - 1차 블록 종류는 `Markdown + Code + Text` 3종입니다.
-- Markdown 블록과 Text 블록은 모두 `BlockNote 기반` 편집기를 사용합니다. Text 블록은 Markdown과 동일한 에디터이지만 용도 구분을 위해 별도 kind로 유지합니다.
+- Markdown 블록은 `BlockNote 기반` 편집기를 사용합니다.
+- Text 블록은 `plain textarea 기반` 편집기를 사용합니다.
 - Code 블록은 `plain textarea + highlight.js 기반 구문 강조` 편집기를 사용합니다.
 - Markdown 블록의 canonical 저장 형식은 `normalized Markdown string`입니다.
 - Code 블록의 canonical 저장 형식은 `plain string + language metadata`입니다.
@@ -53,6 +54,8 @@
 - macOS Liquid Glass 스타일을 채택합니다 (`backdrop-filter: blur`, 반투명 배경, 부드러운 둥근 모서리).
 - 블록 추가/제거 시 `framer-motion` 기반 레이아웃 애니메이션을 적용합니다.
 - 블록 선택은 전체 테두리(border + box-shadow glow)로 표시합니다.
+- 업데이트는 설정창 보조 UI와 별도로 헤더 우측의 작은 pill/button으로 노출합니다.
+- 새 버전이 발견되면 백그라운드 다운로드를 먼저 진행하고, 다운로드 완료 후 재시작/적용 버튼을 노출합니다.
 
 ## 미정인 항목
 

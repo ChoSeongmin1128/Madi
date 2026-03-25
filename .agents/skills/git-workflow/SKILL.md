@@ -12,6 +12,7 @@ description: Use this skill when writing commit messages, naming branches, prepa
 - 브랜치 이름을 정할 때
 - PR 제목이나 본문 형식을 맞출 때
 - 변경 사항을 사용자나 리뷰어에게 짧게 정리할 때
+- 커밋, 태그, 릴리스 순서를 정리할 때
 
 다음 상황에서는 이 skill을 우선 사용하지 않습니다.
 - 제품 구조나 아키텍처 결정을 내릴 때

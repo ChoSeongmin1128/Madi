@@ -593,6 +593,38 @@ button {
   gap: 4px;
 }
 
+.update-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid color-mix(in srgb, CanvasText 10%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--canvas-surface-bg) 88%, CanvasText 4%);
+  color: inherit;
+  padding: 7px 11px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.update-pill:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--canvas-surface-bg) 72%, Highlight 8%);
+}
+
+.update-pill:disabled {
+  cursor: default;
+  opacity: 0.84;
+}
+
+.update-pill.is-ready {
+  border-color: color-mix(in srgb, Highlight 24%, transparent);
+  background: color-mix(in srgb, Highlight 9%, var(--canvas-surface-bg));
+}
+
+.update-pill.is-ready:hover {
+  background: color-mix(in srgb, Highlight 14%, var(--canvas-surface-bg));
+}
+
 .workspace-status {
   display: inline-flex;
   align-items: center;

@@ -14,12 +14,15 @@
 - 저장소에는 루트 문서, repo-local skills, Vite 기반 React 프런트엔드, `src-tauri` Rust 백엔드 스캐폴드가 존재합니다.
 - `package.json`, `pnpm-lock.yaml`, `src/`, `src-tauri/`가 실제 기준점입니다.
 - 현재 로컬 환경에서는 Node/pnpm, Rust toolchain, `tauri-cli`가 확인됐습니다.
+- 로컬 `pnpm tauri:dev`와 `pnpm tauri:build`는 Swift sidecar를 자동으로 빌드합니다.
+- 릴리스용 DMG는 `scripts/create-dmg.sh`를 기준으로 만들고, 최종 배포는 self-hosted macOS runner가 필요합니다.
 
 ## 작업 원칙
 
 - 패키지 설치, 스크립트 예시, 실행 방법은 `pnpm` 기준으로 설명합니다.
 - macOS 전용 동작이나 UI/배포 제약이 있으면 cross-platform 일반론보다 macOS 관점을 우선합니다.
 - Tauri 개발은 주로 CLI 기반으로 진행하고, Xcode는 macOS toolchain과 배포 관련 작업에서 보조적으로 사용될 수 있습니다.
+- hosted GitHub runner는 updater 산출물과 공증된 `.app` 기준 작업에 사용하고, DMG 포장은 self-hosted macOS runner 기준으로 설명합니다.
 - 새로운 코어 툴체인 선택이나 기존 확정 스택 변경은 사용자 승인 없이 하지 않습니다.
 
 ## Gotchas

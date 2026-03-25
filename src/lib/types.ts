@@ -89,6 +89,21 @@ export interface ICloudSyncStatus {
   errorMessage: string | null;
 }
 
+export type AppUpdateState =
+  | 'idle'
+  | 'checking'
+  | 'available_downloading'
+  | 'ready_to_install'
+  | 'error';
+
+export interface AppUpdateStatus {
+  state: AppUpdateState;
+  version: string | null;
+  percent: number | null;
+  message: string | null;
+  lastCheckedAt: number | null;
+}
+
 // CloudKit에서 받은 원격 문서 (sidecar → frontend → Rust)
 export interface RemoteDocumentDto {
   id: string;

@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import type {
+  AppUpdateStatus,
   BlockKind,
   BlockTintPreset,
   DocumentSurfaceTonePreset,
@@ -23,6 +24,7 @@ interface WorkspaceState {
   themeMode: ThemeMode;
   icloudSyncEnabled: boolean;
   icloudSyncStatus: ICloudSyncStatus;
+  appUpdateStatus: AppUpdateStatus;
   menuBarIconEnabled: boolean;
   alwaysOnTopEnabled: boolean;
   windowOpacityPercent: number;
@@ -46,6 +48,7 @@ interface WorkspaceState {
   setThemeMode: (themeMode: ThemeMode) => void;
   setIcloudSyncEnabled: (value: boolean) => void;
   setIcloudSyncStatus: (status: ICloudSyncStatus) => void;
+  setAppUpdateStatus: (status: AppUpdateStatus) => void;
   setMenuBarIconEnabled: (value: boolean) => void;
   setAlwaysOnTopEnabled: (value: boolean) => void;
   setWindowOpacityPercent: (value: number) => void;
@@ -75,6 +78,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
   themeMode: 'system',
   icloudSyncEnabled: false,
   icloudSyncStatus: { state: 'disabled', lastSyncAt: null, errorMessage: null },
+  appUpdateStatus: { state: 'idle', version: null, percent: null, message: null, lastCheckedAt: null },
   menuBarIconEnabled: false,
   alwaysOnTopEnabled: false,
   windowOpacityPercent: 100,
@@ -108,6 +112,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
   setThemeMode: (themeMode) => set({ themeMode }),
   setIcloudSyncEnabled: (icloudSyncEnabled) => set({ icloudSyncEnabled }),
   setIcloudSyncStatus: (icloudSyncStatus) => set({ icloudSyncStatus }),
+  setAppUpdateStatus: (appUpdateStatus) => set({ appUpdateStatus }),
   setMenuBarIconEnabled: (menuBarIconEnabled) => set({ menuBarIconEnabled }),
   setAlwaysOnTopEnabled: (alwaysOnTopEnabled) => set({ alwaysOnTopEnabled }),
   setWindowOpacityPercent: (windowOpacityPercent) => set({ windowOpacityPercent }),

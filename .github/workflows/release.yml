@@ -6,7 +6,7 @@ on:
       - 'v*'
 
 jobs:
-  release:
+  release_app:
     runs-on: macos-latest
     permissions:
       contents: write
@@ -35,8 +35,8 @@ jobs:
           APPLE_PROVISIONING_PROFILE: ${{ secrets.APPLE_PROVISIONING_PROFILE }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
-          echo $APPLE_CERTIFICATE | base64 --decode > certificate.p12
-          echo $APPLE_PROVISIONING_PROFILE | base64 --decode > src-tauri/embedded.provisionprofile
+          echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
+          echo "$APPLE_PROVISIONING_PROFILE" | base64 --decode > src-tauri/embedded.provisionprofile
           security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
           security default-keychain -s build.keychain
           security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
@@ -56,7 +56,7 @@ jobs:
           swift build -c release --arch x86_64
           cp .build/x86_64-apple-macosx/release/MNSyncDaemon ../src-tauri/binaries/minnote-sync-x86_64-apple-darwin
 
-      - name: Build macOS bundles
+      - name: Build notarized app bundle
         env:
           CI: true
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -66,35 +66,9 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_SIGNING_IDENTITY: "Developer ID Application: SEONGMIN CHO (5YG4V2PLZV)"
         run: |
-          for attempt in 1 2 3; do
-            echo "Build attempt ${attempt}/3"
+          pnpm tauri build --bundles app --verbose
 
-            rm -rf src-tauri/target/release/bundle/dmg
-            rm -rf src-tauri/target/release/bundle/macos/MinNote.app
-            rm -f src-tauri/target/release/bundle/macos/MinNote.app.tar.gz
-            rm -f src-tauri/target/release/bundle/macos/MinNote.app.tar.gz.sig
-            rm -f src-tauri/target/release/bundle/macos/MinNote_*.dmg
-
-            for mount in /Volumes/MinNote*; do
-              [ -e "$mount" ] || continue
-              hdiutil detach "$mount" || true
-            done
-
-            if pnpm tauri build --bundles app,dmg --verbose; then
-              exit 0
-            fi
-
-            status=$?
-            echo "Build attempt ${attempt} failed with exit code ${status}"
-
-            if [ "$attempt" -eq 3 ]; then
-              exit "$status"
-            fi
-
-            sleep $((attempt * 5))
-          done
-
-      - name: Verify macOS signing
+      - name: Verify macOS app signing
         env:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
         run: |
@@ -113,8 +87,22 @@ jobs:
 
           codesign --verify --deep --strict --verbose=2 "$APP_PATH"
           xcrun stapler validate "$APP_PATH"
+          spctl -a -vv -t exec "$APP_PATH"
 
-      - name: Create or update GitHub release
+      - name: Package notarized app for DMG job
+        run: |
+          APP_PATH="$(find src-tauri/target/release/bundle/macos -maxdepth 1 -name 'MinNote.app' -print -quit)"
+          tar -czf MinNote.notarized.app.tar.gz -C "$(dirname "$APP_PATH")" "$(basename "$APP_PATH")"
+
+      - name: Upload notarized app artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: notarized-app-bundle
+          path: MinNote.notarized.app.tar.gz
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Create or update draft GitHub release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -123,49 +111,40 @@ jobs:
           NOTES="MinNote $TAG 업데이트"
 
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" --title "$TITLE" --notes "$NOTES"
+            RELEASE_ID="$(gh api repos/${{ github.repository }}/releases/tags/$TAG --jq '.id')"
+            gh api repos/${{ github.repository }}/releases/"$RELEASE_ID" \
+              --method PATCH \
+              -f draft=true \
+              -f name="$TITLE" \
+              -f body="$NOTES" >/dev/null
           else
-            gh release create "$TAG" --title "$TITLE" --notes "$NOTES"
+            gh release create "$TAG" --draft --title "$TITLE" --notes "$NOTES"
           fi
 
-      - name: Upload release bundles
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          TAG="${{ github.ref_name }}"
-          DMG_FILE="$(find src-tauri/target/release/bundle/dmg -type f -name 'MinNote_*_aarch64.dmg' -print -quit)"
-          APP_TAR_FILE="$(find src-tauri/target -type f -name 'MinNote*.app.tar.gz' -print -quit)"
-
-          if [ -z "$DMG_FILE" ] || [ ! -f "$DMG_FILE" ]; then
-            echo "DMG file not found"
-            exit 1
-          fi
-
-          if [ -z "$APP_TAR_FILE" ] || [ ! -f "$APP_TAR_FILE" ]; then
-            echo "App archive not found"
-            find src-tauri/target -type f -name '*.app.tar.gz' -print || true
-            exit 1
-          fi
-
-          gh release upload "$TAG" "$DMG_FILE#$(basename "$DMG_FILE")" --clobber
-          gh release upload "$TAG" "$APP_TAR_FILE#MinNote_aarch64.app.tar.gz" --clobber
-
-      - name: Upload updater assets
+      - name: Upload updater release assets
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           TAG="${{ github.ref_name }}"
           VERSION="${TAG#v}"
+          APP_TAR_FILE="$(find src-tauri/target -type f -name 'MinNote*.app.tar.gz' -print -quit)"
           SIG_FILE="$(find src-tauri/target -type f -name 'MinNote*.app.tar.gz.sig' -print -quit)"
 
-          if [ -z "$SIG_FILE" ] || [ ! -f "$SIG_FILE" ]; then
-            echo "Signature file not found, skipping updater assets upload"
-            find src-tauri/target -type f \( -name '*.app.tar.gz' -o -name '*.app.tar.gz.sig' \) -print || true
-            exit 0
+          if [ -z "$APP_TAR_FILE" ] || [ ! -f "$APP_TAR_FILE" ]; then
+            echo "App archive not found"
+            exit 1
           fi
 
-          SIGNATURE=$(cat "$SIG_FILE")
-          PUB_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+          if [ -z "$SIG_FILE" ] || [ ! -f "$SIG_FILE" ]; then
+            echo "Signature file not found"
+            exit 1
+          fi
+
+          gh release upload "$TAG" "$APP_TAR_FILE#MinNote_aarch64.app.tar.gz" --clobber
+          gh release upload "$TAG" "$SIG_FILE#MinNote_aarch64.app.tar.gz.sig" --clobber
+
+          SIGNATURE="$(cat "$SIG_FILE")"
+          PUB_DATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
           DOWNLOAD_URL="https://github.com/${{ github.repository }}/releases/download/$TAG/MinNote_aarch64.app.tar.gz"
 
           jq -n \
@@ -183,5 +162,90 @@ jobs:
               }
             }' > latest.json
 
-          gh release upload "$TAG" "$SIG_FILE#MinNote_aarch64.app.tar.gz.sig" --clobber
           gh release upload "$TAG" latest.json --clobber
+
+  release_dmg:
+    needs: release_app
+    runs-on:
+      - self-hosted
+      - macOS
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Download notarized app artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: notarized-app-bundle
+
+      - name: Check self-hosted tooling
+        run: |
+          command -v gh
+          command -v codesign
+          command -v xcrun
+          xcrun notarytool --version
+
+      - name: Import Apple certificate
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          echo "$APPLE_CERTIFICATE" | base64 --decode > certificate.p12
+          security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security default-keychain -s build.keychain
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
+          security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
+
+      - name: Extract notarized app bundle
+        run: |
+          mkdir -p dist
+          tar -xzf MinNote.notarized.app.tar.gz -C dist
+
+      - name: Create signed and notarized DMG
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_SIGNING_IDENTITY: "Developer ID Application: SEONGMIN CHO (5YG4V2PLZV)"
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          DMG_PATH="$(./scripts/create-dmg.sh dist/MinNote.app dist "$VERSION")"
+          codesign --force --sign "$APPLE_SIGNING_IDENTITY" "$DMG_PATH"
+          xcrun notarytool submit "$DMG_PATH" \
+            --apple-id "$APPLE_ID" \
+            --password "$APPLE_PASSWORD" \
+            --team-id "$APPLE_TEAM_ID" \
+            --wait
+          xcrun stapler staple "$DMG_PATH"
+          echo "DMG_PATH=$DMG_PATH" >> "$GITHUB_ENV"
+
+      - name: Verify DMG
+        run: |
+          xcrun stapler validate "$DMG_PATH"
+          spctl -a -vv -t open "$DMG_PATH"
+
+      - name: Upload DMG to release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "${{ github.ref_name }}" "$DMG_PATH#$(basename "$DMG_PATH")" --clobber
+
+      - name: Publish GitHub release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RELEASE_ID="$(gh api repos/${{ github.repository }}/releases/tags/${{ github.ref_name }} --jq '.id')"
+          gh api repos/${{ github.repository }}/releases/"$RELEASE_ID" \
+            --method PATCH \
+            -f draft=false >/dev/null

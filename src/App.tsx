@@ -2,11 +2,13 @@ import { useEffect } from 'react';
 import { listen } from '@tauri-apps/api/event';
 import { AlertCircle, LoaderCircle, PanelLeft } from 'lucide-react';
 import { bootstrapApp } from './app/actions';
+import { AppUpdateButton } from './components/AppUpdateButton';
 import { DocumentMenu } from './components/DocumentMenu';
 import { Sidebar } from './components/Sidebar';
 import { DocumentCanvas } from './components/DocumentCanvas';
 import { SettingsModal } from './components/SettingsModal';
 import { WindowMenu } from './components/WindowMenu';
+import { useAppUpdater } from './hooks/useAppUpdater';
 import { useAppShortcuts } from './hooks/useAppShortcuts';
 import { useIsMobileViewport } from './hooks/useIsMobileViewport';
 import { useSyncEventListener } from './hooks/useSyncEventListener';
@@ -34,6 +36,7 @@ function App() {
   const isFlushing = useDocumentSessionStore((state) => state.isFlushing);
   const lastSavedAt = useDocumentSessionStore((state) => state.lastSavedAt);
   const isBootstrapping = useWorkspaceStore((state) => state.isBootstrapping);
+  const appUpdateStatus = useWorkspaceStore((state) => state.appUpdateStatus);
   const error = useWorkspaceStore((state) => state.error);
   const themeMode = useWorkspaceStore((state) => state.themeMode);
   const defaultDocumentSurfaceTonePreset = useWorkspaceStore((state) => state.defaultDocumentSurfaceTonePreset);
@@ -47,6 +50,7 @@ function App() {
 
   useAppShortcuts();
   useSyncEventListener();
+  useAppUpdater(!isBootstrapping);
 
   useEffect(() => {
     void bootstrapApp();
@@ -96,6 +100,7 @@ function App() {
             ) : null}
           </div>
           <div className="workspace-actions">
+            <AppUpdateButton status={appUpdateStatus} />
             <WindowMenu />
             {currentDocument ? <DocumentMenu /> : null}
           </div>
