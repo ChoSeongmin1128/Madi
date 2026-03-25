@@ -150,6 +150,7 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: |
+          unset TAURI_SIGNING_PRIVATE_KEY_PATH
           pnpm exec tauri signer sign MinNote_aarch64.app.tar.gz
 
       - name: Upload notarized app artifact
