@@ -15,6 +15,7 @@ if [ -n "${APPLE_PROVISIONING_PROFILE_PATH:-}" ]; then
 fi
 
 CANDIDATES+=(
+  "$HOME/Personal/MinNote/.local-release/MinNote_Developer_ID_CloudKit.provisionprofile"
   "$HOME/Documents/minnote/MinNote_Developer_ID_CloudKit.provisionprofile"
   "$HOME/Documents/MinNote_Developer_ID_CloudKit.provisionprofile"
 )

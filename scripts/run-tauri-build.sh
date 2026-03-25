@@ -2,19 +2,33 @@
 
 set -euo pipefail
 
-"$(dirname "$0")/prepare-provisioning-profile.sh"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+ENV_FILE="$ROOT_DIR/.env.release.local"
 
-if [ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ] && [ -z "${TAURI_SIGNING_PRIVATE_KEY_PATH:-}" ]; then
+if [ -f "$ENV_FILE" ]; then
+  set -a
+  source "$ENV_FILE"
+  set +a
+fi
+
+"$SCRIPT_DIR/prepare-provisioning-profile.sh"
+
+if [ -z "${TAURI_SIGNING_PRIVATE_KEY_PATH:-}" ]; then
   for candidate in \
+    "$ROOT_DIR/.local-release/minnote-updater.key" \
     "$HOME/Documents/minnote/minnote-updater.key" \
     "$HOME/Documents/minnote-updater.key"
   do
     if [ -f "$candidate" ]; then
       export TAURI_SIGNING_PRIVATE_KEY_PATH="$candidate"
-      export TAURI_SIGNING_PRIVATE_KEY="$(cat "$candidate")"
       break
     fi
   done
+fi
+
+if [ -z "${TAURI_SIGNING_PRIVATE_KEY:-}" ] && [ -n "${TAURI_SIGNING_PRIVATE_KEY_PATH:-}" ] && [ -f "${TAURI_SIGNING_PRIVATE_KEY_PATH}" ]; then
+  export TAURI_SIGNING_PRIVATE_KEY="$(cat "$TAURI_SIGNING_PRIVATE_KEY_PATH")"
 fi
 
 if { [ -n "${TAURI_SIGNING_PRIVATE_KEY:-}" ] || [ -n "${TAURI_SIGNING_PRIVATE_KEY_PATH:-}" ]; } && [ -z "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}" ]; then

@@ -37,6 +37,7 @@ sync-sidecar/.build
 .env
 .env.*
 !.env.example
+.local-release/
 
 # OS files
 Thumbs.db
