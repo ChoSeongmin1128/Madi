@@ -46,7 +46,10 @@ MinNote는 macOS 단독 데스크톱 노트 앱입니다. 현재 방향은 Heyno
 
 - 이 저장소는 `Tauri + React + TypeScript + Rust + SQLite` 기반의 macOS 앱 구현을 포함합니다.
 - 프런트엔드에는 문서 목록, 블록 셸, Markdown/Code/Text 편집기, autosave, 검색 UI, iCloud 동기화 상태 표시가 들어 있습니다.
-- 앱은 시작 시와 실행 중 주기적으로 업데이트를 확인하고, 새 버전이 있으면 백그라운드 다운로드 후 헤더 우측의 작은 버튼으로 재시작/적용할 수 있습니다.
+- 앱은 초기 로딩이 끝나면 업데이트를 한 번 확인하고, 이후 `6시간` 간격으로 다시 확인합니다.
+- 새 버전이 있으면 백그라운드 다운로드를 먼저 진행하고, 헤더 우측의 작은 버튼으로 `업데이트 적용`을 실행합니다.
+- 설정의 업데이트 영역은 상태 확인과 수동 `업데이트 확인` 버튼을 위한 보조 UI입니다.
+- iCloud 상태는 `꺼짐`, `동기화 중`, `최근 동기화 ...`, `동기화 기록 없음`, `오류`로 표시합니다. `동기화 기록 없음`은 아직 CloudKit 왕복 성공 신호를 받지 못한 상태를 뜻합니다.
 - 백엔드에는 SQLite schema, Tauri command facade, 문서/블록 저장 로직, FTS 기반 검색 인덱스, CloudKit 동기화 sidecar 연동이 들어 있습니다.
 - AI 전용 세부 맥락은 루트 `AGENTS.md`와 `.agents/skills/` 아래 skill들에 둡니다.
 
@@ -61,11 +64,21 @@ MinNote는 macOS 단독 데스크톱 노트 앱입니다. 현재 방향은 Heyno
 
 `pnpm tauri:dev`와 `pnpm tauri:build`를 실제로 실행하려면 로컬에 Rust toolchain과 Swift toolchain이 필요합니다. sidecar는 스크립트에서 자동으로 준비됩니다.
 
+로컬 릴리스 빌드는 아래 경로를 전제로 합니다.
+
+- `/.env.release.local`
+- `/.local-release/minnote-updater.key`
+- `/.local-release/MinNote_Developer_ID_CloudKit.provisionprofile`
+
+위 파일들은 Git에서 무시되며, `pnpm tauri:build`가 자동으로 읽습니다.
+
 ## 릴리스 흐름
 
 - updater 기준 산출물은 `MinNote_aarch64.app.tar.gz`, `MinNote_aarch64.app.tar.gz.sig`, `latest.json`입니다.
-- `GitHub hosted macOS runner`는 공증된 `.app`과 updater 산출물을 만들고 draft release를 생성합니다.
-- `self-hosted Mac runner`는 공증된 `.app`을 받아 DMG를 만들고 같은 release에 첨부한 뒤 release를 publish합니다.
+- 자동 릴리스 워크플로우는 [`.github/workflows/release.yml`](/Users/seongmin/Personal/MinNote/.github/workflows/release.yml)에 남아 있습니다.
+- 다만 현재 기준으로 가장 안정적으로 검증된 배포 경로는 `로컬 Mac에서 빌드/서명/공증/검증 후 gh release로 업로드`하는 방식입니다.
+- 자동 워크플로우를 쓸 때는 `GitHub hosted macOS runner`가 공증된 `.app`과 updater 산출물을 만들고, `self-hosted Mac runner`가 DMG 생성과 release publish를 담당합니다.
+- 수동 릴리스에서는 `pnpm tauri:build` 후 DMG를 추가 공증/staple하고, 검증된 산출물만 release에 업로드합니다.
 - DMG 생성 스크립트는 [`scripts/create-dmg.sh`](/Users/seongmin/Personal/MinNote/scripts/create-dmg.sh) 기준으로 유지합니다.
 - release는 DMG가 첨부되기 전까지 완료로 보지 않습니다.
 
@@ -78,6 +91,7 @@ MinNote는 macOS 단독 데스크톱 노트 앱입니다. 현재 방향은 Heyno
   - [`src-tauri/Cargo.lock`](/Users/seongmin/Personal/MinNote/src-tauri/Cargo.lock)의 `name = "minnote"` 항목
 - 태그는 반드시 `vX.Y.Z` 형식을 사용합니다.
 - 릴리스 태그는 검증이 끝난 커밋에서만 생성합니다.
+- 별도 지시가 없으면 릴리스 작업은 `main` 기준으로 진행합니다.
 - DMG가 없는 release는 배포 완료로 취급하지 않습니다.
 
 ## 문서 안내

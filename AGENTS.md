@@ -25,11 +25,13 @@
 - 커밋 전에는 최소한 `pnpm exec tsc -b --pretty false`, `pnpm test:run`, `cargo check --no-default-features` 결과를 확인합니다.
 - 태그는 검증이 끝난 커밋에서만 생성하며 형식은 `vX.Y.Z`를 사용합니다.
 - 태그 푸시 전에는 워크트리가 clean인지 확인합니다.
+- 별도 요청이 없으면 작업 브랜치는 `main`을 기준으로 합니다.
 - 릴리스 워크플로우는 `hosted runner`와 `self-hosted macOS runner` 2단계로 유지합니다.
 - hosted runner는 공증된 `.app`과 updater 산출물(`.app.tar.gz`, `.sig`, `latest.json`)만 책임집니다.
 - self-hosted runner는 DMG 생성, DMG 서명/공증/검증, release publish를 책임집니다.
 - DMG가 GitHub Release에 첨부되기 전까지는 배포 완료로 간주하지 않습니다.
 - DMG 생성 기준 스크립트와 좌표는 `scripts/create-dmg.sh`와 `src-tauri/tauri.conf.json`을 source of truth로 봅니다.
+- 실제 배포가 급하고 자동 워크플로우가 불안정하면, 로컬에서 `pnpm tauri:build`와 추가 검증을 끝낸 산출물을 `gh release`로 수동 업로드하는 경로를 허용합니다.
 
 ## Routing
 - 커밋 메시지, 브랜치 이름, PR 제목/본문, 변경 요약 형식이 필요할 때는 `git-workflow` skill을 먼저 참고합니다.

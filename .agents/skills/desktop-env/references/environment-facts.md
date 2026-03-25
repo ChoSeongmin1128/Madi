@@ -15,14 +15,17 @@
 - `package.json`, `pnpm-lock.yaml`, `src/`, `src-tauri/`가 실제 기준점입니다.
 - 현재 로컬 환경에서는 Node/pnpm, Rust toolchain, `tauri-cli`가 확인됐습니다.
 - 로컬 `pnpm tauri:dev`와 `pnpm tauri:build`는 Swift sidecar를 자동으로 빌드합니다.
-- 릴리스용 DMG는 `scripts/create-dmg.sh`를 기준으로 만들고, 최종 배포는 self-hosted macOS runner가 필요합니다.
+- 로컬 릴리스 secret은 `.env.release.local`과 `.local-release/` 아래에 둡니다. 둘 다 Git에서 무시됩니다.
+- `pnpm tauri:build`는 `.env.release.local`을 자동 로드하고, updater key와 provisioning profile을 repo-local ignored 경로에서 우선 찾습니다.
+- 릴리스용 DMG는 `scripts/create-dmg.sh`를 기준으로 만듭니다.
+- 자동 워크플로우는 남아 있지만, 현재 검증된 안정 배포 경로는 `로컬 Mac에서 빌드/공증/검증 후 gh release 업로드`입니다.
 
 ## 작업 원칙
 
 - 패키지 설치, 스크립트 예시, 실행 방법은 `pnpm` 기준으로 설명합니다.
 - macOS 전용 동작이나 UI/배포 제약이 있으면 cross-platform 일반론보다 macOS 관점을 우선합니다.
 - Tauri 개발은 주로 CLI 기반으로 진행하고, Xcode는 macOS toolchain과 배포 관련 작업에서 보조적으로 사용될 수 있습니다.
-- hosted GitHub runner는 updater 산출물과 공증된 `.app` 기준 작업에 사용하고, DMG 포장은 self-hosted macOS runner 기준으로 설명합니다.
+- hosted GitHub runner는 updater 산출물과 공증된 `.app` 기준 작업에 사용하고, DMG 포장은 self-hosted macOS runner 또는 로컬 Mac 기준으로 설명합니다.
 - 새로운 코어 툴체인 선택이나 기존 확정 스택 변경은 사용자 승인 없이 하지 않습니다.
 
 ## Gotchas

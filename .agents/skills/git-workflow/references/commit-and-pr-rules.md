@@ -30,6 +30,7 @@ chore: repo-local skill 골격 추가
 ## 브랜치 이름
 
 - 권장 형식: `<type>/<short-kebab-topic>`
+- 별도 지시가 없으면 실제 작업과 릴리스 준비는 `main` 기준으로 진행합니다.
 - 예시:
   - `feat/block-shell`
   - `docs/repo-bootstrap`
@@ -74,3 +75,4 @@ docs: 초기 Codex 문서 구조 추가
 - GitHub hosted runner는 공증된 `.app`과 updater 산출물(`.app.tar.gz`, `.sig`, `latest.json`)만 릴리스에 올립니다.
 - self-hosted macOS runner는 DMG 생성, DMG 서명/공증/검증, release publish를 담당합니다.
 - DMG가 release에 첨부되기 전까지는 배포 완료로 간주하지 않습니다.
+- 자동 워크플로우가 불안정하면, 로컬에서 검증한 `.dmg`, `.app.tar.gz`, `.sig`, `latest.json`을 `gh release`로 직접 업로드하는 수동 릴리스 경로를 사용할 수 있습니다.
