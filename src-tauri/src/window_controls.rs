@@ -214,7 +214,7 @@ mod tests {
 
     let result = replace_shortcut_registration(
       &registrar,
-      Some("Cmd+Shift+Space"),
+      Some("Option+M"),
       Some("Cmd+Shift+K"),
     );
 
@@ -225,13 +225,13 @@ mod tests {
   #[test]
   fn rolls_back_next_shortcut_when_unregistering_current_fails() {
     let registrar = MockShortcutRegistrar {
-      fail_unregister: Some("Cmd+Shift+Space".to_string()),
+      fail_unregister: Some("Option+M".to_string()),
       ..Default::default()
     };
 
     let result = replace_shortcut_registration(
       &registrar,
-      Some("Cmd+Shift+Space"),
+      Some("Option+M"),
       Some("Cmd+Shift+K"),
     );
 
@@ -240,7 +240,7 @@ mod tests {
       registrar.log.borrow().as_slice(),
       [
         "register:Cmd+Shift+K",
-        "unregister:Cmd+Shift+Space",
+        "unregister:Option+M",
         "unregister:Cmd+Shift+K",
       ],
     );
@@ -250,11 +250,11 @@ mod tests {
   fn unregisters_current_shortcut_when_disabling() {
     let registrar = MockShortcutRegistrar::default();
 
-    let result = replace_shortcut_registration(&registrar, Some("Cmd+Shift+Space"), None)
+    let result = replace_shortcut_registration(&registrar, Some("Option+M"), None)
       .expect("disable should succeed");
 
     assert_eq!(result, None);
-    assert_eq!(registrar.log.borrow().as_slice(), ["unregister:Cmd+Shift+Space"]);
+    assert_eq!(registrar.log.borrow().as_slice(), ["unregister:Option+M"]);
   }
 }
 

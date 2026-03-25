@@ -25,7 +25,7 @@ describe('globalShortcut', () => {
   });
 
   it('formats accelerators for display', () => {
-    expect(formatShortcutDisplay('Cmd+Shift+Space')).toBe('⌘ ⇧ Space');
+    expect(formatShortcutDisplay('Option+M')).toBe('⌥ M');
     expect(formatShortcutDisplay(null)).toBe('사용 안 함');
   });
 });

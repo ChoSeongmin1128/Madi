@@ -528,7 +528,7 @@ mod tests {
           menu_bar_icon_enabled: false,
           always_on_top_enabled: true,
           window_opacity_percent: 84,
-          global_toggle_shortcut: Some("Cmd+Shift+Space".to_string()),
+          global_toggle_shortcut: Some("Option+M".to_string()),
         },
         current_document: document,
         current_blocks: vec![block],
@@ -642,7 +642,7 @@ mod tests {
     assert_eq!(payload.default_block_kind, BlockKind::Code);
     assert!(payload.always_on_top_enabled);
     assert_eq!(payload.window_opacity_percent, 84);
-    assert_eq!(payload.global_toggle_shortcut.as_deref(), Some("Cmd+Shift+Space"));
+    assert_eq!(payload.global_toggle_shortcut.as_deref(), Some("Option+M"));
   }
 
   #[test]

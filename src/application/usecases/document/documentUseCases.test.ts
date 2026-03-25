@@ -16,7 +16,7 @@ function createPayload(defaultBlockKind: WorkspaceBootstrapState['defaultBlockKi
     menuBarIconEnabled: false,
     alwaysOnTopEnabled: false,
     windowOpacityPercent: 100,
-    globalToggleShortcut: 'Cmd+Shift+Space',
+    globalToggleShortcut: 'Option+M',
   };
 }
 
@@ -71,7 +71,7 @@ function createPreferencesGateway() {
     setAlwaysOnTopEnabled: vi.fn(),
     getWindowOpacityPercent: vi.fn(() => 100),
     setWindowOpacityPercent: vi.fn(),
-    getGlobalToggleShortcut: vi.fn(() => 'Cmd+Shift+Space'),
+    getGlobalToggleShortcut: vi.fn(() => 'Option+M'),
     setGlobalToggleShortcut: vi.fn(),
     getGlobalShortcutError: vi.fn(() => null),
     setGlobalShortcutError: vi.fn(),

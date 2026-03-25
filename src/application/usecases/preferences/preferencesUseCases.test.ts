@@ -10,7 +10,7 @@ function createWorkspaceGateway() {
 
 function createPreferencesGateway() {
   let opacity = 100;
-  let shortcut: string | null = 'Cmd+Shift+Space';
+  let shortcut: string | null = 'Option+M';
 
   return {
     setThemeMode: vi.fn(),

@@ -27,7 +27,7 @@ const DEFAULT_ICLOUD_SYNC_ENABLED: &str = "false";
 const DEFAULT_MENU_BAR_ICON_ENABLED: &str = "false";
 const DEFAULT_ALWAYS_ON_TOP_ENABLED: &str = "false";
 const DEFAULT_WINDOW_OPACITY_PERCENT: &str = "100";
-const DEFAULT_GLOBAL_TOGGLE_SHORTCUT: &str = "Cmd+Shift+Space";
+const DEFAULT_GLOBAL_TOGGLE_SHORTCUT: &str = "Option+M";
 
 pub struct SqliteStore {
   pub(crate) connection: Connection,

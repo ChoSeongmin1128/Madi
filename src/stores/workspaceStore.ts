@@ -78,7 +78,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
   menuBarIconEnabled: false,
   alwaysOnTopEnabled: false,
   windowOpacityPercent: 100,
-  globalToggleShortcut: 'Cmd+Shift+Space',
+  globalToggleShortcut: 'Option+M',
   globalShortcutError: null,
   isSettingsOpen: false,
   desktopSidebarExpanded: true,

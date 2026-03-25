@@ -1,4 +1,4 @@
-export const DEFAULT_GLOBAL_TOGGLE_SHORTCUT = 'Cmd+Shift+Space';
+export const DEFAULT_GLOBAL_TOGGLE_SHORTCUT = 'Option+M';
 export const MIN_WINDOW_OPACITY_PERCENT = 50;
 export const MAX_WINDOW_OPACITY_PERCENT = 100;
 
