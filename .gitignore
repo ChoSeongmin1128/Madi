@@ -28,6 +28,7 @@ src-tauri/target
 src-tauri/gen
 src-tauri/bin
 src-tauri/binaries
+src-tauri/embedded.provisionprofile
 
 # Swift sidecar build artifacts
 sync-sidecar/.build
