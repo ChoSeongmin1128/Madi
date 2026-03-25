@@ -1437,6 +1437,40 @@ button {
   letter-spacing: -0.02em;
 }
 
+.settings-status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  border: 1px solid color-mix(in srgb, CanvasText 8%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, CanvasText 3%, transparent);
+  color: var(--text-soft);
+  padding: 4px 8px;
+  font-size: 0.76rem;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.settings-status-chip.is-ready {
+  border-color: color-mix(in srgb, Highlight 18%, transparent);
+  color: color-mix(in srgb, Highlight 70%, CanvasText 30%);
+}
+
+.settings-status-chip.is-progress {
+  border-color: color-mix(in srgb, CanvasText 12%, transparent);
+  color: var(--text);
+}
+
+.settings-status-chip.is-error {
+  border-color: color-mix(in srgb, #d34b57 26%, transparent);
+  color: color-mix(in srgb, #d34b57 80%, CanvasText 20%);
+}
+
+.settings-status-chip.is-muted {
+  color: var(--text-soft);
+}
+
 .settings-description {
   margin: 4px 0 0;
   color: var(--text-soft);

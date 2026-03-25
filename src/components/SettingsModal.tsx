@@ -1,4 +1,16 @@
-import { AlertTriangle, MoonStar, MonitorCog, RefreshCw, SunMedium, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Cloud,
+  CloudAlert,
+  CloudOff,
+  Download,
+  MoonStar,
+  MonitorCog,
+  RefreshCw,
+  SunMedium,
+  X,
+} from 'lucide-react';
 import { useState } from 'react';
 import {
   deleteAllDocuments,
@@ -80,10 +92,86 @@ function formatIcloudSyncDescription(
   }
 
   if (status.lastSyncAt) {
-    return `마지막 동기화 ${new Date(status.lastSyncAt).toLocaleString('ko-KR')}`;
+    return `최근 동기화 ${formatCompactDateTime(status.lastSyncAt)}`;
   }
 
-  return '대기 중';
+  return '동기화 기록 없음';
+}
+
+function formatCompactDateTime(value: number) {
+  const date = new Date(value);
+  const now = new Date();
+  const sameDay = date.toDateString() === now.toDateString();
+
+  if (sameDay) {
+    return date.toLocaleTimeString('ko-KR', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+
+  return date.toLocaleString('ko-KR', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+function getIcloudSyncPresentation(
+  enabled: boolean,
+  status: { state: 'idle' | 'syncing' | 'error' | 'disabled'; lastSyncAt: number | null; errorMessage: string | null },
+) {
+  const label = formatIcloudSyncDescription(enabled, status);
+
+  if (!enabled || status.state === 'disabled') {
+    return { label, tone: 'muted' as const, icon: CloudOff, spin: false };
+  }
+
+  if (status.state === 'error') {
+    return { label, tone: 'error' as const, icon: CloudAlert, spin: false };
+  }
+
+  if (status.state === 'syncing') {
+    return { label, tone: 'progress' as const, icon: RefreshCw, spin: true };
+  }
+
+  if (status.lastSyncAt) {
+    return { label, tone: 'ready' as const, icon: CheckCircle2, spin: false };
+  }
+
+  return { label, tone: 'muted' as const, icon: Cloud, spin: false };
+}
+
+function getAppUpdatePresentation(
+  status: Pick<
+    ReturnType<typeof useWorkspaceStore.getState>['appUpdateStatus'],
+    'state' | 'message' | 'version' | 'percent' | 'lastCheckedAt'
+  >,
+) {
+  const label = formatUpdateStatusMessage(status);
+
+  if (status.state === 'checking') {
+    return { label, tone: 'progress' as const, icon: RefreshCw, spin: true };
+  }
+
+  if (status.state === 'available_downloading') {
+    return { label, tone: 'progress' as const, icon: Download, spin: false };
+  }
+
+  if (status.state === 'ready_to_install') {
+    return { label, tone: 'ready' as const, icon: CheckCircle2, spin: false };
+  }
+
+  if (status.state === 'error') {
+    return { label, tone: 'error' as const, icon: AlertTriangle, spin: false };
+  }
+
+  if (label) {
+    return { label, tone: 'ready' as const, icon: CheckCircle2, spin: false };
+  }
+
+  return null;
 }
 
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
@@ -100,8 +188,10 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const appUpdateStatus = useWorkspaceStore((state) => state.appUpdateStatus);
   const { draftOpacity, previewOpacity, commitOpacity } = useWindowOpacityControl();
   const [isConfirmOpen, setConfirmOpen] = useState(false);
-  const icloudSyncDescription = formatIcloudSyncDescription(icloudSyncEnabled, icloudSyncStatus);
-  const appUpdateMessage = formatUpdateStatusMessage(appUpdateStatus);
+  const icloudSyncPresentation = getIcloudSyncPresentation(icloudSyncEnabled, icloudSyncStatus);
+  const appUpdatePresentation = getAppUpdatePresentation(appUpdateStatus);
+  const IcloudSyncIcon = icloudSyncPresentation.icon;
+  const AppUpdateIcon = appUpdatePresentation?.icon;
 
   if (!isOpen) {
     return null;
@@ -282,7 +372,10 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         <div className="settings-section">
           <div className="settings-section-header">
             <span className="settings-section-title">iCloud 동기화</span>
-            <span className="document-menu-option-description">{icloudSyncDescription}</span>
+            <span className={`settings-status-chip is-${icloudSyncPresentation.tone}`}>
+              <IcloudSyncIcon className={icloudSyncPresentation.spin ? 'spin' : undefined} size={14} />
+              <span>{icloudSyncPresentation.label}</span>
+            </span>
           </div>
           <SegmentedSelector
             ariaLabel="iCloud 동기화 선택"
@@ -296,9 +389,10 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
         <div className="settings-section">
           <div className="settings-section-header">
             <span className="settings-section-title">업데이트</span>
-            {appUpdateMessage && (
-              <span className="document-menu-option-description">
-                {appUpdateMessage}
+            {appUpdatePresentation && AppUpdateIcon && (
+              <span className={`settings-status-chip is-${appUpdatePresentation.tone}`}>
+                <AppUpdateIcon className={appUpdatePresentation.spin ? 'spin' : undefined} size={14} />
+                <span>{appUpdatePresentation.label}</span>
               </span>
             )}
           </div>

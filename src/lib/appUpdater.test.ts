@@ -47,18 +47,22 @@ describe('runUpdateCheck', () => {
   });
 
   it('downloads an available update in the background and marks it ready to install', async () => {
+    const downloadMock = vi.fn(async (onEvent: (event: unknown) => void) => {
+      onEvent({ event: 'Started', data: { contentLength: 100 } });
+      onEvent({ event: 'Progress', data: { chunkLength: 25 } });
+      onEvent({ event: 'Progress', data: { chunkLength: 75 } });
+      onEvent({ event: 'Finished' });
+    });
+
     checkMock.mockResolvedValueOnce({
       version: '1.1.0',
-      downloadAndInstall: vi.fn(async (onEvent: (event: unknown) => void) => {
-        onEvent({ event: 'Started', data: { contentLength: 100 } });
-        onEvent({ event: 'Progress', data: { chunkLength: 25 } });
-        onEvent({ event: 'Progress', data: { chunkLength: 75 } });
-        onEvent({ event: 'Finished' });
-      }),
+      download: downloadMock,
+      install: vi.fn(),
     });
 
     await runUpdateCheck();
 
+    expect(downloadMock).toHaveBeenCalledTimes(1);
     expect(useWorkspaceStore.getState().appUpdateStatus).toEqual({
       state: 'ready_to_install',
       version: '1.1.0',
@@ -80,16 +84,20 @@ describe('runUpdateCheck', () => {
   });
 
   it('relaunches the app after a prepared update is applied', async () => {
+    const installMock = vi.fn(async () => {});
+
     checkMock.mockResolvedValueOnce({
       version: '1.1.0',
-      downloadAndInstall: vi.fn(async (onEvent: (event: unknown) => void) => {
+      download: vi.fn(async (onEvent: (event: unknown) => void) => {
         onEvent({ event: 'Finished' });
       }),
+      install: installMock,
     });
 
     await runUpdateCheck();
     await applyPreparedUpdate();
 
+    expect(installMock).toHaveBeenCalledTimes(1);
     expect(relaunchMock).toHaveBeenCalledTimes(1);
   });
 });

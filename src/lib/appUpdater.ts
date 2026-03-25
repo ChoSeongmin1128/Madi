@@ -6,9 +6,21 @@ import { useWorkspaceStore } from '../stores/workspaceStore';
 export const APP_UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 type PreparedUpdateAction = (() => Promise<void>) | null;
+type DownloadProgressEvent =
+  | { event: 'Started'; data: { contentLength?: number } }
+  | { event: 'Progress'; data: { chunkLength: number } }
+  | { event: 'Finished' };
+
+type DownloadedUpdate = {
+  version: string;
+  download: (onEvent?: (event: DownloadProgressEvent) => void) => Promise<void>;
+  install: () => Promise<void>;
+  close?: () => Promise<void>;
+};
 
 let pendingCheck: Promise<void> | null = null;
 let preparedUpdateAction: PreparedUpdateAction = null;
+let downloadedUpdate: DownloadedUpdate | null = null;
 
 function buildStatus(next: Partial<AppUpdateStatus> & Pick<AppUpdateStatus, 'state'>): AppUpdateStatus {
   const current = useWorkspaceStore.getState().appUpdateStatus;
@@ -40,6 +52,21 @@ function normalizeUpdateError(error: unknown) {
   return message || '오류';
 }
 
+async function closeDownloadedUpdate() {
+  if (!downloadedUpdate?.close) {
+    downloadedUpdate = null;
+    return;
+  }
+
+  try {
+    await downloadedUpdate.close();
+  } catch {
+    // Updater resource cleanup failure should not block the next check.
+  } finally {
+    downloadedUpdate = null;
+  }
+}
+
 export function formatUpdateStatusMessage(status: AppUpdateStatus) {
   if (status.state === 'checking') {
     return '확인 중';
@@ -55,6 +82,10 @@ export function formatUpdateStatusMessage(status: AppUpdateStatus) {
 
   if (status.state === 'ready_to_install') {
     return status.version ? `${status.version} 준비됨` : '준비됨';
+  }
+
+  if (status.state === 'idle' && status.message === '최신') {
+    return '최신 버전';
   }
 
   return status.message;
@@ -77,6 +108,7 @@ export function getHeaderUpdateActionLabel(status: AppUpdateStatus) {
 }
 
 async function performUpdateCheck() {
+  await closeDownloadedUpdate();
   preparedUpdateAction = null;
   setUpdateStatus(buildStatus({
     state: 'checking',
@@ -112,7 +144,7 @@ async function performUpdateCheck() {
       lastCheckedAt: checkedAt,
     });
 
-    await update.downloadAndInstall((event) => {
+    await update.download((event) => {
       if (event.event === 'Started') {
         total = event.data.contentLength ?? 0;
         downloaded = 0;
@@ -141,7 +173,10 @@ async function performUpdateCheck() {
 
       if (event.event === 'Finished') {
         completed = true;
+        downloadedUpdate = update;
         preparedUpdateAction = async () => {
+          await update.install();
+          await closeDownloadedUpdate();
           await relaunch();
         };
         setUpdateStatus({
@@ -155,7 +190,10 @@ async function performUpdateCheck() {
     });
 
     if (!completed) {
+      downloadedUpdate = update;
       preparedUpdateAction = async () => {
+        await update.install();
+        await closeDownloadedUpdate();
         await relaunch();
       };
       setUpdateStatus({
@@ -167,6 +205,7 @@ async function performUpdateCheck() {
       });
     }
   } catch (error) {
+    await closeDownloadedUpdate();
     preparedUpdateAction = null;
     setUpdateStatus({
       state: 'error',
@@ -205,10 +244,21 @@ export async function applyPreparedUpdate() {
     return;
   }
 
-  await preparedUpdateAction();
+  try {
+    await preparedUpdateAction();
+  } catch (error) {
+    setUpdateStatus(buildStatus({
+      state: 'error',
+      version: null,
+      percent: null,
+      message: normalizeUpdateError(error),
+      lastCheckedAt: Date.now(),
+    }));
+  }
 }
 
 export function __resetAppUpdaterForTests() {
   pendingCheck = null;
   preparedUpdateAction = null;
+  downloadedUpdate = null;
 }
