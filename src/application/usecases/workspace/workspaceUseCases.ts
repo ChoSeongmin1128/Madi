@@ -99,10 +99,14 @@ export function createWorkspaceUseCases({
         : message.state === 'syncing'
           ? 'syncing'
           : 'error';
+      const current = preferences.getIcloudSyncStatus();
       preferences.setIcloudSyncStatus({
         state,
-        lastSyncAt: message.lastSyncAt ?? null,
+        lastSyncAt: message.lastSyncAt ?? current.lastSyncAt,
         lastStatusAt: Date.now(),
+        lastFetchAt: message.lastFetchAt ?? current.lastFetchAt,
+        lastSendAt: message.lastSendAt ?? current.lastSendAt,
+        initialFetchCompleted: message.initialFetchCompleted,
         errorMessage: null,
       });
       return;
@@ -118,10 +122,14 @@ export function createWorkspaceUseCases({
       return;
     }
 
+    const current = preferences.getIcloudSyncStatus();
     preferences.setIcloudSyncStatus({
       state: 'error',
-      lastSyncAt: preferences.getIcloudSyncStatus().lastSyncAt,
+      lastSyncAt: current.lastSyncAt,
       lastStatusAt: Date.now(),
+      lastFetchAt: current.lastFetchAt,
+      lastSendAt: current.lastSendAt,
+      initialFetchCompleted: current.initialFetchCompleted,
       errorMessage: message.message,
     });
   }

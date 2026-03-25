@@ -54,9 +54,12 @@ export function createPreferencesUseCases({
       workspace.clearError();
       preferences.setIcloudSyncEnabled(result);
       preferences.setIcloudSyncStatus({
-        state: result ? 'idle' : 'disabled',
+        state: result ? 'syncing' : 'disabled',
         lastSyncAt: null,
         lastStatusAt: result ? Date.now() : null,
+        lastFetchAt: null,
+        lastSendAt: null,
+        initialFetchCompleted: false,
         errorMessage: null,
       });
     } catch (error) {

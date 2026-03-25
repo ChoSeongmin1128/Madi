@@ -27,7 +27,7 @@ describe('AppUpdateButton', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
-  it('shows a disabled progress pill while downloading', () => {
+  it('does not render while downloading', () => {
     render(
       <AppUpdateButton
         status={{
@@ -40,7 +40,7 @@ describe('AppUpdateButton', () => {
       />,
     );
 
-    expect(screen.getByRole('button', { name: '업데이트 다운로드 중 42%' })).toBeDisabled();
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
   it('applies the prepared update when the update is ready', async () => {
@@ -58,8 +58,24 @@ describe('AppUpdateButton', () => {
       />,
     );
 
-    await user.click(screen.getByRole('button', { name: '업데이트 적용' }));
+    await user.click(screen.getByRole('button', { name: '업데이트' }));
 
     expect(applyPreparedUpdateMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a disabled installing pill while an update is applying', () => {
+    render(
+      <AppUpdateButton
+        status={{
+          state: 'installing',
+          version: '1.1.0',
+          percent: null,
+          message: null,
+          lastCheckedAt: Date.now(),
+        }}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: '업데이트 중' })).toBeDisabled();
   });
 });

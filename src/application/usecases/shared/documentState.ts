@@ -47,9 +47,12 @@ export function applyBootstrapPayloadState(
   preferences.setDefaultBlockKind(payload.defaultBlockKind);
   preferences.setIcloudSyncEnabled(payload.icloudSyncEnabled);
   preferences.setIcloudSyncStatus({
-    state: payload.icloudSyncEnabled ? 'idle' : 'disabled',
+    state: payload.icloudSyncEnabled ? 'syncing' : 'disabled',
     lastSyncAt: null,
     lastStatusAt: payload.icloudSyncEnabled ? Date.now() : null,
+    lastFetchAt: null,
+    lastSendAt: null,
+    initialFetchCompleted: false,
     errorMessage: null,
   });
   preferences.setMenuBarIconEnabled(payload.menuBarIconEnabled);

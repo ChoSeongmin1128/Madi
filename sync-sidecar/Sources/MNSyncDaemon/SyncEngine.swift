@@ -9,6 +9,11 @@ final class SyncEngine: NSObject {
   private let statePath: String
   private var engine: CKSyncEngine?
   private var lastSyncAt: Int64?
+  private var lastFetchAt: Int64?
+  private var lastSendAt: Int64?
+  private var initialFetchCompleted = false
+  private var scheduledSendTask: Task<Void, Never>?
+  private let sendDebounceNanoseconds: UInt64 = 300_000_000
 
   init(containerIdentifier: String, dbPath: String, statePath: String) throws {
     self.container = CKContainer(identifier: containerIdentifier)
@@ -28,9 +33,11 @@ final class SyncEngine: NSObject {
         delegate: self
       )
       engine = CKSyncEngine(config)
-      emitMessage(StatusMessage(state: "idle", lastSyncAt: lastSyncAt))
+      emitCurrentStatus(state: "syncing")
+      try await engine?.fetchChanges()
     } catch {
       emitMessage(ErrorMessage(message: "동기화 시작 실패: \(error.localizedDescription)"))
+      emitCurrentStatus(state: "error")
     }
   }
 
@@ -38,6 +45,7 @@ final class SyncEngine: NSObject {
     engine?.state.add(pendingRecordZoneChanges: [
       .saveRecord(CKRecord.ID(recordName: documentId, zoneID: RecordMapper.zoneID))
     ])
+    scheduleSend()
   }
 
   func notifyDeleted(documentId: String) {
@@ -45,15 +53,21 @@ final class SyncEngine: NSObject {
     engine?.state.add(pendingRecordZoneChanges: [
       .saveRecord(CKRecord.ID(recordName: documentId, zoneID: RecordMapper.zoneID))
     ])
+    scheduleSend()
   }
 
   func notifyReset() async {
     do {
       try await database.deleteRecordZone(withID: RecordMapper.zoneID)
       try await ensureZoneExists()
-      emitMessage(StatusMessage(state: "idle", lastSyncAt: lastSyncAt))
+      initialFetchCompleted = false
+      lastFetchAt = nil
+      lastSendAt = nil
+      emitCurrentStatus(state: "syncing")
+      try await engine?.fetchChanges()
     } catch {
       emitMessage(ErrorMessage(message: "전체 초기화 실패: \(error.localizedDescription)"))
+      emitCurrentStatus(state: "error")
     }
   }
 
@@ -79,6 +93,43 @@ final class SyncEngine: NSObject {
   private func persistState(_ state: CKSyncEngine.State.Serialization) {
     guard let data = try? JSONEncoder().encode(state) else { return }
     try? data.write(to: URL(fileURLWithPath: statePath), options: .atomic)
+  }
+
+  private func emitCurrentStatus(state: String) {
+    emitMessage(
+      StatusMessage(
+        state: state,
+        lastSyncAt: lastSyncAt,
+        lastFetchAt: lastFetchAt,
+        lastSendAt: lastSendAt,
+        initialFetchCompleted: initialFetchCompleted
+      )
+    )
+  }
+
+  private func scheduleSend() {
+    scheduledSendTask?.cancel()
+    scheduledSendTask = Task { @MainActor [weak self] in
+      guard let self else {
+        return
+      }
+      do {
+        try await Task.sleep(nanoseconds: self.sendDebounceNanoseconds)
+      } catch {
+        return
+      }
+
+      await self.sendPendingChanges()
+    }
+  }
+
+  private func sendPendingChanges() async {
+    do {
+      try await engine?.sendChanges()
+    } catch {
+      emitMessage(ErrorMessage(message: "업로드 실패: \(error.localizedDescription)"))
+      emitCurrentStatus(state: "error")
+    }
   }
 }
 
@@ -116,14 +167,14 @@ extension SyncEngine: CKSyncEngineDelegate {
       case .signOut:
         await MainActor.run {
           emitMessage(ErrorMessage(message: "iCloud 계정에서 로그아웃되었습니다."))
-          emitMessage(StatusMessage(state: "error", lastSyncAt: self.lastSyncAt))
+          self.emitCurrentStatus(state: "error")
         }
       default: break
       }
 
     case .willFetchChanges:
       await MainActor.run {
-        emitMessage(StatusMessage(state: "syncing", lastSyncAt: self.lastSyncAt))
+        self.emitCurrentStatus(state: "syncing")
       }
 
     case .fetchedRecordZoneChanges(let e):
@@ -143,7 +194,9 @@ extension SyncEngine: CKSyncEngineDelegate {
       await MainActor.run {
         let now = Int64(Date().timeIntervalSince1970 * 1000)
         self.lastSyncAt = now
-        emitMessage(StatusMessage(state: "idle", lastSyncAt: now))
+        self.lastFetchAt = now
+        self.initialFetchCompleted = true
+        self.emitCurrentStatus(state: "idle")
       }
 
     case .sentRecordZoneChanges(let e):
@@ -151,7 +204,8 @@ extension SyncEngine: CKSyncEngineDelegate {
         await MainActor.run {
           let now = Int64(Date().timeIntervalSince1970 * 1000)
           self.lastSyncAt = now
-          emitMessage(StatusMessage(state: "idle", lastSyncAt: now))
+          self.lastSendAt = now
+          self.emitCurrentStatus(state: "idle")
         }
       }
       if let failed = e.failedRecordSaves.first {

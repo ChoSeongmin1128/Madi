@@ -5,6 +5,7 @@ import { useWorkspaceStore } from '../stores/workspaceStore';
 
 export const APP_UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 export const APP_UPDATE_CHECK_TIMEOUT_MS = 15 * 1000;
+export const APP_UPDATE_INSTALL_TIMEOUT_MS = 30 * 1000;
 
 type PreparedUpdateAction = (() => Promise<void>) | null;
 type DownloadProgressEvent =
@@ -92,16 +93,16 @@ export function formatUpdateStatusMessage(status: AppUpdateStatus) {
     return '확인 중';
   }
 
-  if (status.state === 'available_downloading') {
-    if (typeof status.percent === 'number' && status.percent > 0) {
-      return `다운로드 중 ${status.percent}%`;
-    }
+  if (status.state === 'ready_to_install') {
+    return '준비됨';
+  }
 
+  if (status.state === 'available_downloading') {
     return '다운로드 중';
   }
 
-  if (status.state === 'ready_to_install') {
-    return status.version ? `${status.version} 준비됨` : '준비됨';
+  if (status.state === 'installing') {
+    return '적용 중';
   }
 
   if (status.state === 'idle' && status.message === '최신') {
@@ -112,16 +113,12 @@ export function formatUpdateStatusMessage(status: AppUpdateStatus) {
 }
 
 export function getHeaderUpdateActionLabel(status: AppUpdateStatus) {
-  if (status.state === 'available_downloading') {
-    if (typeof status.percent === 'number' && status.percent > 0) {
-      return `업데이트 다운로드 중 ${status.percent}%`;
-    }
-
-    return '업데이트 다운로드 중';
+  if (status.state === 'ready_to_install') {
+    return '업데이트';
   }
 
-  if (status.state === 'ready_to_install') {
-    return '업데이트 적용';
+  if (status.state === 'installing') {
+    return '업데이트 중';
   }
 
   return null;
@@ -138,11 +135,7 @@ async function performUpdateCheck() {
   }));
 
   try {
-    const update = await withTimeout(
-      check(),
-      APP_UPDATE_CHECK_TIMEOUT_MS,
-      '업데이트 응답 지연',
-    );
+    const update = await check({ timeout: APP_UPDATE_CHECK_TIMEOUT_MS });
     const checkedAt = Date.now();
 
     if (!update) {
@@ -253,6 +246,10 @@ export async function runUpdateCheck() {
     return;
   }
 
+  if (current.state === 'installing') {
+    return;
+  }
+
   const nextCheck = performUpdateCheck().finally(() => {
     if (pendingCheck === nextCheck) {
       pendingCheck = null;
@@ -269,7 +266,18 @@ export async function applyPreparedUpdate() {
   }
 
   try {
-    await preparedUpdateAction();
+    const current = useWorkspaceStore.getState().appUpdateStatus;
+    setUpdateStatus(buildStatus({
+      state: 'installing',
+      version: current.version,
+      percent: null,
+      message: null,
+    }));
+    await withTimeout(
+      preparedUpdateAction(),
+      APP_UPDATE_INSTALL_TIMEOUT_MS,
+      '업데이트 적용 지연',
+    );
   } catch (error) {
     setUpdateStatus(buildStatus({
       state: 'error',

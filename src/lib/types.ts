@@ -87,6 +87,9 @@ export interface ICloudSyncStatus {
   state: ICloudSyncState;
   lastSyncAt: number | null;
   lastStatusAt: number | null;
+  lastFetchAt: number | null;
+  lastSendAt: number | null;
+  initialFetchCompleted: boolean;
   errorMessage: string | null;
 }
 
@@ -95,6 +98,7 @@ export type AppUpdateState =
   | 'checking'
   | 'available_downloading'
   | 'ready_to_install'
+  | 'installing'
   | 'error';
 
 export interface AppUpdateStatus {
@@ -119,6 +123,13 @@ export interface RemoteDocumentDto {
 
 // sidecar → frontend 이벤트 메시지
 export type SyncEventMessage =
-  | { type: 'status'; state: string; lastSyncAt: number | null }
+  | {
+      type: 'status';
+      state: string;
+      lastSyncAt: number | null;
+      lastFetchAt: number | null;
+      lastSendAt: number | null;
+      initialFetchCompleted: boolean;
+    }
   | { type: 'remote-changed'; documents: RemoteDocumentDto[] }
   | { type: 'error'; message: string };

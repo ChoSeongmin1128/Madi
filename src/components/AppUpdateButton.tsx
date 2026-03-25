@@ -13,20 +13,20 @@ export function AppUpdateButton({ status }: AppUpdateButtonProps) {
     return null;
   }
 
-  const isDownloading = status.state === 'available_downloading';
+  const isBusy = status.state === 'installing';
 
   return (
     <button
-      className={`update-pill${isDownloading ? ' is-progress' : ' is-ready'}`}
+      className={`update-pill${isBusy ? ' is-progress' : ' is-ready'}`}
       type="button"
-      disabled={isDownloading}
+      disabled={isBusy}
       onClick={() => {
-        if (!isDownloading) {
+        if (!isBusy) {
           void applyPreparedUpdate();
         }
       }}
     >
-      {isDownloading ? <LoaderCircle className="spin" size={13} /> : <Download size={13} />}
+      {isBusy ? <LoaderCircle className="spin" size={13} /> : <Download size={13} />}
       <span>{label}</span>
     </button>
   );

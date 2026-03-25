@@ -48,6 +48,9 @@ struct StatusMessage: Encodable {
   let type = "status"
   let state: String
   let lastSyncAt: Int64?
+  let lastFetchAt: Int64?
+  let lastSendAt: Int64?
+  let initialFetchCompleted: Bool
 }
 
 struct RemoteChangedMessage: Encodable {
@@ -59,6 +62,7 @@ struct RemoteDocument: Encodable {
   let id: String
   let title: String?
   let blockTintOverride: String?
+  let documentSurfaceToneOverride: String?
   let blocksJson: String
   let createdAt: Int64
   let updatedAt: Int64

@@ -81,6 +81,9 @@ function formatIcloudSyncDescription(
     state: 'idle' | 'syncing' | 'error' | 'disabled';
     lastSyncAt: number | null;
     lastStatusAt: number | null;
+    lastFetchAt: number | null;
+    lastSendAt: number | null;
+    initialFetchCompleted: boolean;
     errorMessage: string | null;
   },
 ) {
@@ -93,7 +96,7 @@ function formatIcloudSyncDescription(
   }
 
   if (status.state === 'syncing') {
-    return '동기화 중';
+    return status.initialFetchCompleted ? '동기화 중' : '가져오는 중';
   }
 
   if (status.lastSyncAt) {
@@ -133,6 +136,9 @@ function getIcloudSyncPresentation(
     state: 'idle' | 'syncing' | 'error' | 'disabled';
     lastSyncAt: number | null;
     lastStatusAt: number | null;
+    lastFetchAt: number | null;
+    lastSendAt: number | null;
+    initialFetchCompleted: boolean;
     errorMessage: string | null;
   },
 ) {
@@ -179,6 +185,10 @@ function getAppUpdatePresentation(
 
   if (status.state === 'ready_to_install') {
     return { label, tone: 'ready' as const, icon: CheckCircle2, spin: false };
+  }
+
+  if (status.state === 'installing') {
+    return { label, tone: 'progress' as const, icon: RefreshCw, spin: true };
   }
 
   if (status.state === 'error') {
@@ -418,7 +428,11 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
             <button
               className="ghost-button"
               type="button"
-              disabled={appUpdateStatus.state === 'checking' || appUpdateStatus.state === 'available_downloading'}
+              disabled={
+                appUpdateStatus.state === 'checking'
+                || appUpdateStatus.state === 'available_downloading'
+                || appUpdateStatus.state === 'installing'
+              }
               onClick={() => {
                 void runUpdateCheck();
               }}

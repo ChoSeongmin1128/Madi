@@ -22,6 +22,7 @@ enum RecordMapper {
 
     record["title"] = document.title as CKRecordValue?
     record["blockTintOverride"] = document.blockTintOverride as CKRecordValue?
+    record["documentSurfaceToneOverride"] = document.documentSurfaceToneOverride as CKRecordValue?
     record["createdAt"] = NSNumber(value: document.createdAt)
     record["updatedAt"] = NSNumber(value: document.updatedAt)
     if let deletedAt = document.deletedAt {
@@ -58,6 +59,7 @@ enum RecordMapper {
       id: record.recordID.recordName,
       title: record["title"] as? String,
       blockTintOverride: record["blockTintOverride"] as? String,
+      documentSurfaceToneOverride: record["documentSurfaceToneOverride"] as? String,
       blocksJson: blocksJson,
       createdAt: createdAt,
       updatedAt: updatedAt,

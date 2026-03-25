@@ -5,6 +5,7 @@ struct DocumentRow {
   let id: String
   let title: String?
   let blockTintOverride: String?
+  let documentSurfaceToneOverride: String?
   let createdAt: Int64
   let updatedAt: Int64
   let deletedAt: Int64?
@@ -60,7 +61,7 @@ actor LocalDatabase {
 
   func fetchDocument(id: String) -> DocumentRow? {
     var stmt: OpaquePointer?
-    let sql = "SELECT id, title, block_tint_override, created_at, updated_at, deleted_at FROM documents WHERE id = ?"
+    let sql = "SELECT id, title, block_tint_override, document_surface_tone_override, created_at, updated_at, deleted_at FROM documents WHERE id = ?"
     guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else { return nil }
     defer { sqlite3_finalize(stmt) }
 
@@ -71,9 +72,10 @@ actor LocalDatabase {
       id: String(cString: sqlite3_column_text(stmt, 0)),
       title: sqlite3_column_type(stmt, 1) == SQLITE_NULL ? nil : String(cString: sqlite3_column_text(stmt, 1)),
       blockTintOverride: sqlite3_column_type(stmt, 2) == SQLITE_NULL ? nil : String(cString: sqlite3_column_text(stmt, 2)),
-      createdAt: sqlite3_column_int64(stmt, 3),
-      updatedAt: sqlite3_column_int64(stmt, 4),
-      deletedAt: sqlite3_column_type(stmt, 5) == SQLITE_NULL ? nil : sqlite3_column_int64(stmt, 5)
+      documentSurfaceToneOverride: sqlite3_column_type(stmt, 3) == SQLITE_NULL ? nil : String(cString: sqlite3_column_text(stmt, 3)),
+      createdAt: sqlite3_column_int64(stmt, 4),
+      updatedAt: sqlite3_column_int64(stmt, 5),
+      deletedAt: sqlite3_column_type(stmt, 6) == SQLITE_NULL ? nil : sqlite3_column_int64(stmt, 6)
     )
   }
 

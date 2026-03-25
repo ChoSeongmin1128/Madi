@@ -68,6 +68,9 @@ function createPreferencesGateway() {
       state: 'idle' as const,
       lastSyncAt: 10,
       lastStatusAt: 11,
+      lastFetchAt: 12,
+      lastSendAt: 13,
+      initialFetchCompleted: true,
       errorMessage: null,
     })),
     setIcloudSyncStatus: vi.fn(),
@@ -224,5 +227,47 @@ describe('handleSyncEventMessage (remote-changed)', () => {
     await useCases.handleSyncEventMessage({ type: 'remote-changed', documents: [] });
 
     expect(session.setCurrentDocument).not.toHaveBeenCalled();
+  });
+});
+
+describe('handleSyncEventMessage (status)', () => {
+  it('captures fetch and send timestamps from sync status events', async () => {
+    const workspace = createWorkspaceGateway();
+    const preferences = createPreferencesGateway();
+    const session = createSessionGateway();
+    const useCases = createWorkspaceUseCases({
+      backend: {
+        bootstrapApp: vi.fn(),
+        getWindowControlRuntimeState: vi.fn(),
+        searchDocuments: vi.fn(),
+        deleteAllDocuments: vi.fn(),
+        applyRemoteDocuments: vi.fn(),
+      } as never,
+      documentSync: { clearAllDocumentSync: vi.fn() } as never,
+      preferences: preferences as never,
+      scheduler: { setTimeout: vi.fn(), clearTimeout: vi.fn() },
+      session,
+      syncMutation: { enqueue: vi.fn() },
+      workspace,
+    });
+
+    await useCases.handleSyncEventMessage({
+      type: 'status',
+      state: 'idle',
+      lastSyncAt: 100,
+      lastFetchAt: 80,
+      lastSendAt: 90,
+      initialFetchCompleted: true,
+    });
+
+    expect(preferences.setIcloudSyncStatus).toHaveBeenCalledWith({
+      state: 'idle',
+      lastSyncAt: 100,
+      lastStatusAt: expect.any(Number),
+      lastFetchAt: 80,
+      lastSendAt: 90,
+      initialFetchCompleted: true,
+      errorMessage: null,
+    });
   });
 });
