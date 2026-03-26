@@ -47,16 +47,19 @@ export function applyBootstrapPayloadState(
   preferences.setDefaultBlockTintPreset(payload.defaultBlockTintPreset);
   preferences.setDefaultDocumentSurfaceTonePreset(payload.defaultDocumentSurfaceTonePreset);
   preferences.setDefaultBlockKind(payload.defaultBlockKind);
-  preferences.setIcloudSyncEnabled(payload.icloudSyncEnabled);
+  preferences.setIcloudSyncMode(payload.icloudSyncMode);
   if (syncStatusStrategy === 'reset') {
     preferences.setIcloudSyncStatus({
-      state: payload.icloudSyncEnabled ? 'syncing' : 'disabled',
+      connectionMode: payload.icloudSyncMode,
+      runtimeState: payload.icloudSyncMode === 'connected' ? 'syncing' : 'idle',
       lastSyncAt: null,
-      lastStatusAt: payload.icloudSyncEnabled ? Date.now() : null,
+      lastStatusAt: payload.icloudSyncMode === 'connected' ? Date.now() : null,
       lastFetchAt: null,
       lastSendAt: null,
       initialFetchCompleted: false,
       errorMessage: null,
+      hasPendingWrites: payload.icloudPendingChangeCount > 0,
+      pendingChangeCount: payload.icloudPendingChangeCount,
     });
   }
   preferences.setMenuBarIconEnabled(payload.menuBarIconEnabled);

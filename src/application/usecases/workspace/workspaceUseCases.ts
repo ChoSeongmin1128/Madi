@@ -6,6 +6,7 @@ import type { SchedulerPort } from '../../ports/schedulerPort';
 import type { SessionGateway } from '../../ports/sessionGateway';
 import type { SyncMutationPort } from '../../ports/syncMutationPort';
 import type { WorkspaceGateway } from '../../ports/workspaceGateway';
+import { isIcloudDebugEnabled } from '../../../lib/debugFlags';
 import { applyBootstrapPayloadState, applyWindowControlRuntimeState } from '../shared/documentState';
 import { normalizeErrorMessage } from '../shared/errors';
 
@@ -32,7 +33,7 @@ export function createWorkspaceUseCases({
   let searchRequestToken = 0;
 
   function debugIcloud(message: string, payload?: unknown) {
-    if (!import.meta.env.DEV) {
+    if (!isIcloudDebugEnabled) {
       return;
     }
 
@@ -108,27 +109,27 @@ export function createWorkspaceUseCases({
   async function handleSyncEventMessage(message: SyncEventMessage) {
     debugIcloud('handle-event', message);
     if (message.type === 'status') {
-      const state = message.state === 'idle'
-        ? 'idle'
-        : message.state === 'syncing'
-          ? 'syncing'
-          : 'error';
       const current = preferences.getIcloudSyncStatus();
       preferences.setIcloudSyncStatus({
-        state,
+        connectionMode: message.connectionMode,
+        runtimeState: message.state,
         lastSyncAt: message.lastSyncAt ?? current.lastSyncAt,
         lastStatusAt: Date.now(),
         lastFetchAt: message.lastFetchAt ?? current.lastFetchAt,
         lastSendAt: message.lastSendAt ?? current.lastSendAt,
         initialFetchCompleted: message.initialFetchCompleted,
         errorMessage: null,
+        hasPendingWrites: message.hasPendingWrites,
+        pendingChangeCount: message.pendingChangeCount,
       });
       debugIcloud('status:applied', {
-        state,
+        connectionMode: message.connectionMode,
+        runtimeState: message.state,
         lastSyncAt: message.lastSyncAt ?? current.lastSyncAt,
         lastFetchAt: message.lastFetchAt ?? current.lastFetchAt,
         lastSendAt: message.lastSendAt ?? current.lastSendAt,
         initialFetchCompleted: message.initialFetchCompleted,
+        pendingChangeCount: message.pendingChangeCount,
       });
       return;
     }
@@ -143,13 +144,16 @@ export function createWorkspaceUseCases({
         const current = preferences.getIcloudSyncStatus();
         const errorMessage = normalizeErrorMessage(error, '원격 문서를 반영하지 못했습니다.');
         preferences.setIcloudSyncStatus({
-          state: 'error',
+          connectionMode: current.connectionMode,
+          runtimeState: 'error',
           lastSyncAt: current.lastSyncAt,
           lastStatusAt: Date.now(),
           lastFetchAt: current.lastFetchAt,
           lastSendAt: current.lastSendAt,
           initialFetchCompleted: current.initialFetchCompleted,
           errorMessage,
+          hasPendingWrites: current.hasPendingWrites,
+          pendingChangeCount: current.pendingChangeCount,
         });
         debugIcloud('remote-changed:apply:error', { message: errorMessage });
       }
@@ -158,13 +162,16 @@ export function createWorkspaceUseCases({
 
     const current = preferences.getIcloudSyncStatus();
     preferences.setIcloudSyncStatus({
-      state: 'error',
+      connectionMode: current.connectionMode,
+      runtimeState: 'error',
       lastSyncAt: current.lastSyncAt,
       lastStatusAt: Date.now(),
       lastFetchAt: current.lastFetchAt,
       lastSendAt: current.lastSendAt,
       initialFetchCompleted: current.initialFetchCompleted,
       errorMessage: message.message,
+      hasPendingWrites: current.hasPendingWrites,
+      pendingChangeCount: current.pendingChangeCount,
     });
   }
 

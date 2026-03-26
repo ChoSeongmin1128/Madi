@@ -11,7 +11,7 @@ use crate::application::dto::{
   WindowControlRuntimeStateDto,
 };
 use crate::application::services;
-use crate::domain::models::{BlockKind, BlockTintPreset, DocumentSurfaceTonePreset, ThemeMode};
+use crate::domain::models::{BlockKind, BlockTintPreset, DocumentSurfaceTonePreset, IcloudSyncMode, ThemeMode};
 use crate::error::AppError;
 use crate::ports::repositories::AppStateRepository;
 use crate::state::AppState;
@@ -21,6 +21,8 @@ use crate::window_controls::{
   update_global_shortcut_registration,
 };
 use crate::{TRAY_ID, build_tray_icon};
+#[cfg(target_os = "macos")]
+use crate::register_remote_notifications;
 
 fn with_repository<T>(
   state: State<'_, AppState>,
@@ -266,13 +268,13 @@ pub fn restore_document_from_trash(
 }
 
 #[tauri::command]
-pub fn set_icloud_sync_enabled(
+pub fn set_icloud_sync_mode(
   state: State<'_, AppState>,
   app_handle: tauri::AppHandle,
-  enabled: bool,
-) -> Result<bool, String> {
+  mode: IcloudSyncMode,
+) -> Result<IcloudSyncMode, String> {
   with_repository(state.clone(), |repository| {
-    services::set_icloud_sync_enabled(repository, enabled)
+    services::set_icloud_sync_mode(repository, mode.clone())
   })?;
 
   let mut sync = state
@@ -280,15 +282,25 @@ pub fn set_icloud_sync_enabled(
     .lock()
     .map_err(|_| "sync manager lock failed".to_string())?;
 
-  if enabled {
-    let db_path = state.db_path.to_str().unwrap_or_default().to_string();
-    let state_path = state.sync_state_path.to_str().unwrap_or_default().to_string();
-    sync.start(&app_handle, &db_path, &state_path)?;
-  } else {
-    sync.stop();
+  match mode {
+    IcloudSyncMode::Connected => {
+      #[cfg(target_os = "macos")]
+      register_remote_notifications();
+
+      let db_path = state.db_path.to_str().unwrap_or_default().to_string();
+      let state_path = state.sync_state_path.to_str().unwrap_or_default().to_string();
+      sync.start(&app_handle, &db_path, &state_path)?;
+    }
+    IcloudSyncMode::Paused => {
+      sync.stop();
+    }
+    IcloudSyncMode::Disconnected => {
+      sync.stop();
+      let _ = std::fs::remove_file(&state.sync_state_path);
+    }
   }
 
-  Ok(enabled)
+  Ok(mode)
 }
 
 #[tauri::command]
@@ -297,7 +309,7 @@ pub fn refresh_icloud_sync(
   app_handle: tauri::AppHandle,
 ) -> Result<bool, String> {
   let settings = with_repository(state.clone(), |repository| repository.get_app_settings())?;
-  if !settings.icloud_sync_enabled {
+  if settings.icloud_sync_mode != IcloudSyncMode::Connected {
     return Ok(false);
   }
 

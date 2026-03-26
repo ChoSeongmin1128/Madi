@@ -58,7 +58,8 @@ export interface BootstrapPayload {
   defaultBlockTintPreset: BlockTintPreset;
   defaultDocumentSurfaceTonePreset: DocumentSurfaceTonePreset;
   defaultBlockKind: BlockKind;
-  icloudSyncEnabled: boolean;
+  icloudSyncMode: ICloudSyncConnectionMode;
+  icloudPendingChangeCount: number;
   menuBarIconEnabled: boolean;
   alwaysOnTopEnabled: boolean;
   windowOpacityPercent: number;
@@ -81,16 +82,20 @@ export interface BlockRestoreDto {
   position: number;
 }
 
-export type ICloudSyncState = 'idle' | 'syncing' | 'error' | 'disabled';
+export type ICloudSyncConnectionMode = 'connected' | 'paused' | 'disconnected';
+export type ICloudSyncRuntimeState = 'idle' | 'syncing' | 'offline' | 'error';
 
 export interface ICloudSyncStatus {
-  state: ICloudSyncState;
+  connectionMode: ICloudSyncConnectionMode;
+  runtimeState: ICloudSyncRuntimeState;
   lastSyncAt: number | null;
   lastStatusAt: number | null;
   lastFetchAt: number | null;
   lastSendAt: number | null;
   initialFetchCompleted: boolean;
   errorMessage: string | null;
+  hasPendingWrites: boolean;
+  pendingChangeCount: number;
 }
 
 export type AppUpdateState =
@@ -109,7 +114,7 @@ export interface AppUpdateStatus {
   lastCheckedAt: number | null;
 }
 
-// CloudKit에서 받은 원격 문서 (sidecar → frontend → Rust)
+// CloudKit에서 받은 원격 문서 (Tauri → frontend → Rust)
 export interface RemoteDocumentDto {
   id: string;
   title: string | null;
@@ -121,15 +126,18 @@ export interface RemoteDocumentDto {
   deletedAt: number | null;
 }
 
-// sidecar → frontend 이벤트 메시지
+// Tauri → frontend 이벤트 메시지
 export type SyncEventMessage =
   | {
       type: 'status';
-      state: string;
+      state: ICloudSyncRuntimeState;
+      connectionMode: ICloudSyncConnectionMode;
       lastSyncAt: number | null;
       lastFetchAt: number | null;
       lastSendAt: number | null;
       initialFetchCompleted: boolean;
+      hasPendingWrites: boolean;
+      pendingChangeCount: number;
     }
   | { type: 'remote-changed'; documents: RemoteDocumentDto[] }
   | { type: 'error'; message: string };

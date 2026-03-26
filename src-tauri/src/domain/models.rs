@@ -125,6 +125,32 @@ impl ThemeMode {
   }
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum IcloudSyncMode {
+  Connected,
+  Paused,
+  Disconnected,
+}
+
+impl IcloudSyncMode {
+  pub fn as_str(&self) -> &'static str {
+    match self {
+      Self::Connected => "connected",
+      Self::Paused => "paused",
+      Self::Disconnected => "disconnected",
+    }
+  }
+
+  pub fn from_str(value: &str) -> Self {
+    match value {
+      "connected" => Self::Connected,
+      "paused" => Self::Paused,
+      _ => Self::Disconnected,
+    }
+  }
+}
+
 #[derive(Debug, Clone)]
 pub struct Document {
   pub id: String,
@@ -174,7 +200,7 @@ pub struct AppSettings {
   pub default_block_tint_preset: BlockTintPreset,
   pub default_document_surface_tone_preset: DocumentSurfaceTonePreset,
   pub default_block_kind: BlockKind,
-  pub icloud_sync_enabled: bool,
+  pub icloud_sync_mode: IcloudSyncMode,
   pub menu_bar_icon_enabled: bool,
   pub always_on_top_enabled: bool,
   pub window_opacity_percent: u8,

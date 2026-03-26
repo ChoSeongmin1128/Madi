@@ -14,8 +14,8 @@ export const preferencesGateway: PreferencesGateway = {
   setDefaultBlockKind(kind) {
     useWorkspaceStore.getState().setDefaultBlockKind(kind);
   },
-  setIcloudSyncEnabled(value) {
-    useWorkspaceStore.getState().setIcloudSyncEnabled(value);
+  setIcloudSyncMode(value) {
+    useWorkspaceStore.getState().setIcloudSyncMode(value);
   },
   getIcloudSyncStatus() {
     return useWorkspaceStore.getState().icloudSyncStatus;

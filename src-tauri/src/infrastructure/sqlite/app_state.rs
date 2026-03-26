@@ -23,10 +23,10 @@ impl AppStateRepository for SqliteStore {
       .get_state_value("default_document_surface_tone_preset")?
       .map(|value| DocumentSurfaceTonePreset::from_str(&value))
       .unwrap_or(DocumentSurfaceTonePreset::Default);
-    let icloud_sync_enabled = self
-      .get_state_value("icloud_sync_enabled")?
-      .map(|value| value == "true")
-      .unwrap_or(false);
+    let icloud_sync_mode = self
+      .get_state_value("icloud_sync_mode")?
+      .map(|value| IcloudSyncMode::from_str(&value))
+      .unwrap_or(IcloudSyncMode::Disconnected);
     let menu_bar_icon_enabled = self
       .get_state_value("menu_bar_icon_enabled")?
       .map(|value| value == "true")
@@ -53,12 +53,16 @@ impl AppStateRepository for SqliteStore {
       default_block_tint_preset,
       default_document_surface_tone_preset,
       default_block_kind,
-      icloud_sync_enabled,
+      icloud_sync_mode,
       menu_bar_icon_enabled,
       always_on_top_enabled,
       window_opacity_percent,
       global_toggle_shortcut,
     })
+  }
+
+  fn count_pending_sync_changes(&self) -> Result<usize, AppError> {
+    SqliteStore::count_pending_sync_changes(self)
   }
 
   fn set_theme_mode(&mut self, theme_mode: ThemeMode) -> Result<(), AppError> {
@@ -79,8 +83,17 @@ impl AppStateRepository for SqliteStore {
     Ok(())
   }
 
-  fn set_icloud_sync_enabled(&mut self, enabled: bool) -> Result<(), AppError> {
-    self.set_state_value("icloud_sync_enabled", if enabled { "true" } else { "false" })?;
+  fn set_icloud_sync_mode(&mut self, mode: IcloudSyncMode) -> Result<(), AppError> {
+    self.set_state_value("icloud_sync_mode", mode.as_str())?;
+    self.set_state_value(
+      "icloud_sync_enabled",
+      if mode == IcloudSyncMode::Connected { "true" } else { "false" },
+    )?;
+    Ok(())
+  }
+
+  fn clear_sync_outbox(&mut self) -> Result<(), AppError> {
+    SqliteStore::clear_sync_outbox(self)?;
     Ok(())
   }
 

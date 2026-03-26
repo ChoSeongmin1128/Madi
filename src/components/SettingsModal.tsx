@@ -19,7 +19,8 @@ import {
   setDefaultBlockTintPreset,
   setDefaultDocumentSurfaceTonePreset,
   setGlobalToggleShortcut,
-  setIcloudSyncEnabled,
+  refreshIcloudSync,
+  setIcloudSyncMode,
   setMenuBarIconEnabled,
   setThemeMode,
 } from '../app/actions';
@@ -28,7 +29,7 @@ import { BLOCK_TINT_PRESETS } from '../lib/blockTint';
 import { DOCUMENT_SURFACE_TONE_PRESETS } from '../lib/documentSurfaceTone';
 import { DocumentSurfacePreview } from './DocumentSurfacePreview';
 import { SegmentedSelector } from './SegmentedSelector';
-import type { BlockKind, ThemeMode } from '../lib/types';
+import type { BlockKind, ICloudSyncConnectionMode, ICloudSyncStatus, ThemeMode } from '../lib/types';
 import { useWorkspaceStore } from '../stores/workspaceStore';
 import { applyPreparedUpdate, formatUpdateStatusMessage, runUpdateCheckFrom } from '../lib/appUpdater';
 import { ShortcutCaptureField } from './ShortcutCaptureField';
@@ -55,11 +56,6 @@ const MENU_BAR_OPTIONS = [
   { value: 'on', label: '켜짐' },
 ] as const;
 
-const ICLOUD_OPTIONS = [
-  { value: 'off', label: '꺼짐' },
-  { value: 'on', label: '켜짐' },
-] as const;
-
 const BLOCK_TINT_OPTIONS = BLOCK_TINT_PRESETS.map((preset) => ({
   value: preset.id,
   label: preset.label,
@@ -76,27 +72,34 @@ interface SettingsModalProps {
 }
 
 function formatIcloudSyncDescription(
-  enabled: boolean,
-  status: {
-    state: 'idle' | 'syncing' | 'error' | 'disabled';
-    lastSyncAt: number | null;
-    lastStatusAt: number | null;
-    lastFetchAt: number | null;
-    lastSendAt: number | null;
-    initialFetchCompleted: boolean;
-    errorMessage: string | null;
-  },
+  status: ICloudSyncStatus,
 ) {
-  if (!enabled || status.state === 'disabled') {
-    return '꺼짐';
+  if (status.connectionMode === 'disconnected') {
+    return '해제됨';
   }
 
-  if (status.state === 'error') {
+  if (status.connectionMode === 'paused') {
+    return status.pendingChangeCount > 0
+      ? `일시중지 · 보류 ${status.pendingChangeCount}건`
+      : '일시중지';
+  }
+
+  if (status.runtimeState === 'offline') {
+    return status.pendingChangeCount > 0
+      ? `오프라인 · 보류 ${status.pendingChangeCount}건`
+      : '오프라인';
+  }
+
+  if (status.runtimeState === 'error') {
     return status.errorMessage ?? '오류';
   }
 
-  if (status.state === 'syncing') {
+  if (status.runtimeState === 'syncing') {
     return status.initialFetchCompleted ? '동기화 중' : '가져오는 중';
+  }
+
+  if (status.pendingChangeCount > 0) {
+    return `보류 ${status.pendingChangeCount}건`;
   }
 
   if (status.lastSyncAt) {
@@ -131,28 +134,23 @@ function formatCompactDateTime(value: number) {
 }
 
 function getIcloudSyncPresentation(
-  enabled: boolean,
-  status: {
-    state: 'idle' | 'syncing' | 'error' | 'disabled';
-    lastSyncAt: number | null;
-    lastStatusAt: number | null;
-    lastFetchAt: number | null;
-    lastSendAt: number | null;
-    initialFetchCompleted: boolean;
-    errorMessage: string | null;
-  },
+  status: ICloudSyncStatus,
 ) {
-  const label = formatIcloudSyncDescription(enabled, status);
+  const label = formatIcloudSyncDescription(status);
 
-  if (!enabled || status.state === 'disabled') {
+  if (status.connectionMode === 'disconnected') {
     return { label, tone: 'muted' as const, icon: CloudOff, spin: false };
   }
 
-  if (status.state === 'error') {
+  if (status.connectionMode === 'paused') {
+    return { label, tone: 'muted' as const, icon: CloudOff, spin: false };
+  }
+
+  if (status.runtimeState === 'offline' || status.runtimeState === 'error') {
     return { label, tone: 'error' as const, icon: CloudAlert, spin: false };
   }
 
-  if (status.state === 'syncing') {
+  if (status.runtimeState === 'syncing') {
     return { label, tone: 'progress' as const, icon: RefreshCw, spin: true };
   }
 
@@ -207,7 +205,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const defaultBlockTintPreset = useWorkspaceStore((state) => state.defaultBlockTintPreset);
   const defaultDocumentSurfaceTonePreset = useWorkspaceStore((state) => state.defaultDocumentSurfaceTonePreset);
   const defaultBlockKind = useWorkspaceStore((state) => state.defaultBlockKind);
-  const icloudSyncEnabled = useWorkspaceStore((state) => state.icloudSyncEnabled);
+  const icloudSyncMode = useWorkspaceStore((state) => state.icloudSyncMode);
   const icloudSyncStatus = useWorkspaceStore((state) => state.icloudSyncStatus);
   const menuBarIconEnabled = useWorkspaceStore((state) => state.menuBarIconEnabled);
   const alwaysOnTopEnabled = useWorkspaceStore((state) => state.alwaysOnTopEnabled);
@@ -216,10 +214,16 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const appUpdateStatus = useWorkspaceStore((state) => state.appUpdateStatus);
   const { draftOpacity, previewOpacity, commitOpacity } = useWindowOpacityControl();
   const [isConfirmOpen, setConfirmOpen] = useState(false);
-  const icloudSyncPresentation = getIcloudSyncPresentation(icloudSyncEnabled, icloudSyncStatus);
+  const [isDisconnectConfirmOpen, setDisconnectConfirmOpen] = useState(false);
+  const icloudSyncPresentation = getIcloudSyncPresentation(icloudSyncStatus);
   const appUpdatePresentation = getAppUpdatePresentation(appUpdateStatus);
   const IcloudSyncIcon = icloudSyncPresentation.icon;
   const AppUpdateIcon = appUpdatePresentation?.icon;
+  const canRefreshIcloud = icloudSyncMode === 'connected' && icloudSyncStatus.runtimeState !== 'syncing';
+  const primaryIcloudActionLabel =
+    icloudSyncMode === 'connected' ? '동기화 일시중지' : '동기화 재개';
+  const nextIcloudMode: ICloudSyncConnectionMode =
+    icloudSyncMode === 'connected' ? 'paused' : 'connected';
 
   if (!isOpen) {
     return null;
@@ -405,13 +409,63 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               <span>{icloudSyncPresentation.label}</span>
             </span>
           </div>
-          <SegmentedSelector
-            ariaLabel="iCloud 동기화 선택"
-            tone="settings"
-            value={icloudSyncEnabled ? 'on' : 'off'}
-            options={ICLOUD_OPTIONS}
-            onChange={(nextValue) => setIcloudSyncEnabled(nextValue === 'on')}
-          />
+          <div className="settings-update-actions">
+            <button
+              className="ghost-button"
+              type="button"
+              onClick={() => {
+                void setIcloudSyncMode(nextIcloudMode);
+              }}
+            >
+              {primaryIcloudActionLabel}
+            </button>
+            <button
+              className="ghost-button"
+              type="button"
+              disabled={!canRefreshIcloud}
+              onClick={() => {
+                void refreshIcloudSync();
+              }}
+            >
+              지금 동기화
+            </button>
+          </div>
+          <div className="document-menu-option-description">
+            마지막 가져오기 {icloudSyncStatus.lastFetchAt ? formatCompactDateTime(icloudSyncStatus.lastFetchAt) : '기록 없음'}
+            {' · '}
+            마지막 보내기 {icloudSyncStatus.lastSendAt ? formatCompactDateTime(icloudSyncStatus.lastSendAt) : '기록 없음'}
+          </div>
+          {!isDisconnectConfirmOpen ? (
+            <button
+              className="document-menu-danger"
+              type="button"
+              disabled={icloudSyncMode === 'disconnected'}
+              onClick={() => setDisconnectConfirmOpen(true)}
+            >
+              <CloudOff size={14} />
+              iCloud 연결 해제
+            </button>
+          ) : (
+            <div className="danger-confirm-actions">
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={() => setDisconnectConfirmOpen(false)}
+              >
+                취소
+              </button>
+              <button
+                className="document-menu-danger"
+                type="button"
+                onClick={() => {
+                  void setIcloudSyncMode('disconnected');
+                  setDisconnectConfirmOpen(false);
+                }}
+              >
+                연결 해제 실행
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="settings-section">

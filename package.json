@@ -6,11 +6,11 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 1420",
-    "sidecar:build": "./scripts/build-sidecar.sh",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "tauri:dev": "pnpm sidecar:build && tauri dev",
+    "tauri:dev": "tauri dev",
+    "tauri:dev:signed": "./scripts/run-signed-dev-app.sh",
     "tauri:build": "./scripts/run-tauri-build.sh",
     "test": "vitest",
     "test:run": "vitest run"

@@ -5,6 +5,7 @@ import type {
   BlockKind,
   BlockTintPreset,
   DocumentSurfaceTonePreset,
+  ICloudSyncConnectionMode,
   ICloudSyncStatus,
   ThemeMode,
 } from '../lib/types';
@@ -22,7 +23,7 @@ interface WorkspaceState {
   defaultDocumentSurfaceTonePreset: DocumentSurfaceTonePreset;
   defaultBlockKind: BlockKind;
   themeMode: ThemeMode;
-  icloudSyncEnabled: boolean;
+  icloudSyncMode: ICloudSyncConnectionMode;
   icloudSyncStatus: ICloudSyncStatus;
   appUpdateStatus: AppUpdateStatus;
   menuBarIconEnabled: boolean;
@@ -46,7 +47,7 @@ interface WorkspaceState {
   setDefaultDocumentSurfaceTonePreset: (preset: DocumentSurfaceTonePreset) => void;
   setDefaultBlockKind: (kind: BlockKind) => void;
   setThemeMode: (themeMode: ThemeMode) => void;
-  setIcloudSyncEnabled: (value: boolean) => void;
+  setIcloudSyncMode: (value: ICloudSyncConnectionMode) => void;
   setIcloudSyncStatus: (status: ICloudSyncStatus) => void;
   setAppUpdateStatus: (status: AppUpdateStatus) => void;
   setMenuBarIconEnabled: (value: boolean) => void;
@@ -76,15 +77,18 @@ export const useWorkspaceStore = create<WorkspaceState>()(
   defaultDocumentSurfaceTonePreset: 'default',
   defaultBlockKind: 'markdown' as BlockKind,
   themeMode: 'system',
-  icloudSyncEnabled: false,
+  icloudSyncMode: 'disconnected',
   icloudSyncStatus: {
-    state: 'disabled',
+    connectionMode: 'disconnected',
+    runtimeState: 'idle',
     lastSyncAt: null,
     lastStatusAt: null,
     lastFetchAt: null,
     lastSendAt: null,
     initialFetchCompleted: false,
     errorMessage: null,
+    hasPendingWrites: false,
+    pendingChangeCount: 0,
   },
   appUpdateStatus: { state: 'idle', version: null, percent: null, message: null, lastCheckedAt: null },
   menuBarIconEnabled: false,
@@ -118,7 +122,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
   setDefaultDocumentSurfaceTonePreset: (defaultDocumentSurfaceTonePreset) => set({ defaultDocumentSurfaceTonePreset }),
   setDefaultBlockKind: (defaultBlockKind) => set({ defaultBlockKind }),
   setThemeMode: (themeMode) => set({ themeMode }),
-  setIcloudSyncEnabled: (icloudSyncEnabled) => set({ icloudSyncEnabled }),
+  setIcloudSyncMode: (icloudSyncMode) => set({ icloudSyncMode }),
   setIcloudSyncStatus: (icloudSyncStatus) => set({ icloudSyncStatus }),
   setAppUpdateStatus: (appUpdateStatus) => set({ appUpdateStatus }),
   setMenuBarIconEnabled: (menuBarIconEnabled) => set({ menuBarIconEnabled }),

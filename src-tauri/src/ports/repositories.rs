@@ -1,4 +1,4 @@
-use crate::domain::models::{AppSettings, Block, BlockKind, BlockTintPreset, Document, DocumentSummary, DocumentSurfaceTonePreset, SearchResult, ThemeMode};
+use crate::domain::models::{AppSettings, Block, BlockKind, BlockTintPreset, Document, DocumentSummary, DocumentSurfaceTonePreset, IcloudSyncMode, SearchResult, ThemeMode};
 use crate::error::AppError;
 use crate::ports::models::{RemoteDocumentApplyOutcome, RemoteRestoreBlockInput, RestoreBlockInput};
 
@@ -60,10 +60,12 @@ pub trait AppStateRepository {
   fn get_last_opened_document_id(&self) -> Result<Option<String>, AppError>;
   fn set_last_opened_document_id(&mut self, document_id: &str) -> Result<(), AppError>;
   fn get_app_settings(&self) -> Result<AppSettings, AppError>;
+  fn count_pending_sync_changes(&self) -> Result<usize, AppError>;
   fn set_theme_mode(&mut self, theme_mode: ThemeMode) -> Result<(), AppError>;
   fn set_default_block_tint_preset(&mut self, preset: BlockTintPreset) -> Result<(), AppError>;
   fn set_default_document_surface_tone_preset(&mut self, preset: DocumentSurfaceTonePreset) -> Result<(), AppError>;
-  fn set_icloud_sync_enabled(&mut self, enabled: bool) -> Result<(), AppError>;
+  fn set_icloud_sync_mode(&mut self, mode: IcloudSyncMode) -> Result<(), AppError>;
+  fn clear_sync_outbox(&mut self) -> Result<(), AppError>;
   fn set_menu_bar_icon_enabled(&mut self, enabled: bool) -> Result<(), AppError>;
   fn set_default_block_kind(&mut self, kind: BlockKind) -> Result<(), AppError>;
   fn set_always_on_top_enabled(&mut self, enabled: bool) -> Result<(), AppError>;

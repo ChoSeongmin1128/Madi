@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   subscribe: vi.fn(),
   handleSyncEventMessage: vi.fn(),
   refreshIcloudSync: vi.fn(),
-  icloudSyncEnabled: false,
+  icloudSyncMode: 'disconnected' as 'connected' | 'paused' | 'disconnected',
 }));
 
 vi.mock('../app/runtime', () => ({
@@ -17,8 +17,9 @@ vi.mock('../app/runtime', () => ({
 }));
 
 vi.mock('../stores/workspaceStore', () => ({
-  useWorkspaceStore: (selector: (state: { icloudSyncEnabled: boolean }) => boolean) =>
-    selector({ icloudSyncEnabled: mocks.icloudSyncEnabled }),
+  useWorkspaceStore: (
+    selector: (state: { icloudSyncMode: 'connected' | 'paused' | 'disconnected' }) => 'connected' | 'paused' | 'disconnected',
+  ) => selector({ icloudSyncMode: mocks.icloudSyncMode }),
 }));
 
 import { useSyncEventListener } from './useSyncEventListener';
@@ -26,7 +27,7 @@ import { useSyncEventListener } from './useSyncEventListener';
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
-  mocks.icloudSyncEnabled = false;
+  mocks.icloudSyncMode = 'disconnected';
 });
 
 describe('useSyncEventListener', () => {
@@ -57,12 +58,27 @@ describe('useSyncEventListener', () => {
   });
 
   it('requests icloud refresh after subscribe when enabled', async () => {
-    mocks.icloudSyncEnabled = true;
+    mocks.icloudSyncMode = 'connected';
     mocks.subscribe.mockResolvedValue(vi.fn());
 
     renderHook(() => useSyncEventListener());
     await Promise.resolve();
 
+    expect(mocks.refreshIcloudSync).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not resubscribe when icloud mode changes', async () => {
+    const unlisten = vi.fn();
+    mocks.subscribe.mockResolvedValue(unlisten);
+
+    const { rerender } = renderHook(() => useSyncEventListener());
+    await Promise.resolve();
+
+    mocks.icloudSyncMode = 'connected';
+    rerender();
+    await Promise.resolve();
+
+    expect(mocks.subscribe).toHaveBeenCalledTimes(1);
     expect(mocks.refreshIcloudSync).toHaveBeenCalledTimes(1);
   });
 });

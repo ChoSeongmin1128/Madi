@@ -37,9 +37,6 @@
     "active": true,
     "createUpdaterArtifacts": true,
     "targets": "all",
-    "externalBin": [
-      "binaries/minnote-sync"
-    ],
     "macOS": {
       "dmg": {
         "windowSize": {

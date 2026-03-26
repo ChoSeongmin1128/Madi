@@ -8,6 +8,7 @@ import type {
   DocumentSurfaceTonePreset,
   DocumentDto,
   DocumentSummaryDto,
+  ICloudSyncConnectionMode,
   RemoteDocumentDto,
   SearchResultDto,
   ThemeMode,
@@ -132,8 +133,8 @@ export const desktopApi = {
   restoreDocumentFromTrash(documentId: string) {
     return call<BootstrapPayload>('restore_document_from_trash', { documentId });
   },
-  setIcloudSyncEnabled(enabled: boolean) {
-    return call<boolean>('set_icloud_sync_enabled', { enabled });
+  setIcloudSyncMode(mode: ICloudSyncConnectionMode) {
+    return call<ICloudSyncConnectionMode>('set_icloud_sync_mode', { mode });
   },
   refreshIcloudSync() {
     return call<boolean>('refresh_icloud_sync');

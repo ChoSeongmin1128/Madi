@@ -5,7 +5,7 @@ use serde_json::Value;
 use uuid::Uuid;
 
 use crate::domain::models::{
-  AppSettings, Block, BlockKind, BlockTintPreset, Document, DocumentSummary, DocumentSurfaceTonePreset, SearchResult, ThemeMode,
+  AppSettings, Block, BlockKind, BlockTintPreset, Document, DocumentSummary, DocumentSurfaceTonePreset, IcloudSyncMode, SearchResult, ThemeMode,
 };
 use crate::error::AppError;
 use crate::ports::repositories::{AppStateRepository, BlockRepository, DocumentRepository, RemoteSyncRepository};
@@ -24,10 +24,26 @@ const DEFAULT_BLOCK_TINT_PRESET: &str = "mist";
 const DEFAULT_DOCUMENT_SURFACE_TONE_PRESET: &str = "default";
 const DEFAULT_BLOCK_KIND: &str = "markdown";
 const DEFAULT_ICLOUD_SYNC_ENABLED: &str = "false";
+const DEFAULT_ICLOUD_SYNC_MODE: &str = "disconnected";
 const DEFAULT_MENU_BAR_ICON_ENABLED: &str = "false";
 const DEFAULT_ALWAYS_ON_TOP_ENABLED: &str = "false";
 const DEFAULT_WINDOW_OPACITY_PERCENT: &str = "100";
 const DEFAULT_GLOBAL_TOGGLE_SHORTCUT: &str = "Option+M";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SyncOutboxOperation {
+  Upsert,
+  Delete,
+}
+
+impl SyncOutboxOperation {
+  pub(crate) fn as_str(&self) -> &'static str {
+    match self {
+      Self::Upsert => "upsert",
+      Self::Delete => "delete",
+    }
+  }
+}
 
 pub struct SqliteStore {
   pub(crate) connection: Connection,

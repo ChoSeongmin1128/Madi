@@ -36,5 +36,4 @@ if { [ -n "${TAURI_SIGNING_PRIVATE_KEY:-}" ] || [ -n "${TAURI_SIGNING_PRIVATE_KE
   exit 1
 fi
 
-pnpm sidecar:build
 tauri build "$@"

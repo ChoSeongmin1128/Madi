@@ -24,7 +24,6 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 tauri = { version = "2.10.3", features = ["tray-icon"] }
 tauri-plugin-log = "2"
-tauri-plugin-shell = "2"
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 tauri-plugin-global-shortcut = "2"
@@ -35,7 +34,20 @@ image = { version = "0.25", default-features = false, features = ["png"] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
-objc2-foundation = { version = "0.3", features = ["NSNotification"] }
-objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSView", "NSWindow"] }
+objc2-foundation = { version = "0.3", features = [
+  "NSArray",
+  "NSData",
+  "NSDate",
+  "NSError",
+  "NSNotification",
+  "NSCoder",
+  "NSKeyedArchiver",
+  "NSObject",
+  "NSSet",
+  "NSString",
+  "NSValue"
+] }
+objc2-app-kit = { version = "0.3", features = ["NSApplication", "NSResponder", "NSView", "NSWindow"] }
+objc2-cloud-kit = { version = "0.3", features = ["block2"] }
 objc2-core-foundation = "0.3"
 block2 = "0.6"

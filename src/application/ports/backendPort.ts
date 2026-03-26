@@ -2,6 +2,7 @@ import type {
   BlockKind,
   BlockTintPreset,
   DocumentSurfaceTonePreset,
+  ICloudSyncConnectionMode,
   RemoteDocumentDto,
   ThemeMode,
 } from '../../lib/types';
@@ -38,7 +39,7 @@ export interface BackendPort {
   restoreDocumentBlocks(documentId: string, blocks: RestoreBlockInput[]): Promise<DocumentVm>;
   emptyTrash(): Promise<void>;
   restoreDocumentFromTrash(documentId: string): Promise<WorkspaceBootstrapState>;
-  setIcloudSyncEnabled(enabled: boolean): Promise<boolean>;
+  setIcloudSyncMode(mode: ICloudSyncConnectionMode): Promise<ICloudSyncConnectionMode>;
   refreshIcloudSync(): Promise<boolean>;
   confirmAppShutdown(): Promise<void>;
   setMenuBarIconEnabled(enabled: boolean): Promise<boolean>;

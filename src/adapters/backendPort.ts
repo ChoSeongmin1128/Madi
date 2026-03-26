@@ -85,8 +85,8 @@ export const backendPort: BackendPort = {
   async restoreDocumentFromTrash(documentId) {
     return mapBootstrapPayloadToState(await desktopApi.restoreDocumentFromTrash(documentId));
   },
-  setIcloudSyncEnabled(enabled) {
-    return desktopApi.setIcloudSyncEnabled(enabled);
+  setIcloudSyncMode(mode) {
+    return desktopApi.setIcloudSyncMode(mode);
   },
   refreshIcloudSync() {
     return desktopApi.refreshIcloudSync();

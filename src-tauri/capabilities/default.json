@@ -8,8 +8,6 @@
   "permissions": [
     "core:default",
     "process:default",
-    "shell:allow-execute",
-    "shell:allow-stdin-write",
     "global-shortcut:allow-is-registered",
     "global-shortcut:allow-register",
     "global-shortcut:allow-register-all",

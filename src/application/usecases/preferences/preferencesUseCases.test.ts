@@ -17,15 +17,18 @@ function createPreferencesGateway() {
     setDefaultBlockTintPreset: vi.fn(),
     setDefaultDocumentSurfaceTonePreset: vi.fn(),
     setDefaultBlockKind: vi.fn(),
-    setIcloudSyncEnabled: vi.fn(),
+    setIcloudSyncMode: vi.fn(),
     getIcloudSyncStatus: vi.fn(() => ({
-      state: 'idle' as const,
+      connectionMode: 'connected' as const,
+      runtimeState: 'idle' as const,
       lastSyncAt: null,
       lastStatusAt: null,
       lastFetchAt: null,
       lastSendAt: null,
       initialFetchCompleted: false,
       errorMessage: null,
+      hasPendingWrites: false,
+      pendingChangeCount: 0,
     })),
     setIcloudSyncStatus: vi.fn(),
     setMenuBarIconEnabled: vi.fn(),
@@ -113,7 +116,7 @@ describe('preferences usecases', () => {
     const workspace = createWorkspaceGateway();
     const preferences = createPreferencesGateway();
     const backend = {
-      setIcloudSyncEnabled: vi.fn(async () => true),
+      setIcloudSyncMode: vi.fn(async () => 'connected'),
       refreshIcloudSync: vi.fn(async () => true),
     };
 
@@ -132,7 +135,7 @@ describe('preferences usecases', () => {
     const workspace = createWorkspaceGateway();
     const preferences = createPreferencesGateway();
     const backend = {
-      setIcloudSyncEnabled: vi.fn(async () => true),
+      setIcloudSyncMode: vi.fn(async () => 'connected'),
       refreshIcloudSync: vi.fn(async () => {
         throw new Error('refresh failed');
       }),
@@ -146,10 +149,10 @@ describe('preferences usecases', () => {
 
     await useCases.setIcloudSyncEnabled(true);
 
-    expect(preferences.setIcloudSyncEnabled).toHaveBeenCalledWith(true);
+    expect(preferences.setIcloudSyncMode).toHaveBeenCalledWith('connected');
     expect(preferences.setIcloudSyncStatus).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        state: 'error',
+        runtimeState: 'error',
         errorMessage: 'refresh failed',
       }),
     );

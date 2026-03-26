@@ -2,6 +2,7 @@ import type {
   BlockKind,
   BlockTintPreset,
   DocumentSurfaceTonePreset,
+  ICloudSyncConnectionMode,
   ICloudSyncStatus,
   ThemeMode,
 } from '../../lib/types';
@@ -11,7 +12,7 @@ export interface PreferencesGateway {
   setDefaultBlockTintPreset(preset: BlockTintPreset): void;
   setDefaultDocumentSurfaceTonePreset(preset: DocumentSurfaceTonePreset): void;
   setDefaultBlockKind(kind: BlockKind): void;
-  setIcloudSyncEnabled(value: boolean): void;
+  setIcloudSyncMode(value: ICloudSyncConnectionMode): void;
   getIcloudSyncStatus(): ICloudSyncStatus;
   setIcloudSyncStatus(status: ICloudSyncStatus): void;
   setMenuBarIconEnabled(value: boolean): void;

@@ -136,6 +136,7 @@ impl SqliteStore {
         "UPDATE documents SET updated_at = ?1 WHERE id = ?2",
         params![now, document_id],
       )?;
+      self.enqueue_sync_change(document_id, SyncOutboxOperation::Upsert, now)?;
     }
 
     self.get_document(document_id)?
@@ -529,5 +530,41 @@ impl SqliteStore {
       params![key, value],
     )?;
     Ok(())
+  }
+
+  pub(crate) fn enqueue_sync_change(
+    &self,
+    document_id: &str,
+    operation: SyncOutboxOperation,
+    version_at_enqueue: i64,
+  ) -> Result<(), AppError> {
+    let now = Self::now();
+    self.connection.execute(
+      "INSERT INTO sync_outbox (document_id, operation, version_at_enqueue, enqueued_at, last_attempt_at, last_error, acknowledged_at)
+       VALUES (?1, ?2, ?3, ?4, NULL, NULL, NULL)
+       ON CONFLICT(document_id) DO UPDATE SET
+         operation = excluded.operation,
+         version_at_enqueue = excluded.version_at_enqueue,
+         enqueued_at = excluded.enqueued_at,
+         last_attempt_at = NULL,
+         last_error = NULL,
+         acknowledged_at = NULL",
+      params![document_id, operation.as_str(), version_at_enqueue, now],
+    )?;
+    Ok(())
+  }
+
+  pub(crate) fn clear_sync_outbox(&self) -> Result<(), AppError> {
+    self.connection.execute("DELETE FROM sync_outbox", [])?;
+    Ok(())
+  }
+
+  pub(crate) fn count_pending_sync_changes(&self) -> Result<usize, AppError> {
+    let count = self.connection.query_row(
+      "SELECT COUNT(*) FROM sync_outbox WHERE acknowledged_at IS NULL",
+      [],
+      |row| row.get::<_, i64>(0),
+    )?;
+    Ok(count as usize)
   }
 }

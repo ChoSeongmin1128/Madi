@@ -28,6 +28,8 @@ fn emit_shutdown_request(app_handle: &tauri::AppHandle) {
 #[cfg(target_os = "macos")]
 pub(crate) fn setup_activation_listener(app_handle: tauri::AppHandle) {
   use block2::RcBlock;
+  use objc2::MainThreadMarker;
+  use objc2_app_kit::NSApplication;
   use objc2_app_kit::NSApplicationDidBecomeActiveNotification;
   use objc2_foundation::{NSNotification, NSNotificationCenter};
   use std::ptr::NonNull;
@@ -50,6 +52,24 @@ pub(crate) fn setup_activation_listener(app_handle: tauri::AppHandle) {
   };
   // 앱 생명주기 동안 observer 유지
   std::mem::forget(observer);
+
+  if let Some(mtm) = MainThreadMarker::new() {
+    let app = NSApplication::sharedApplication(mtm);
+    app.registerForRemoteNotifications();
+  }
+}
+
+#[cfg(target_os = "macos")]
+pub(crate) fn register_remote_notifications() {
+  use objc2::MainThreadMarker;
+  use objc2_app_kit::NSApplication;
+
+  if let Some(mtm) = MainThreadMarker::new() {
+    let app = NSApplication::sharedApplication(mtm);
+    if !app.isRegisteredForRemoteNotifications() {
+      app.registerForRemoteNotifications();
+    }
+  }
 }
 
 pub(crate) fn build_tray_icon(app: &tauri::AppHandle) -> tauri::Result<TrayIcon> {
@@ -102,7 +122,6 @@ pub fn run() {
   tauri::Builder::default()
     .plugin(tauri_plugin_updater::Builder::new().build())
     .plugin(tauri_plugin_process::init())
-    .plugin(tauri_plugin_shell::init())
     .plugin(tauri_plugin_global_shortcut::Builder::new().build())
     .plugin(tauri_plugin_window_state::Builder::default().build())
     .setup(|app| {
@@ -118,7 +137,10 @@ pub fn run() {
         .ok()
         .and_then(|repo| repo.get_app_settings().ok());
 
-      let icloud_enabled = settings.as_ref().map(|s| s.icloud_sync_enabled).unwrap_or(false);
+      let icloud_enabled = settings
+        .as_ref()
+        .map(|s| s.icloud_sync_mode == crate::domain::models::IcloudSyncMode::Connected)
+        .unwrap_or(false);
       let menu_bar_icon_enabled = settings.as_ref().map(|s| s.menu_bar_icon_enabled).unwrap_or(false);
 
       app.manage(app_state);
@@ -216,7 +238,7 @@ pub fn run() {
       commands::restore_document_blocks,
       commands::empty_trash,
       commands::restore_document_from_trash,
-      commands::set_icloud_sync_enabled,
+      commands::set_icloud_sync_mode,
       commands::refresh_icloud_sync,
       commands::confirm_app_shutdown,
       commands::set_menu_bar_icon_enabled,

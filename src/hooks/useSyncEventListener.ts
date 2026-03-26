@@ -1,19 +1,24 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { appUseCases, syncEventPort } from '../app/runtime';
+import { isIcloudDebugEnabled } from '../lib/debugFlags';
 import { useWorkspaceStore } from '../stores/workspaceStore';
 
 export function useSyncEventListener() {
-  const icloudSyncEnabled = useWorkspaceStore((state) => state.icloudSyncEnabled);
+  const icloudSyncMode = useWorkspaceStore((state) => state.icloudSyncMode);
+  const modeRef = useRef(icloudSyncMode);
+  const subscriptionReadyRef = useRef(false);
+
+  modeRef.current = icloudSyncMode;
 
   useEffect(() => {
-    if (import.meta.env.DEV) {
-      console.info('[icloud] subscribe:start', { icloudSyncEnabled });
+    if (isIcloudDebugEnabled) {
+      console.info('[icloud] subscribe:start', { icloudSyncMode: modeRef.current });
     }
     let unlistenFn: (() => void) | null = null;
     let disposed = false;
 
     void syncEventPort.subscribe((message) => {
-      if (import.meta.env.DEV) {
+      if (isIcloudDebugEnabled) {
         console.info('[icloud] event', message);
       }
       void appUseCases.handleSyncEventMessage(message);
@@ -22,11 +27,12 @@ export function useSyncEventListener() {
         fn();
       } else {
         unlistenFn = fn;
-        if (import.meta.env.DEV) {
-          console.info('[icloud] subscribe:ready', { icloudSyncEnabled });
+        subscriptionReadyRef.current = true;
+        if (isIcloudDebugEnabled) {
+          console.info('[icloud] subscribe:ready', { icloudSyncMode: modeRef.current });
         }
-        if (icloudSyncEnabled) {
-          if (import.meta.env.DEV) {
+        if (modeRef.current === 'connected') {
+          if (isIcloudDebugEnabled) {
             console.info('[icloud] refresh:requested-after-subscribe');
           }
           void appUseCases.refreshIcloudSync();
@@ -36,7 +42,20 @@ export function useSyncEventListener() {
 
     return () => {
       disposed = true;
+      subscriptionReadyRef.current = false;
       unlistenFn?.();
     };
-  }, [icloudSyncEnabled]);
+  }, []);
+
+  useEffect(() => {
+    if (icloudSyncMode !== 'connected' || !subscriptionReadyRef.current) {
+      return;
+    }
+
+    if (isIcloudDebugEnabled) {
+      console.info('[icloud] refresh:requested-after-enabled');
+    }
+
+    void appUseCases.refreshIcloudSync();
+  }, [icloudSyncMode]);
 }

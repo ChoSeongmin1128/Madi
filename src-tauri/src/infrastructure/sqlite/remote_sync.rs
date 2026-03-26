@@ -14,40 +14,63 @@ impl RemoteSyncRepository for SqliteStore {
   ) -> Result<RemoteDocumentApplyOutcome, AppError> {
     let tint_str = block_tint_override.as_ref().map(|p| p.as_str().to_string());
     let surface_tone_str = document_surface_tone_override.as_ref().map(|p| p.as_str().to_string());
-    let existing_updated_at = self
+    let existing = self
       .connection
       .query_row(
-        "SELECT updated_at FROM documents WHERE id = ?1",
+        "SELECT updated_at, deleted_at, last_opened_at FROM documents WHERE id = ?1",
+        params![id],
+        |row| {
+          Ok((
+            row.get::<_, i64>(0)?,
+            row.get::<_, Option<i64>>(1)?,
+            row.get::<_, i64>(2)?,
+          ))
+        },
+      )
+      .optional()?;
+    let pending_local_version = self
+      .connection
+      .query_row(
+        "SELECT version_at_enqueue
+         FROM sync_outbox
+         WHERE document_id = ?1 AND acknowledged_at IS NULL",
         params![id],
         |row| row.get::<_, i64>(0),
       )
       .optional()?;
+    let existing_updated_at = existing.as_ref().map(|(current, _, _)| *current);
+    let existing_deleted_at = existing.as_ref().and_then(|(_, deleted_at, _)| *deleted_at);
+    let last_opened_at = existing
+      .as_ref()
+      .map(|(_, _, last_opened_at)| *last_opened_at)
+      .unwrap_or(updated_at);
 
-    // last_opened_at은 로컬 값 유지 (없으면 updated_at 사용)
-    let existing_opened_at = self
-      .connection
-      .query_row(
-        "SELECT last_opened_at FROM documents WHERE id = ?1",
-        params![id],
-        |row| row.get::<_, i64>(0),
-      )
-      .optional()?;
+    let local_pending_wins = pending_local_version.is_some_and(|version| version >= updated_at);
+    let applied = if local_pending_wins {
+      false
+    } else {
+      match existing_updated_at {
+        None => true,
+        Some(current) if updated_at > current => true,
+        Some(current) if updated_at < current => false,
+        Some(_) => deleted_at.is_some() && existing_deleted_at.is_none(),
+      }
+    };
 
-    let last_opened_at = existing_opened_at.unwrap_or(updated_at);
-    let applied = existing_updated_at.map_or(true, |current| updated_at >= current);
-
-    self.connection.execute(
-      "INSERT INTO documents (id, title, block_tint_override, document_surface_tone_override, created_at, updated_at, last_opened_at, deleted_at)
-       VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
-       ON CONFLICT(id) DO UPDATE SET
-         title = excluded.title,
-         block_tint_override = excluded.block_tint_override,
-         document_surface_tone_override = excluded.document_surface_tone_override,
-         updated_at = excluded.updated_at,
-         deleted_at = excluded.deleted_at
-       WHERE excluded.updated_at >= documents.updated_at",
-      params![id, title, tint_str, surface_tone_str, created_at, updated_at, last_opened_at, deleted_at],
-    )?;
+    if applied {
+      self.connection.execute(
+        "INSERT INTO documents (id, title, block_tint_override, document_surface_tone_override, created_at, updated_at, last_opened_at, deleted_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+         ON CONFLICT(id) DO UPDATE SET
+           title = excluded.title,
+           block_tint_override = excluded.block_tint_override,
+           document_surface_tone_override = excluded.document_surface_tone_override,
+           created_at = excluded.created_at,
+           updated_at = excluded.updated_at,
+           deleted_at = excluded.deleted_at",
+        params![id, title, tint_str, surface_tone_str, created_at, updated_at, last_opened_at, deleted_at],
+      )?;
+    }
 
     let document = self
       .get_document(id)?

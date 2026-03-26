@@ -148,6 +148,7 @@ impl DocumentRepository for SqliteStore {
 
     self.create_empty_block(&document.id, 0, BlockKind::Markdown)?;
     self.rebuild_search_index(&document.id)?;
+    self.enqueue_sync_change(&document.id, SyncOutboxOperation::Upsert, document.updated_at)?;
 
     Ok(document)
   }
@@ -165,17 +166,20 @@ impl DocumentRepository for SqliteStore {
   fn delete_document(&mut self, document_id: &str) -> Result<(), AppError> {
     let now = Self::now();
     self.connection.execute(
-      "UPDATE documents SET deleted_at = ?1 WHERE id = ?2",
+      "UPDATE documents SET deleted_at = ?1, updated_at = ?1 WHERE id = ?2",
       params![now, document_id],
     )?;
+    self.enqueue_sync_change(document_id, SyncOutboxOperation::Delete, now)?;
     Ok(())
   }
 
   fn restore_document_from_trash(&mut self, document_id: &str) -> Result<Document, AppError> {
+    let now = Self::now();
     self.connection.execute(
-      "UPDATE documents SET deleted_at = NULL WHERE id = ?1",
-      params![document_id],
+      "UPDATE documents SET deleted_at = NULL, updated_at = ?1 WHERE id = ?2",
+      params![now, document_id],
     )?;
+    self.enqueue_sync_change(document_id, SyncOutboxOperation::Upsert, now)?;
     self
       .get_document(document_id)?
       .ok_or_else(|| AppError::validation("문서를 찾을 수 없습니다."))
@@ -184,7 +188,16 @@ impl DocumentRepository for SqliteStore {
   fn purge_expired_trash(&mut self, cutoff_ms: i64) -> Result<(), AppError> {
     let expired_ids: Vec<String> = self
       .connection
-      .prepare("SELECT id FROM documents WHERE deleted_at IS NOT NULL AND deleted_at < ?1")?
+      .prepare(
+        "SELECT id
+         FROM documents
+         WHERE deleted_at IS NOT NULL
+           AND deleted_at < ?1
+           AND id NOT IN (
+             SELECT document_id FROM sync_outbox
+             WHERE operation = 'delete' AND acknowledged_at IS NULL
+           )",
+      )?
       .query_map(params![cutoff_ms], |row| row.get::<_, String>(0))?
       .collect::<Result<Vec<_>, _>>()?;
 
@@ -196,7 +209,13 @@ impl DocumentRepository for SqliteStore {
     }
 
     self.connection.execute(
-      "DELETE FROM documents WHERE deleted_at IS NOT NULL AND deleted_at < ?1",
+      "DELETE FROM documents
+       WHERE deleted_at IS NOT NULL
+         AND deleted_at < ?1
+         AND id NOT IN (
+           SELECT document_id FROM sync_outbox
+           WHERE operation = 'delete' AND acknowledged_at IS NULL
+         )",
       params![cutoff_ms],
     )?;
 
@@ -206,7 +225,15 @@ impl DocumentRepository for SqliteStore {
   fn empty_trash(&mut self) -> Result<(), AppError> {
     let trash_ids: Vec<String> = self
       .connection
-      .prepare("SELECT id FROM documents WHERE deleted_at IS NOT NULL")?
+      .prepare(
+        "SELECT id
+         FROM documents
+         WHERE deleted_at IS NOT NULL
+           AND id NOT IN (
+             SELECT document_id FROM sync_outbox
+             WHERE operation = 'delete' AND acknowledged_at IS NULL
+           )",
+      )?
       .query_map([], |row| row.get::<_, String>(0))?
       .collect::<Result<Vec<_>, _>>()?;
 
@@ -217,7 +244,15 @@ impl DocumentRepository for SqliteStore {
       )?;
     }
 
-    self.connection.execute("DELETE FROM documents WHERE deleted_at IS NOT NULL", [])?;
+    self.connection.execute(
+      "DELETE FROM documents
+       WHERE deleted_at IS NOT NULL
+         AND id NOT IN (
+           SELECT document_id FROM sync_outbox
+           WHERE operation = 'delete' AND acknowledged_at IS NULL
+         )",
+      [],
+    )?;
 
     Ok(())
   }

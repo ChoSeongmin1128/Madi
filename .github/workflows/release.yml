@@ -41,35 +41,6 @@ jobs:
         run: |
           echo "$APPLE_PROVISIONING_PROFILE" | base64 --decode > src-tauri/embedded.provisionprofile
 
-      - name: Build Swift sidecar (arm64)
-        run: |
-          mkdir -p src-tauri/binaries
-          cd sync-sidecar
-          swift build -c release --arch arm64
-          cp .build/arm64-apple-macosx/release/MNSyncDaemon ../src-tauri/binaries/minnote-sync-aarch64-apple-darwin
-
-      - name: Build Swift sidecar (x86_64)
-        run: |
-          cd sync-sidecar
-          swift build -c release --arch x86_64
-          cp .build/x86_64-apple-macosx/release/MNSyncDaemon ../src-tauri/binaries/minnote-sync-x86_64-apple-darwin
-
-      - name: Inspect sidecar binaries
-        run: |
-          for BIN in \
-            src-tauri/binaries/minnote-sync-aarch64-apple-darwin \
-            src-tauri/binaries/minnote-sync-x86_64-apple-darwin
-          do
-            echo "::group::$BIN"
-            ls -l "$BIN"
-            file "$BIN"
-            xattr -lr "$BIN" || true
-            lipo -info "$BIN" || true
-            shasum -a 256 "$BIN"
-            codesign -dv --verbose=4 "$BIN" 2>&1 || true
-            echo "::endgroup::"
-          done
-
       - name: Build, sign, notarize, and package app bundles
         env:
           CI: true
@@ -102,7 +73,6 @@ jobs:
             fi
 
             xattr -crs "$APP_PATH"
-            codesign --force --sign "$APPLE_SIGNING_IDENTITY" --options runtime --entitlements "$ENTITLEMENTS_PATH" "$APP_PATH/Contents/MacOS/minnote-sync"
             codesign --force --sign "$APPLE_SIGNING_IDENTITY" --options runtime --entitlements "$ENTITLEMENTS_PATH" "$APP_PATH/Contents/MacOS/minnote"
             codesign --force --sign "$APPLE_SIGNING_IDENTITY" --options runtime --entitlements "$ENTITLEMENTS_PATH" "$APP_PATH"
 

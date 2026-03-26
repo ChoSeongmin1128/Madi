@@ -1,7 +1,7 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::application::dto::{BlockDto, BlockRestoreDto, BootstrapPayload, DocumentDto, DocumentSummaryDto, RemoteBlockJson, RemoteDocumentDto, SearchResultDto};
-use crate::domain::models::{BlockKind, BlockTintPreset, DocumentSurfaceTonePreset, ThemeMode};
+use crate::domain::models::{BlockKind, BlockTintPreset, DocumentSurfaceTonePreset, IcloudSyncMode, ThemeMode};
 use crate::error::AppError;
 use crate::ports::models::{RemoteRestoreBlockInput, RestoreBlockInput};
 use crate::ports::repositories::AppRepository;
@@ -16,7 +16,33 @@ fn now_ms() -> i64 {
     .unwrap_or(0)
 }
 
-const TRASH_TTL_MS: i64 = 86_400_000; // 24시간
+const TRASH_TTL_MS: i64 = 30 * 86_400_000; // 30일
+
+fn build_bootstrap_payload(
+  repository: &mut impl AppRepository,
+  settings: crate::domain::models::AppSettings,
+  documents: Vec<crate::domain::models::DocumentSummary>,
+  trash_documents: Vec<crate::domain::models::DocumentSummary>,
+  current_document: Option<DocumentDto>,
+) -> Result<BootstrapPayload, AppError> {
+  let pending_change_count = repository.count_pending_sync_changes()?;
+
+  Ok(BootstrapPayload {
+    documents: documents.into_iter().map(DocumentSummaryDto::from).collect(),
+    trash_documents: trash_documents.into_iter().map(DocumentSummaryDto::from).collect(),
+    current_document,
+    theme_mode: settings.theme_mode,
+    default_block_tint_preset: settings.default_block_tint_preset,
+    default_document_surface_tone_preset: settings.default_document_surface_tone_preset,
+    default_block_kind: settings.default_block_kind,
+    icloud_sync_mode: settings.icloud_sync_mode,
+    icloud_pending_change_count: pending_change_count,
+    menu_bar_icon_enabled: settings.menu_bar_icon_enabled,
+    always_on_top_enabled: settings.always_on_top_enabled,
+    window_opacity_percent: settings.window_opacity_percent,
+    global_toggle_shortcut: settings.global_toggle_shortcut,
+  })
+}
 
 pub fn bootstrap_app(repository: &mut impl AppRepository) -> Result<BootstrapPayload, AppError> {
   repository.purge_expired_trash(now_ms() - TRASH_TTL_MS)?;
@@ -25,12 +51,6 @@ pub fn bootstrap_app(repository: &mut impl AppRepository) -> Result<BootstrapPay
   let settings = repository.get_app_settings()?;
   let documents = repository.list_documents()?;
   let trash_documents = repository.list_trash_documents()?;
-  let document_summaries = documents
-    .clone()
-    .into_iter()
-    .map(DocumentSummaryDto::from)
-    .collect::<Vec<_>>();
-
   let current_document_id = repository
     .get_last_opened_document_id()?
     .or_else(|| documents.first().map(|document| document.id.clone()));
@@ -40,20 +60,13 @@ pub fn bootstrap_app(repository: &mut impl AppRepository) -> Result<BootstrapPay
     .map(|document_id| open_document(repository, document_id))
     .transpose()?;
 
-  Ok(BootstrapPayload {
-    documents: document_summaries,
-    trash_documents: trash_documents.into_iter().map(DocumentSummaryDto::from).collect(),
+  build_bootstrap_payload(
+    repository,
+    settings,
+    documents,
+    trash_documents,
     current_document,
-    theme_mode: settings.theme_mode,
-    default_block_tint_preset: settings.default_block_tint_preset,
-    default_document_surface_tone_preset: settings.default_document_surface_tone_preset,
-    default_block_kind: settings.default_block_kind,
-    icloud_sync_enabled: settings.icloud_sync_enabled,
-    menu_bar_icon_enabled: settings.menu_bar_icon_enabled,
-    always_on_top_enabled: settings.always_on_top_enabled,
-    window_opacity_percent: settings.window_opacity_percent,
-    global_toggle_shortcut: settings.global_toggle_shortcut,
-  })
+  )
 }
 
 pub fn list_documents(repository: &mut impl AppRepository) -> Result<Vec<DocumentSummaryDto>, AppError> {
@@ -112,20 +125,7 @@ pub fn delete_document(
     .map(|id| open_document(repository, id))
     .transpose()?;
 
-  Ok(BootstrapPayload {
-    documents: documents.into_iter().map(DocumentSummaryDto::from).collect(),
-    trash_documents: trash_documents.into_iter().map(DocumentSummaryDto::from).collect(),
-    current_document,
-    theme_mode: settings.theme_mode,
-    default_block_tint_preset: settings.default_block_tint_preset,
-    default_document_surface_tone_preset: settings.default_document_surface_tone_preset,
-    default_block_kind: settings.default_block_kind,
-    icloud_sync_enabled: settings.icloud_sync_enabled,
-    menu_bar_icon_enabled: settings.menu_bar_icon_enabled,
-    always_on_top_enabled: settings.always_on_top_enabled,
-    window_opacity_percent: settings.window_opacity_percent,
-    global_toggle_shortcut: settings.global_toggle_shortcut,
-  })
+  build_bootstrap_payload(repository, settings, documents, trash_documents, current_document)
 }
 
 pub fn empty_trash(repository: &mut impl AppRepository) -> Result<(), AppError> {
@@ -150,20 +150,7 @@ pub fn restore_document_from_trash(
     .map(|id| open_document(repository, id))
     .transpose()?;
 
-  Ok(BootstrapPayload {
-    documents: documents.into_iter().map(DocumentSummaryDto::from).collect(),
-    trash_documents: trash_documents.into_iter().map(DocumentSummaryDto::from).collect(),
-    current_document,
-    theme_mode: settings.theme_mode,
-    default_block_tint_preset: settings.default_block_tint_preset,
-    default_document_surface_tone_preset: settings.default_document_surface_tone_preset,
-    default_block_kind: settings.default_block_kind,
-    icloud_sync_enabled: settings.icloud_sync_enabled,
-    menu_bar_icon_enabled: settings.menu_bar_icon_enabled,
-    always_on_top_enabled: settings.always_on_top_enabled,
-    window_opacity_percent: settings.window_opacity_percent,
-    global_toggle_shortcut: settings.global_toggle_shortcut,
-  })
+  build_bootstrap_payload(repository, settings, documents, trash_documents, current_document)
 }
 
 pub fn delete_all_documents(repository: &mut impl AppRepository) -> Result<BootstrapPayload, AppError> {
@@ -180,20 +167,7 @@ pub fn delete_all_documents(repository: &mut impl AppRepository) -> Result<Boots
   repository.set_last_opened_document_id(&current_document_id)?;
   let current_document = open_document(repository, &current_document_id)?;
 
-  Ok(BootstrapPayload {
-    documents: documents.into_iter().map(DocumentSummaryDto::from).collect(),
-    trash_documents: vec![],
-    current_document: Some(current_document),
-    theme_mode: settings.theme_mode,
-    default_block_tint_preset: settings.default_block_tint_preset,
-    default_document_surface_tone_preset: settings.default_document_surface_tone_preset,
-    default_block_kind: settings.default_block_kind,
-    icloud_sync_enabled: settings.icloud_sync_enabled,
-    menu_bar_icon_enabled: settings.menu_bar_icon_enabled,
-    always_on_top_enabled: settings.always_on_top_enabled,
-    window_opacity_percent: settings.window_opacity_percent,
-    global_toggle_shortcut: settings.global_toggle_shortcut,
-  })
+  build_bootstrap_payload(repository, settings, documents, vec![], Some(current_document))
 }
 
 pub fn set_document_block_tint_override(
@@ -321,12 +295,15 @@ pub fn restore_document_blocks(
   hydrate_document(repository, document_id, None)
 }
 
-pub fn set_icloud_sync_enabled(
+pub fn set_icloud_sync_mode(
   repository: &mut impl AppRepository,
-  enabled: bool,
-) -> Result<bool, AppError> {
-  repository.set_icloud_sync_enabled(enabled)?;
-  Ok(enabled)
+  mode: IcloudSyncMode,
+) -> Result<IcloudSyncMode, AppError> {
+  repository.set_icloud_sync_mode(mode.clone())?;
+  if mode == IcloudSyncMode::Disconnected {
+    repository.clear_sync_outbox()?;
+  }
+  Ok(mode)
 }
 
 pub fn set_menu_bar_icon_enabled(
@@ -532,7 +509,7 @@ mod tests {
           default_block_tint_preset: BlockTintPreset::OceanSand,
           default_document_surface_tone_preset: DocumentSurfaceTonePreset::Paper,
           default_block_kind,
-          icloud_sync_enabled: true,
+          icloud_sync_mode: IcloudSyncMode::Connected,
           menu_bar_icon_enabled: false,
           always_on_top_enabled: true,
           window_opacity_percent: 84,
@@ -619,7 +596,9 @@ mod tests {
       &mut self,
       _preset: DocumentSurfaceTonePreset,
     ) -> Result<(), AppError> { Ok(()) }
-    fn set_icloud_sync_enabled(&mut self, _enabled: bool) -> Result<(), AppError> { Ok(()) }
+    fn count_pending_sync_changes(&self) -> Result<usize, AppError> { Ok(0) }
+    fn set_icloud_sync_mode(&mut self, _mode: IcloudSyncMode) -> Result<(), AppError> { Ok(()) }
+    fn clear_sync_outbox(&mut self) -> Result<(), AppError> { Ok(()) }
     fn set_menu_bar_icon_enabled(&mut self, _enabled: bool) -> Result<(), AppError> { Ok(()) }
     fn set_default_block_kind(&mut self, _kind: BlockKind) -> Result<(), AppError> { Ok(()) }
     fn set_always_on_top_enabled(&mut self, _enabled: bool) -> Result<(), AppError> { Ok(()) }

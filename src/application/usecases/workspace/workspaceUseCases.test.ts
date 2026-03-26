@@ -12,7 +12,8 @@ function createPayload(defaultBlockKind: WorkspaceBootstrapState['defaultBlockKi
     defaultBlockTintPreset: 'ocean-sand',
     defaultDocumentSurfaceTonePreset: 'default',
     defaultBlockKind,
-    icloudSyncEnabled: true,
+    icloudSyncMode: 'connected',
+    icloudPendingChangeCount: 0,
     menuBarIconEnabled: true,
     alwaysOnTopEnabled: false,
     windowOpacityPercent: 100,
@@ -63,15 +64,18 @@ function createPreferencesGateway() {
     setDefaultDocumentSurfaceTonePreset: vi.fn(),
     setDefaultBlockKind: vi.fn(),
     setThemeMode: vi.fn(),
-    setIcloudSyncEnabled: vi.fn(),
+    setIcloudSyncMode: vi.fn(),
     getIcloudSyncStatus: vi.fn(() => ({
-      state: 'idle' as const,
+      connectionMode: 'connected' as const,
+      runtimeState: 'idle' as const,
       lastSyncAt: 10,
       lastStatusAt: 11,
       lastFetchAt: 12,
       lastSendAt: 13,
       initialFetchCompleted: true,
       errorMessage: null,
+      hasPendingWrites: false,
+      pendingChangeCount: 0,
     })),
     setIcloudSyncStatus: vi.fn(),
     setMenuBarIconEnabled: vi.fn(),
@@ -280,13 +284,16 @@ describe('handleSyncEventMessage (remote-changed)', () => {
     await useCases.handleSyncEventMessage({ type: 'remote-changed', documents: [] });
 
     expect(preferences.setIcloudSyncStatus).toHaveBeenCalledWith({
-      state: 'error',
+      connectionMode: 'connected',
+      runtimeState: 'error',
       lastSyncAt: 10,
       lastStatusAt: expect.any(Number),
       lastFetchAt: 12,
       lastSendAt: 13,
       initialFetchCompleted: true,
       errorMessage: 'remote apply failed',
+      hasPendingWrites: false,
+      pendingChangeCount: 0,
     });
   });
 });
@@ -315,20 +322,26 @@ describe('handleSyncEventMessage (status)', () => {
     await useCases.handleSyncEventMessage({
       type: 'status',
       state: 'idle',
+      connectionMode: 'connected',
       lastSyncAt: 100,
       lastFetchAt: 80,
       lastSendAt: 90,
       initialFetchCompleted: true,
+      hasPendingWrites: true,
+      pendingChangeCount: 2,
     });
 
     expect(preferences.setIcloudSyncStatus).toHaveBeenCalledWith({
-      state: 'idle',
+      connectionMode: 'connected',
+      runtimeState: 'idle',
       lastSyncAt: 100,
       lastStatusAt: expect.any(Number),
       lastFetchAt: 80,
       lastSendAt: 90,
       initialFetchCompleted: true,
       errorMessage: null,
+      hasPendingWrites: true,
+      pendingChangeCount: 2,
     });
   });
 });
