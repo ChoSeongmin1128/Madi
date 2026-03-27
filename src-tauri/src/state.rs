@@ -96,7 +96,13 @@ impl AppState {
   }
 
   pub fn shutdown_confirmed(&self) -> bool {
-    self.shutdown_confirmed.lock().map(|state| *state).unwrap_or(false)
+    match self.shutdown_confirmed.lock() {
+      Ok(state) => *state,
+      Err(error) => {
+        log::warn!("종료 확인 상태를 읽지 못했습니다: {error}");
+        false
+      }
+    }
   }
 
   pub fn set_shutdown_confirmed(&self, confirmed: bool) {

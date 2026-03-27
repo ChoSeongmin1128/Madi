@@ -35,8 +35,16 @@ pub(crate) fn setup_activation_listener(app_handle: tauri::AppHandle) {
     let center = NSNotificationCenter::defaultCenter();
     let block = RcBlock::new(move |_notif: NonNull<NSNotification>| {
       if let Some(window) = app_handle.get_webview_window("main") {
-        if !window.is_visible().unwrap_or(true) {
-          let _ = show_main_window(&app_handle);
+        match window.is_visible() {
+          Ok(is_visible) => {
+            if !is_visible {
+              let _ = show_main_window(&app_handle);
+            }
+          }
+          Err(error) => {
+            log::warn!("앱 활성화 시 창 표시 상태를 확인하지 못했습니다: {error}");
+            let _ = show_main_window(&app_handle);
+          }
         }
       }
     });

@@ -20,7 +20,10 @@ impl SqliteStore {
     SystemTime::now()
       .duration_since(UNIX_EPOCH)
       .map(|duration| duration.as_millis() as i64)
-      .unwrap_or(0)
+      .unwrap_or_else(|error| {
+        log::warn!("현재 시각을 계산하지 못했습니다: {error}");
+        0
+      })
   }
 
   pub(crate) fn new_id() -> String {
