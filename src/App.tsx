@@ -57,7 +57,7 @@ function App() {
 
   useEffect(() => {
     void bootstrapApp();
-  }, []);
+  }, [bootstrapApp]);
 
   useEffect(() => {
     const unlisten = listen('tray-open-settings', () => {
@@ -94,7 +94,7 @@ function App() {
     return () => {
       void unlisten.then((fn) => fn());
     };
-  }, [setWorkspaceError]);
+  }, [confirmAppShutdown, flushCurrentDocument, setWorkspaceError]);
 
   useEffect(() => {
     document.documentElement.dataset.themeMode = themeMode;

@@ -17,13 +17,13 @@ export function useWindowOpacityControl() {
     try {
       await previewWindowOpacityPercent(percent);
     } catch {
-      setDraftOpacity(useWorkspaceStore.getState().windowOpacityPercent);
+      setDraftOpacity(persistedOpacity);
     }
-  }, []);
+  }, [persistedOpacity, previewWindowOpacityPercent]);
 
   const commitOpacity = useCallback(async (percent: number) => {
     const nextPercent = Math.round(percent);
-    if (nextPercent === useWorkspaceStore.getState().windowOpacityPercent) {
+    if (nextPercent === persistedOpacity) {
       setDraftOpacity(nextPercent);
       return nextPercent;
     }
@@ -33,11 +33,10 @@ export function useWindowOpacityControl() {
       setDraftOpacity(result);
       return result;
     } catch {
-      const fallback = useWorkspaceStore.getState().windowOpacityPercent;
-      setDraftOpacity(fallback);
-      return fallback;
+      setDraftOpacity(persistedOpacity);
+      return persistedOpacity;
     }
-  }, []);
+  }, [persistedOpacity, setWindowOpacityPercent]);
 
   return {
     draftOpacity,

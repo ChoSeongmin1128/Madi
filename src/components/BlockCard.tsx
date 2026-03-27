@@ -1,6 +1,4 @@
-import { Copy, GripVertical, Trash2 } from 'lucide-react';
 import {
-  Suspense,
   useCallback,
   useEffect,
   useMemo,
@@ -16,20 +14,15 @@ import type { BlockEditorHandle } from '../lib/editorHandle';
 import type { CodeLanguageId } from '../lib/codeLanguageRegistry';
 import type { BlockCaretPlacement, BlockKind } from '../lib/types';
 import { useDocumentSessionStore } from '../stores/documentSessionStore';
-import { BlockMenu } from './BlockMenu';
-import { CodeLanguageTrigger } from './CodeLanguageMenu';
-import { ContextMenu } from './ContextMenu';
 import {
   buildBlockContextMenuItems,
   handleBlockContextAction,
   isEffectivelyEmpty,
   preloadBlockCardEditor,
 } from './blockCardSupport';
-import {
-  MarkdownBlockEditor,
-  PlainTextBlockEditor,
-} from './editors/editorLoaders';
-import { TypeMenu } from './TypeMenu';
+import { BlockCardActions } from './blockCard/BlockCardActions';
+import { BlockCardEditor } from './blockCard/BlockCardEditor';
+import { BlockCardMenus } from './blockCard/BlockCardMenus';
 
 interface BlockCardProps {
   block: BlockVm;
@@ -41,10 +34,6 @@ interface BlockCardProps {
   isMenuOpen: boolean;
   onGripPointerDown: (blockId: string, event: ReactPointerEvent<HTMLButtonElement>) => void;
   onMenuClose: () => void;
-}
-
-function EditorFallback() {
-  return <div className="block-editor-loading" aria-hidden="true" />;
 }
 
 export function BlockCard({
@@ -126,7 +115,16 @@ export function BlockCard({
       updateCodeBlock(block.id, '', lastCodeLanguage);
       return;
     }
-  }, [block.id, block.kind, lastCodeLanguage, onMenuClose, updateCodeBlock]);
+  }, [
+    block.id,
+    block.kind,
+    changeBlockKind,
+    lastCodeLanguage,
+    onMenuClose,
+    updateCodeBlock,
+    updateMarkdownBlock,
+    updateTextBlock,
+  ]);
 
   const handleDeleteBlock = useCallback(() => {
     setContextMenuPosition(null);
@@ -135,7 +133,7 @@ export function BlockCard({
       return;
     }
     void deleteBlock(block.id);
-  }, [block.id, shouldActOnSelectedSet]);
+  }, [block.id, deleteBlock, deleteSelectedBlocks, shouldActOnSelectedSet]);
 
   const handleDeleteIfEmpty = handleDeleteBlock;
 
@@ -162,7 +160,7 @@ export function BlockCard({
       return;
     }
     await editorRef.current?.cut();
-  }, [shouldActOnSelectedSet]);
+  }, [copySelectedBlocks, deleteSelectedBlocks, shouldActOnSelectedSet]);
 
   const handleCopy = useCallback(async () => {
     if (shouldActOnSelectedSet) {
@@ -170,7 +168,7 @@ export function BlockCard({
       return;
     }
     await editorRef.current?.copy();
-  }, [shouldActOnSelectedSet]);
+  }, [copySelectedBlocks, shouldActOnSelectedSet]);
 
   const handlePaste = useCallback(async () => {
     await editorRef.current?.paste();
@@ -230,140 +228,49 @@ export function BlockCard({
         }
       }}
     >
-      <div className="block-header">
-        <div className="block-meta-row">
-          <button
-            className="drag-handle"
-            type="button"
-            aria-label="블록 이동"
-            aria-expanded={isMenuOpen}
-            onPointerDown={(event) => onGripPointerDown(block.id, event)}
-          >
-            <GripVertical size={14} />
-          </button>
-        </div>
-      </div>
+      <BlockCardActions
+        blockId={block.id}
+        shouldActOnSelectedSet={shouldActOnSelectedSet}
+        isMenuOpen={isMenuOpen}
+        onGripPointerDown={onGripPointerDown}
+        onCopySelectedBlocks={copySelectedBlocks}
+        onCopySingleBlock={copySingleBlock}
+        onDeleteBlock={handleDeleteBlock}
+      />
 
-      <div className="block-actions">
-        <button
-          type="button"
-          aria-label="블록 복사"
-          onClick={(event) => {
-            event.stopPropagation();
-            if (shouldActOnSelectedSet) {
-              void copySelectedBlocks();
-              return;
-            }
-            void copySingleBlock(block.id);
-          }}
-        >
-          <Copy size={14} />
-        </button>
-        <button
-          type="button"
-          className="is-danger"
-          aria-label="블록 삭제"
-          onClick={(event) => {
-            event.stopPropagation();
-            handleDeleteBlock();
-          }}
-        >
-          <Trash2 size={14} />
-        </button>
-      </div>
+      <BlockCardMenus
+        block={block}
+        isEmpty={isEmpty}
+        isSelected={isSelected}
+        isMenuOpen={isMenuOpen}
+        typeMenuAnchor={typeMenuAnchor}
+        contextMenuPosition={contextMenuPosition}
+        contextMenuItems={contextMenuItems}
+        onLanguageChange={handleLanguageChange}
+        onTypeChange={handleTypeChange}
+        onDeleteIfEmpty={handleDeleteIfEmpty}
+        onContextAction={handleContextAction}
+        onTypeMenuClose={() => setTypeMenuAnchor(null)}
+        onMenuClose={onMenuClose}
+        onContextMenuClose={() => setContextMenuPosition(null)}
+      />
 
-      {block.kind === 'markdown' || block.kind === 'text' ? (
-        <span className="block-kind-badge">
-          {block.kind === 'markdown' ? 'Markdown' : 'Text'}
-        </span>
-      ) : null}
-
-      {block.kind === 'code' ? (
-        <CodeLanguageTrigger
-          value={block.language}
-          isVisible={isSelected || isMenuOpen || contextMenuPosition != null}
-          onSelect={handleLanguageChange}
-        />
-      ) : null}
-
-      {typeMenuAnchor ? (
-        <TypeMenu
-          anchorRect={typeMenuAnchor}
-          onSelect={(kind) => void handleTypeChange(kind)}
-          onClose={() => setTypeMenuAnchor(null)}
-        />
-      ) : null}
-      {isMenuOpen ? (
-        <BlockMenu
-          block={block}
-          isEmpty={isEmpty}
-          onClose={onMenuClose}
-          onDelete={handleDeleteIfEmpty}
-          onSelectKind={(kind) => void handleTypeChange(kind)}
-        />
-      ) : null}
-      {contextMenuPosition ? (
-        <ContextMenu
-          x={contextMenuPosition.x}
-          y={contextMenuPosition.y}
-          items={contextMenuItems}
-          onAction={handleContextAction}
-          onClose={() => setContextMenuPosition(null)}
-        />
-      ) : null}
-
-      <Suspense fallback={<EditorFallback />}>
-        {block.kind === 'markdown' ? (
-          <MarkdownBlockEditor
-            ref={editorRef}
-            blockId={block.id}
-            content={block.content}
-            isSelected={isSelected}
-            focusPlacement={focusPlacement}
-            focusNonce={focusNonce}
-            onFocus={handleBlockFocus}
-            onSelectionVisualChange={setMarkdownSelectionState}
-            onCreateBelow={() => void createBlockBelow(block.id, defaultBlockKind)}
-            onNavigatePrevious={(caret) => focusPreviousBlock(block.id, caret)}
-            onNavigateNext={(caret) => focusNextBlock(block.id, caret)}
-            onDeleteIfEmpty={handleDeleteIfEmpty}
-            onChange={(content) => updateMarkdownBlock(block.id, content)}
-          />
-        ) : null}
-
-        {block.kind === 'code' ? (
-          <PlainTextBlockEditor
-            ref={editorRef}
-            mode="code"
-            value={block.content}
-            language={block.language}
-            focusPlacement={focusPlacement}
-            focusNonce={focusNonce}
-            onFocus={handleBlockFocus}
-            onCreateBelow={() => void createBlockBelow(block.id, defaultBlockKind)}
-            onNavigatePrevious={(caret) => focusPreviousBlock(block.id, caret)}
-            onNavigateNext={(caret) => focusNextBlock(block.id, caret)}
-            onDeleteIfEmpty={handleDeleteIfEmpty}
-            onChange={(content, language) => updateCodeBlock(block.id, content, language)}
-          />
-        ) : null}
-
-        {block.kind === 'text' ? (
-          <PlainTextBlockEditor
-            ref={editorRef}
-            mode="text"
-            value={block.content}
-            focusPlacement={focusPlacement}
-            focusNonce={focusNonce}
-            onFocus={handleBlockFocus}
-            onCreateBelow={() => void createBlockBelow(block.id, defaultBlockKind)}
-            onNavigatePrevious={(caret) => focusPreviousBlock(block.id, caret)}
-            onNavigateNext={(caret) => focusNextBlock(block.id, caret)}
-            onDeleteIfEmpty={handleDeleteIfEmpty}
-            onChange={(content) => updateTextBlock(block.id, content)}
-          />
-        ) : null}
-      </Suspense>
+      <BlockCardEditor
+        block={block}
+        editorRef={editorRef}
+        isSelected={isSelected}
+        focusPlacement={focusPlacement}
+        focusNonce={focusNonce}
+        onFocus={handleBlockFocus}
+        onSelectionVisualChange={setMarkdownSelectionState}
+        onCreateBelow={async () => createBlockBelow(block.id, defaultBlockKind)}
+        onNavigatePrevious={(caret) => focusPreviousBlock(block.id, caret)}
+        onNavigateNext={(caret) => focusNextBlock(block.id, caret)}
+        onDeleteIfEmpty={handleDeleteIfEmpty}
+        onMarkdownChange={(content) => updateMarkdownBlock(block.id, content)}
+        onTextChange={(content) => updateTextBlock(block.id, content)}
+        onCodeChange={(content, language) => updateCodeBlock(block.id, content, language ?? block.language)}
+      />
     </section>
   );
 }

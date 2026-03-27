@@ -1,31 +1,20 @@
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Download,
-  MoonStar,
-  MonitorCog,
-  RefreshCw,
-  SunMedium,
-  X,
-} from 'lucide-react';
+import { MoonStar, MonitorCog, SunMedium, X } from 'lucide-react';
 import { useState } from 'react';
 import { usePreferencesController, useWorkspaceController } from '../app/controllers';
-import { BlockTintPreview } from './BlockTintPreview';
 import { BLOCK_TINT_PRESETS } from '../lib/blockTint';
 import { DOCUMENT_SURFACE_TONE_PRESETS } from '../lib/documentSurfaceTone';
-import { DocumentSurfacePreview } from './DocumentSurfacePreview';
-import { SegmentedSelector } from './SegmentedSelector';
 import type { BlockKind, ThemeMode } from '../lib/types';
 import { useWorkspaceStore } from '../stores/workspaceStore';
-import { applyPreparedUpdate, formatUpdateStatusMessage, runUpdateCheckFrom } from '../lib/appUpdater';
-import { ShortcutCaptureField } from './ShortcutCaptureField';
 import {
   MAX_WINDOW_OPACITY_PERCENT,
   MIN_WINDOW_OPACITY_PERCENT,
 } from '../lib/globalShortcut';
 import { useWindowOpacityControl } from '../hooks/useWindowOpacityControl';
 import { useUpdaterStore } from '../stores/updaterStore';
-import type { AppUpdateStatus } from '../lib/types';
+import { SettingsDangerZoneSection } from './settings/SettingsDangerZoneSection';
+import { SettingsThemeDefaultsSection } from './settings/SettingsThemeDefaultsSection';
+import { SettingsUpdateSection } from './settings/SettingsUpdateSection';
+import { SettingsWindowSection } from './settings/SettingsWindowSection';
 
 const THEME_OPTIONS: Array<{ id: ThemeMode; label: string; icon: typeof MonitorCog }> = [
   { id: 'system', label: '자동', icon: MonitorCog },
@@ -59,38 +48,6 @@ interface SettingsModalProps {
   onClose: () => void;
 }
 
-function getAppUpdatePresentation(
-  status: Pick<AppUpdateStatus, 'state' | 'message' | 'version' | 'percent' | 'lastCheckedAt'>,
-) {
-  const label = formatUpdateStatusMessage(status);
-
-  if (status.state === 'checking') {
-    return { label, tone: 'progress' as const, icon: RefreshCw, spin: true };
-  }
-
-  if (status.state === 'available_downloading') {
-    return { label, tone: 'progress' as const, icon: Download, spin: false };
-  }
-
-  if (status.state === 'ready_to_install') {
-    return { label, tone: 'ready' as const, icon: CheckCircle2, spin: false };
-  }
-
-  if (status.state === 'installing') {
-    return { label, tone: 'progress' as const, icon: RefreshCw, spin: true };
-  }
-
-  if (status.state === 'error') {
-    return { label, tone: 'error' as const, icon: AlertTriangle, spin: false };
-  }
-
-  if (label) {
-    return { label, tone: 'ready' as const, icon: CheckCircle2, spin: false };
-  }
-
-  return null;
-}
-
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const {
     setAlwaysOnTopEnabled,
@@ -113,8 +70,6 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const appUpdateStatus = useUpdaterStore((state) => state.appUpdateStatus);
   const { draftOpacity, previewOpacity, commitOpacity } = useWindowOpacityControl();
   const [isConfirmOpen, setConfirmOpen] = useState(false);
-  const appUpdatePresentation = getAppUpdatePresentation(appUpdateStatus);
-  const AppUpdateIcon = appUpdatePresentation?.icon;
 
   if (!isOpen) {
     return null;
@@ -131,238 +86,48 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           </button>
         </div>
 
-        <div className="settings-section">
-          <div className="settings-section-header">
-            <span className="settings-section-title">테마</span>
-          </div>
-          <SegmentedSelector
-            ariaLabel="테마 선택"
-            tone="settings"
-            value={themeMode}
-            options={THEME_OPTIONS.map((option) => ({
-              value: option.id,
-              label: option.label,
-              icon: option.icon,
-            }))}
-            onChange={(nextValue) => setThemeMode(nextValue)}
-          />
-        </div>
+        <SettingsThemeDefaultsSection
+          themeMode={themeMode}
+          themeOptions={THEME_OPTIONS}
+          defaultBlockKind={defaultBlockKind}
+          blockKindOptions={BLOCK_KIND_OPTIONS}
+          defaultBlockTintPreset={defaultBlockTintPreset}
+          blockTintOptions={BLOCK_TINT_OPTIONS}
+          defaultDocumentSurfaceTonePreset={defaultDocumentSurfaceTonePreset}
+          documentSurfaceToneOptions={DOCUMENT_SURFACE_TONE_OPTIONS}
+          onThemeModeChange={setThemeMode}
+          onDefaultBlockKindChange={setDefaultBlockKind}
+          onDefaultBlockTintPresetChange={setDefaultBlockTintPreset}
+          onDefaultDocumentSurfaceTonePresetChange={setDefaultDocumentSurfaceTonePreset}
+        />
 
-        <div className="settings-section">
-          <div className="settings-section-header">
-            <span className="settings-section-title">기본 블록 종류</span>
-          </div>
-          <SegmentedSelector
-            ariaLabel="기본 블록 종류 선택"
-            tone="settings"
-            value={defaultBlockKind}
-            options={BLOCK_KIND_OPTIONS.map((option) => ({
-              value: option.id,
-              label: option.label,
-            }))}
-            onChange={(nextValue) => setDefaultBlockKind(nextValue)}
-          />
-        </div>
+        <SettingsWindowSection
+          menuBarIconEnabled={menuBarIconEnabled}
+          alwaysOnTopEnabled={alwaysOnTopEnabled}
+          draftOpacity={draftOpacity}
+          globalToggleShortcut={globalToggleShortcut}
+          globalShortcutError={globalShortcutError}
+          menuBarOptions={MENU_BAR_OPTIONS}
+          minOpacityPercent={MIN_WINDOW_OPACITY_PERCENT}
+          maxOpacityPercent={MAX_WINDOW_OPACITY_PERCENT}
+          onMenuBarIconEnabledChange={setMenuBarIconEnabled}
+          onAlwaysOnTopEnabledChange={setAlwaysOnTopEnabled}
+          onPreviewOpacity={previewOpacity}
+          onCommitOpacity={commitOpacity}
+          onGlobalToggleShortcutCommit={setGlobalToggleShortcut}
+        />
 
-        <div className="settings-section">
-          <div className="settings-section-header">
-            <span className="settings-section-title">기본 블록 색상쌍</span>
-          </div>
-          <SegmentedSelector
-            ariaLabel="기본 블록 색상쌍 선택"
-            tone="settings"
-            value={defaultBlockTintPreset}
-            layout="palette"
-            columns={3}
-            options={BLOCK_TINT_OPTIONS}
-            onChange={(nextValue) => setDefaultBlockTintPreset(nextValue)}
-            renderOption={(option) => (
-              <span className="tint-selector-card">
-                <BlockTintPreview className="tint-selector-preview" preset={option.value} />
-                <span className="tint-selector-label">{option.label}</span>
-              </span>
-            )}
-          />
-        </div>
+        <SettingsUpdateSection appUpdateStatus={appUpdateStatus} />
 
-        <div className="settings-section">
-          <div className="settings-section-header">
-            <span className="settings-section-title">기본 문서 배경 톤</span>
-          </div>
-          <SegmentedSelector
-            ariaLabel="기본 문서 배경 톤 선택"
-            tone="settings"
-            value={defaultDocumentSurfaceTonePreset}
-            layout="palette"
-            columns={3}
-            options={DOCUMENT_SURFACE_TONE_OPTIONS}
-            onChange={(nextValue) => setDefaultDocumentSurfaceTonePreset(nextValue)}
-            renderOption={(option) => (
-              <span className="tint-selector-card">
-                <DocumentSurfacePreview className="surface-selector-preview" preset={option.value} />
-                <span className="tint-selector-label">{option.label}</span>
-              </span>
-            )}
-          />
-        </div>
-
-        <div className="settings-section">
-          <div className="settings-section-header">
-            <span className="settings-section-title">메뉴바 아이콘</span>
-          </div>
-          <SegmentedSelector
-            ariaLabel="메뉴바 아이콘 선택"
-            tone="settings"
-            value={menuBarIconEnabled ? 'on' : 'off'}
-            options={MENU_BAR_OPTIONS}
-            onChange={(nextValue) => setMenuBarIconEnabled(nextValue === 'on')}
-          />
-        </div>
-
-        <div className="settings-section">
-          <div className="settings-section-header">
-            <span className="settings-section-title">창 제어</span>
-          </div>
-
-          <label className="settings-toggle-row" htmlFor="settings-always-on-top">
-            <span className="settings-toggle-copy">
-              <span className="settings-toggle-title">항상 위에 고정</span>
-              <span className="document-menu-option-description">
-                다른 앱으로 전환해도 MinNote 창을 위에 유지합니다.
-              </span>
-            </span>
-            <input
-              id="settings-always-on-top"
-              type="checkbox"
-              checked={alwaysOnTopEnabled}
-              onChange={(event) => {
-                void setAlwaysOnTopEnabled(event.target.checked);
-              }}
-            />
-          </label>
-
-          <div className="settings-range-group">
-            <div className="settings-range-header">
-              <div className="settings-range-title-group">
-                <span className="settings-section-title">투명도</span>
-                <span className="settings-inline-stat">{draftOpacity}%</span>
-              </div>
-              <button
-                className="ghost-button settings-inline-action"
-                type="button"
-                disabled={draftOpacity === MAX_WINDOW_OPACITY_PERCENT}
-                onClick={() => {
-                  void commitOpacity(MAX_WINDOW_OPACITY_PERCENT);
-                }}
-              >
-                100%로 복원
-              </button>
-            </div>
-            <input
-              className="opacity-slider"
-              type="range"
-              min={MIN_WINDOW_OPACITY_PERCENT}
-              max={MAX_WINDOW_OPACITY_PERCENT}
-              step={1}
-              value={draftOpacity}
-              onInput={(event) => {
-                void previewOpacity(Number(event.currentTarget.value));
-              }}
-              onPointerUp={(event) => {
-                void commitOpacity(Number(event.currentTarget.value));
-              }}
-              onKeyUp={(event) => {
-                void commitOpacity(Number(event.currentTarget.value));
-              }}
-              onBlur={(event) => {
-                void commitOpacity(Number(event.currentTarget.value));
-              }}
-            />
-          </div>
-
-          <div className="settings-shortcut-group">
-            <div className="settings-section-header">
-              <span className="settings-section-title">전역 단축키</span>
-            </div>
-            <ShortcutCaptureField
-              value={globalToggleShortcut}
-              error={globalShortcutError}
-              onCommit={(shortcut) => setGlobalToggleShortcut(shortcut)}
-            />
-          </div>
-        </div>
-
-        <div className="settings-section">
-          <div className="settings-section-header">
-            <span className="settings-section-title">업데이트</span>
-            {appUpdatePresentation && AppUpdateIcon && (
-              <span className={`settings-status-chip is-${appUpdatePresentation.tone}`}>
-                <AppUpdateIcon className={appUpdatePresentation.spin ? 'spin' : undefined} size={14} />
-                <span>{appUpdatePresentation.label}</span>
-              </span>
-            )}
-          </div>
-          <div className="settings-update-actions">
-            <button
-              className="ghost-button"
-              type="button"
-              disabled={
-                appUpdateStatus.state === 'checking'
-                || appUpdateStatus.state === 'available_downloading'
-                || appUpdateStatus.state === 'installing'
-              }
-              onClick={() => {
-                void runUpdateCheckFrom('settings-manual');
-              }}
-            >
-              <RefreshCw size={14} />
-              업데이트 확인
-            </button>
-            {appUpdateStatus.state === 'ready_to_install' && (
-              <button
-                className="ghost-button"
-                type="button"
-                onClick={() => {
-                  void applyPreparedUpdate();
-                }}
-              >
-                재시작하여 적용
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="settings-section danger-zone">
-          <div className="settings-section-header">
-            <span className="settings-section-title">Danger Zone</span>
-          </div>
-          {!isConfirmOpen ? (
-            <button className="document-menu-danger" type="button" onClick={() => setConfirmOpen(true)}>
-              <AlertTriangle size={14} />
-              전체 문서 삭제
-            </button>
-          ) : (
-            <div className="danger-confirm-actions">
-              <button
-                className="ghost-button"
-                type="button"
-                onClick={() => setConfirmOpen(false)}
-              >
-                취소
-              </button>
-              <button
-                className="document-menu-danger"
-                type="button"
-                onClick={() => {
-                  void deleteAllDocuments();
-                  setConfirmOpen(false);
-                }}
-              >
-                전체 문서 삭제 실행
-              </button>
-            </div>
-          )}
-        </div>
+        <SettingsDangerZoneSection
+          isConfirmOpen={isConfirmOpen}
+          onOpenConfirm={() => setConfirmOpen(true)}
+          onCloseConfirm={() => setConfirmOpen(false)}
+          onDeleteAllDocuments={async () => {
+            await deleteAllDocuments();
+            setConfirmOpen(false);
+          }}
+        />
       </section>
     </>
   );

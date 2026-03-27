@@ -68,7 +68,6 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
   const currentValueRef = useRef(value);
   const undoStackRef = useRef<string[]>([]);
   const redoStackRef = useRef<string[]>([]);
-  const [highlightSource, setHighlightSource] = useState(value);
   const [loadedLanguage, setLoadedLanguage] = useState<{ id: CodeLanguageId; key: string | null } | null>(null);
 
   const resolvedLanguage = mode === 'code' ? normalizeCodeLanguage(language ?? 'plaintext') : 'plaintext';
@@ -98,7 +97,6 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
       undoStackRef.current = [];
       redoStackRef.current = [];
       currentValueRef.current = value;
-      setHighlightSource(value);
       if (textareaRef.current) {
         textareaRef.current.value = value;
         syncTextareaHeight(textareaRef.current);
@@ -108,7 +106,7 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
 
   useLayoutEffect(() => {
     syncTextareaHeight(textareaRef.current);
-  }, [highlightSource, mode]);
+  }, [mode, value]);
 
   useEffect(() => {
     const textarea = textareaRef.current;
@@ -126,8 +124,8 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
       return '';
     }
 
-    return highlightCodeToHtml(activeLanguageKey, highlightSource);
-  }, [activeLanguageKey, mode, highlightSource]);
+    return highlightCodeToHtml(activeLanguageKey, value);
+  }, [activeLanguageKey, mode, value]);
 
   const syncOverlayScroll = () => {
     const textarea = textareaRef.current;
@@ -147,7 +145,6 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
       redoStackRef.current = [];
     }
     currentValueRef.current = nextValue;
-    setHighlightSource(nextValue);
     onChange(nextValue, mode === 'code' ? resolvedLanguage : null);
   }, [mode, onChange, resolvedLanguage]);
 

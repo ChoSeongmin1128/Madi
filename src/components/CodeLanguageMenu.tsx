@@ -60,10 +60,6 @@ function CodeLanguageMenu({ anchorRect, value, onSelect, onClose }: CodeLanguage
   }, []);
 
   useEffect(() => {
-    setSelectedIndex(0);
-  }, [query]);
-
-  useEffect(() => {
     const onPointerDown = (event: MouseEvent) => {
       if (!rootRef.current?.contains(event.target as Node)) {
         onClose();
@@ -79,7 +75,8 @@ function CodeLanguageMenu({ anchorRect, value, onSelect, onClose }: CodeLanguage
     active?.scrollIntoView({ block: 'nearest' });
   }, [selectedIndex]);
 
-  const selectedOption = filtered[selectedIndex] ?? filtered[0];
+  const activeIndex = Math.min(selectedIndex, Math.max(filtered.length - 1, 0));
+  const selectedOption = filtered[activeIndex] ?? filtered[0];
 
   return createPortal(
     <div
@@ -96,7 +93,10 @@ function CodeLanguageMenu({ anchorRect, value, onSelect, onClose }: CodeLanguage
           type="text"
           placeholder="언어 검색…"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setSelectedIndex(0);
+          }}
           onKeyDown={(event) => {
             if (event.key === 'Escape') {
               event.preventDefault();
@@ -131,7 +131,7 @@ function CodeLanguageMenu({ anchorRect, value, onSelect, onClose }: CodeLanguage
             <button
               key={option.id}
               type="button"
-              className={selectedIndex === index ? 'is-active' : ''}
+              className={activeIndex === index ? 'is-active' : ''}
               onMouseEnter={() => setSelectedIndex(index)}
               onClick={() => onSelect(option.id)}
             >

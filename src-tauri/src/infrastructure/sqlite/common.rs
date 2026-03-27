@@ -2,6 +2,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::*;
 
+pub(crate) enum DocumentTimestampTarget {
+  UpdatedAt,
+  LastOpenedAt,
+}
+
 impl SqliteStore {
   pub(crate) fn now() -> i64 {
     SystemTime::now()
@@ -124,27 +129,38 @@ impl SqliteStore {
     Ok(())
   }
 
-  pub(crate) fn touch_document_internal(&self, document_id: &str, update_opened_at: bool) -> Result<Document, AppError> {
+  pub(crate) fn touch_document_timestamp(
+    &self,
+    document_id: &str,
+    target: DocumentTimestampTarget,
+  ) -> Result<Document, AppError> {
     let now = Self::now();
-    if update_opened_at {
-      self.connection.execute(
-        "UPDATE documents SET last_opened_at = ?1 WHERE id = ?2",
-        params![now, document_id],
-      )?;
-    } else {
-      self.connection.execute(
-        "UPDATE documents SET updated_at = ?1 WHERE id = ?2",
-        params![now, document_id],
-      )?;
+    match target {
+      DocumentTimestampTarget::UpdatedAt => {
+        self.connection.execute(
+          "UPDATE documents SET updated_at = ?1 WHERE id = ?2",
+          params![now, document_id],
+        )?;
+      }
+      DocumentTimestampTarget::LastOpenedAt => {
+        self.connection.execute(
+          "UPDATE documents SET last_opened_at = ?1 WHERE id = ?2",
+          params![now, document_id],
+        )?;
+      }
     }
 
     self.get_document(document_id)?
       .ok_or_else(|| AppError::validation("문서를 찾을 수 없습니다."))
   }
 
+  pub(crate) fn finish_document_open(&self, document_id: &str) -> Result<Document, AppError> {
+    self.touch_document_timestamp(document_id, DocumentTimestampTarget::LastOpenedAt)
+  }
+
   pub(crate) fn finish_document_mutation(&mut self, document_id: &str) -> Result<Document, AppError> {
     self.rebuild_search_index(document_id)?;
-    self.touch_document_internal(document_id, false)
+    self.touch_document_timestamp(document_id, DocumentTimestampTarget::UpdatedAt)
   }
 
   pub(crate) fn finish_document_structure_mutation(&mut self, document_id: &str) -> Result<Document, AppError> {
@@ -186,6 +202,42 @@ impl SqliteStore {
       )
       .optional()?
       .ok_or_else(|| AppError::validation("블록을 찾을 수 없습니다."))
+  }
+
+  pub(crate) fn document_summary_from_document(
+    &self,
+    document: Document,
+  ) -> Result<DocumentSummary, AppError> {
+    let block_count = self
+      .connection
+      .query_row(
+        "SELECT COUNT(*) FROM blocks WHERE document_id = ?1",
+        params![document.id],
+        |row| row.get::<_, i64>(0),
+      )
+      .unwrap_or(0) as usize;
+    let preview = self.document_preview(&document.id)?;
+
+    Ok(DocumentSummary {
+      id: document.id,
+      title: document.title,
+      block_tint_override: document.block_tint_override,
+      document_surface_tone_override: document.document_surface_tone_override,
+      preview,
+      updated_at: document.updated_at,
+      last_opened_at: document.last_opened_at,
+      block_count,
+    })
+  }
+
+  pub(crate) fn collect_document_summaries(
+    &self,
+    documents: Vec<Document>,
+  ) -> Result<Vec<DocumentSummary>, AppError> {
+    documents
+      .into_iter()
+      .map(|document| self.document_summary_from_document(document))
+      .collect()
   }
 
   pub(crate) fn normalize_markdown_storage(raw: &str) -> (String, String, bool) {

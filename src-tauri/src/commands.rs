@@ -10,6 +10,7 @@ use crate::application::dto::{
   WindowControlRuntimeStateDto,
 };
 use crate::application::services;
+use crate::domain::models::AppSettings;
 use crate::domain::models::{BlockKind, BlockTintPreset, DocumentSurfaceTonePreset, ThemeMode};
 use crate::error::AppError;
 use crate::ports::repositories::AppRepository;
@@ -27,6 +28,64 @@ fn with_repository<T>(
 ) -> Result<T, String> {
   let mut repository = state.repository.lock().map_err(|_| AppError::StateLock.to_string())?;
   callback(&mut *repository).map_err(|error| error.to_string())
+}
+
+fn with_repository_and_settings<T>(
+  state: State<'_, AppState>,
+  callback: impl FnOnce(&mut dyn AppRepository) -> Result<T, AppError>,
+) -> Result<(T, AppSettings), String> {
+  with_repository(state, |repository| {
+    let result = callback(repository)?;
+    let settings = repository.get_app_settings()?;
+    Ok((result, settings))
+  })
+}
+
+fn sync_tray_icon_enabled(
+  app_handle: &tauri::AppHandle,
+  enabled: bool,
+) -> Result<(), String> {
+  if enabled {
+    if app_handle.tray_by_id(TRAY_ID).is_none() {
+      build_tray_icon(app_handle).map_err(|error| error.to_string())?;
+    }
+  } else {
+    let _ = app_handle.remove_tray_by_id(TRAY_ID);
+  }
+
+  Ok(())
+}
+
+fn persist_window_setting<T>(
+  state: State<'_, AppState>,
+  app_handle: &tauri::AppHandle,
+  callback: impl FnOnce(&mut dyn AppRepository) -> Result<T, AppError>,
+) -> Result<T, String> {
+  let (result, settings) = with_repository_and_settings(state, callback)?;
+  apply_window_preferences_with_settings(app_handle, &settings)?;
+  Ok(result)
+}
+
+fn persist_global_shortcut(
+  state: State<'_, AppState>,
+  app_handle: &tauri::AppHandle,
+  shortcut: Option<String>,
+) -> Result<Option<String>, String> {
+  let previous_shortcut = state.active_global_toggle_shortcut();
+  let registered_shortcut = update_global_shortcut_registration(app_handle, shortcut.clone())?;
+
+  match with_repository(state.clone(), |repository| {
+    services::set_global_toggle_shortcut(repository, registered_shortcut.clone())
+  }) {
+    Ok(result) => {
+      state.set_global_shortcut_error(None);
+      Ok(result)
+    }
+    Err(error) => {
+      let _ = update_global_shortcut_registration(app_handle, previous_shortcut);
+      Err(error)
+    }
+  }
 }
 
 #[tauri::command]
@@ -262,18 +321,10 @@ pub fn set_menu_bar_icon_enabled(
   app_handle: tauri::AppHandle,
   enabled: bool,
 ) -> Result<bool, String> {
-  with_repository(state.clone(), |repository| {
+  with_repository(state, |repository| {
     services::set_menu_bar_icon_enabled(repository, enabled)
   })?;
-
-  if enabled {
-    if app_handle.tray_by_id(TRAY_ID).is_none() {
-      build_tray_icon(&app_handle).map_err(|e| e.to_string())?;
-    }
-  } else {
-    let _ = app_handle.remove_tray_by_id(TRAY_ID);
-  }
-
+  sync_tray_icon_enabled(&app_handle, enabled)?;
   Ok(enabled)
 }
 
@@ -283,13 +334,9 @@ pub fn set_always_on_top_enabled(
   app_handle: tauri::AppHandle,
   enabled: bool,
 ) -> Result<bool, String> {
-  let settings = with_repository(state.clone(), |repository| {
-    services::set_always_on_top_enabled(repository, enabled)?;
-    repository.get_app_settings()
-  })?;
-
-  apply_window_preferences_with_settings(&app_handle, &settings)?;
-  Ok(enabled)
+  persist_window_setting(state, &app_handle, |repository| {
+    services::set_always_on_top_enabled(repository, enabled)
+  })
 }
 
 #[tauri::command]
@@ -298,13 +345,9 @@ pub fn set_window_opacity_percent(
   app_handle: tauri::AppHandle,
   percent: u8,
 ) -> Result<u8, String> {
-  let settings = with_repository(state.clone(), |repository| {
-    services::set_window_opacity_percent(repository, percent)?;
-    repository.get_app_settings()
-  })?;
-
-  apply_window_preferences_with_settings(&app_handle, &settings)?;
-  Ok(settings.window_opacity_percent)
+  persist_window_setting(state, &app_handle, |repository| {
+    services::set_window_opacity_percent(repository, percent)
+  })
 }
 
 #[tauri::command]
@@ -321,19 +364,5 @@ pub fn set_global_toggle_shortcut(
   app_handle: tauri::AppHandle,
   shortcut: Option<String>,
 ) -> Result<Option<String>, String> {
-  let previous_shortcut = state.active_global_toggle_shortcut();
-  let registered_shortcut = update_global_shortcut_registration(&app_handle, shortcut.clone())?;
-
-  match with_repository(state.clone(), |repository| {
-    services::set_global_toggle_shortcut(repository, registered_shortcut.clone())
-  }) {
-    Ok(result) => {
-      state.set_global_shortcut_error(None);
-      Ok(result)
-    }
-    Err(error) => {
-      let _ = update_global_shortcut_registration(&app_handle, previous_shortcut);
-      Err(error)
-    }
-  }
+  persist_global_shortcut(state, &app_handle, shortcut)
 }

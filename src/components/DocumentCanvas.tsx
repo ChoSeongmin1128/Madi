@@ -1,48 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
-import { useBlockController, useDocumentController } from '../app/controllers';
-import { BlockCard } from './BlockCard';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useBlockController } from '../app/controllers';
 import { BlockGhostPreview } from './BlockGhostPreview';
-import { getEditableDocumentTitle } from '../lib/documentTitle';
 import { useDocumentSessionStore } from '../stores/documentSessionStore';
 import { useWorkspaceStore } from '../stores/workspaceStore';
 import { useBlockReorder } from '../hooks/useBlockReorder';
-
-function DocumentTitleInput({ title }: { title: string | null }) {
-  const { commitDocumentTitle } = useDocumentController();
-  const [draft, setDraft] = useState(getEditableDocumentTitle(title));
-
-  return (
-    <input
-      className="document-title-input"
-      value={draft}
-      onChange={(event) => setDraft(event.target.value)}
-      onBlur={() => void commitDocumentTitle(draft)}
-      onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
-        if (event.key === 'Enter') {
-          event.preventDefault();
-          void commitDocumentTitle(draft);
-          event.currentTarget.blur();
-        }
-      }}
-      placeholder="Untitled"
-    />
-  );
-}
-
-function isEditableElement(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  return Boolean(
-    target.closest('input, textarea, [contenteditable="true"], [contenteditable=""], .ProseMirror'),
-  );
-}
-
-interface MarqueeState {
-  startX: number;
-  startY: number;
-  currentX: number;
-  currentY: number;
-}
+import { DocumentBlockList } from './documentCanvas/DocumentBlockList';
+import { DocumentTitleInput } from './documentCanvas/DocumentTitleInput';
+import { useDocumentMarqueeSelection } from './documentCanvas/useDocumentMarqueeSelection';
 
 export function DocumentCanvas() {
   const { moveBlock } = useBlockController();
@@ -54,7 +18,6 @@ export function DocumentCanvas() {
   const setSelectedBlockId = useDocumentSessionStore((state) => state.setSelectedBlockId);
   const defaultBlockTintPreset = useWorkspaceStore((state) => state.defaultBlockTintPreset);
   const blocksSelectionRef = useRef<HTMLDivElement | null>(null);
-  const [marquee, setMarquee] = useState<MarqueeState | null>(null);
 
   const blocks = useMemo(() => currentDocument?.blocks ?? [], [currentDocument?.blocks]);
   const blockTintPreset = currentDocument?.blockTintOverride ?? defaultBlockTintPreset;
@@ -66,6 +29,11 @@ export function DocumentCanvas() {
   });
   const activePreviewBlock =
     dragPreview == null ? null : blocks.find((block) => block.id === dragPreview.blockId) ?? null;
+  const { marqueeStyle, handleSurfaceMouseDown } = useDocumentMarqueeSelection({
+    surfaceRef,
+    selectedBlockIdsLength: selectedBlockIds.length,
+    setSelectedBlockId,
+  });
 
   useEffect(() => {
     if (!allBlocksSelected && !blockSelected && selectedBlockIds.length === 0) {
@@ -79,139 +47,6 @@ export function DocumentCanvas() {
     window.getSelection()?.removeAllRanges();
   }, [allBlocksSelected, blockSelected, selectedBlockIds.length, currentDocument?.id]);
 
-  // Marquee 선택: 블록과 교차하는 영역 계산
-  const updateMarqueeSelection = useCallback((mq: MarqueeState) => {
-    const surface = surfaceRef.current;
-    if (!surface) return;
-
-    const left = Math.min(mq.startX, mq.currentX);
-    const top = Math.min(mq.startY, mq.currentY);
-    const right = Math.max(mq.startX, mq.currentX);
-    const bottom = Math.max(mq.startY, mq.currentY);
-
-    const ids: string[] = [];
-    for (const card of surface.querySelectorAll<HTMLElement>('[data-block-card-id]')) {
-      const rect = card.getBoundingClientRect();
-      const intersects = rect.bottom > top && rect.top < bottom && rect.right > left && rect.left < right;
-      if (intersects) {
-        const id = card.getAttribute('data-block-card-id');
-        if (id) ids.push(id);
-      }
-    }
-
-    useDocumentSessionStore.getState().setSelectedBlockIds(ids);
-  }, [surfaceRef]);
-
-  const getBlockIdAtPoint = useCallback((x: number, y: number): string | null => {
-    const surface = surfaceRef.current;
-    if (!surface) return null;
-    for (const card of surface.querySelectorAll<HTMLElement>('[data-block-card-id]')) {
-      const rect = card.getBoundingClientRect();
-      if (y >= rect.top && y <= rect.bottom && x >= rect.left && x <= rect.right) {
-        return card.getAttribute('data-block-card-id');
-      }
-    }
-    return null;
-  }, [surfaceRef]);
-
-  const handleSurfaceMouseDown = useCallback((event: ReactMouseEvent) => {
-    if (event.button !== 0) return;
-    if ((event.target as HTMLElement).closest('.drag-handle, .block-actions, .code-language-anchor, .type-menu, .block-menu')) return;
-
-    const startedInEditor = isEditableElement(event.target);
-    const originBlockId = getBlockIdAtPoint(event.clientX, event.clientY);
-    if (!originBlockId && selectedBlockIds.length > 0) {
-      setSelectedBlockId(null);
-    }
-
-    const mq: MarqueeState = {
-      startX: event.clientX,
-      startY: event.clientY,
-      currentX: event.clientX,
-      currentY: event.clientY,
-    };
-
-    const DRAG_THRESHOLD = 8;
-    let activated = false;
-    let scrollFrame = 0;
-
-    const canvas = surfaceRef.current?.closest('.document-canvas') as HTMLElement | null;
-    let lastScrollTop = canvas?.scrollTop ?? 0;
-
-    const autoScroll = (mouseY: number) => {
-      if (!canvas) return;
-      const rect = canvas.getBoundingClientRect();
-      const EDGE = 40;
-      if (mouseY < rect.top + EDGE) {
-        canvas.scrollTop -= Math.max(1, (EDGE - (mouseY - rect.top)) / 5);
-      } else if (mouseY > rect.bottom - EDGE) {
-        canvas.scrollTop += Math.max(1, (EDGE - (rect.bottom - mouseY)) / 5);
-      }
-    };
-
-    // 스크롤 시 mq.startY를 보정해 선택 영역이 문서 기준으로 고정되도록 유지
-    const onCanvasScroll = () => {
-      if (!canvas) return;
-      const currentScrollTop = canvas.scrollTop;
-      const delta = currentScrollTop - lastScrollTop;
-      lastScrollTop = currentScrollTop;
-      if (delta === 0) return;
-      mq.startY -= delta;
-      if (activated) {
-        setMarquee({ ...mq });
-        updateMarqueeSelection(mq);
-      }
-    };
-
-    const onMouseMove = (e: MouseEvent) => {
-      // 앱 밖에서 마우스를 놓았을 때 mouseup이 잡히지 않는 경우 드래그를 종료
-      if (e.buttons === 0) {
-        onMouseUp();
-        return;
-      }
-
-      const dx = e.clientX - mq.startX;
-      const dy = e.clientY - mq.startY;
-
-      if (!activated) {
-        if (Math.abs(dx) + Math.abs(dy) < DRAG_THRESHOLD) return;
-
-        if (startedInEditor) {
-          const currentBlockId = getBlockIdAtPoint(e.clientX, e.clientY);
-          if (currentBlockId === originBlockId) return;
-          const activeEl = document.activeElement;
-          if (activeEl instanceof HTMLElement) activeEl.blur();
-          window.getSelection()?.removeAllRanges();
-        }
-
-        activated = true;
-      }
-
-      mq.currentX = e.clientX;
-      mq.currentY = e.clientY;
-      setMarquee({ ...mq });
-      updateMarqueeSelection(mq);
-
-      cancelAnimationFrame(scrollFrame);
-      scrollFrame = requestAnimationFrame(() => autoScroll(e.clientY));
-    };
-
-    const onMouseUp = () => {
-      canvas?.removeEventListener('scroll', onCanvasScroll);
-      window.removeEventListener('mousemove', onMouseMove);
-      window.removeEventListener('mouseup', onMouseUp);
-      cancelAnimationFrame(scrollFrame);
-      setMarquee(null);
-      if (!activated) {
-        useDocumentSessionStore.getState().setSelectedBlockIds([]);
-      }
-    };
-
-    canvas?.addEventListener('scroll', onCanvasScroll);
-    window.addEventListener('mousemove', onMouseMove);
-    window.addEventListener('mouseup', onMouseUp);
-  }, [getBlockIdAtPoint, selectedBlockIds.length, setSelectedBlockId, surfaceRef, updateMarqueeSelection]);
-
   if (!currentDocument) {
     return (
       <section className="empty-state">
@@ -220,13 +55,6 @@ export function DocumentCanvas() {
       </section>
     );
   }
-
-  const marqueeStyle = marquee ? {
-    left: Math.min(marquee.startX, marquee.currentX),
-    top: Math.min(marquee.startY, marquee.currentY),
-    width: Math.abs(marquee.currentX - marquee.startX),
-    height: Math.abs(marquee.currentY - marquee.startY),
-  } : null;
 
   return (
     <section className="document-canvas">
@@ -241,47 +69,20 @@ export function DocumentCanvas() {
         </div>
 
         <div ref={blocksSelectionRef}>
-          <div
-            className={`block-drop-slot${dragState?.targetSlotIndex === 0 ? ' is-active' : ''}`}
-            data-drop-slot-index={0}
+          <DocumentBlockList
+            blocks={blocks}
+            selectedBlockId={selectedBlockId}
+            selectedBlockIds={selectedBlockIds}
+            blockSelected={blockSelected}
+            allBlocksSelected={allBlocksSelected}
+            activeDragId={dragState?.activeId ?? null}
+            activeTargetSlotIndex={dragState?.targetSlotIndex ?? null}
+            openBlockMenuId={openBlockMenuId}
+            onGripPointerDown={handleGripPointerDown}
+            onToggleMenu={(blockId) => {
+              setOpenBlockMenuId((current) => (current === blockId ? null : current));
+            }}
           />
-          <AnimatePresence mode="popLayout">
-            {blocks.map((block, index) => (
-              <motion.div
-                key={block.id}
-                layout
-                initial={{ opacity: 0, scale: 0.97, y: -4 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.96 }}
-                transition={{
-                  layout: { duration: 0.2, ease: [0.2, 0.9, 0.3, 1] },
-                  opacity: { duration: 0.18 },
-                  scale: { duration: 0.18 },
-                }}
-              >
-                <BlockCard
-                  block={block}
-                  isSelected={selectedBlockId === block.id}
-                  isBlockSelected={
-                    selectedBlockIds.includes(block.id)
-                    || (selectedBlockIds.length === 0 && blockSelected && selectedBlockId === block.id)
-                  }
-                  isAllSelected={allBlocksSelected}
-                  isAlternate={index % 2 === 1}
-                  isDragging={dragState?.activeId === block.id}
-                  isMenuOpen={openBlockMenuId === block.id}
-                  onGripPointerDown={handleGripPointerDown}
-                  onMenuClose={() =>
-                    setOpenBlockMenuId((current) => (current === block.id ? null : current))
-                  }
-                />
-                <div
-                  className={`block-drop-slot${dragState?.targetSlotIndex === index + 1 ? ' is-active' : ''}`}
-                  data-drop-slot-index={index + 1}
-                />
-              </motion.div>
-            ))}
-          </AnimatePresence>
         </div>
       </div>
 

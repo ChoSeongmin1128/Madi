@@ -1,4 +1,5 @@
 use super::*;
+use super::common::DocumentTimestampTarget;
 
 const DOCUMENT_COLUMNS: &str =
   "id, title, block_tint_override, document_surface_tone_override, created_at, updated_at, last_opened_at, deleted_at";
@@ -48,31 +49,7 @@ impl DocumentRepository for SqliteStore {
       .query_map([], map_document)?
       .collect::<Result<Vec<_>, _>>()?;
 
-    documents
-      .into_iter()
-      .map(|document| {
-        let block_count = self
-          .connection
-          .query_row(
-            "SELECT COUNT(*) FROM blocks WHERE document_id = ?1",
-            params![document.id],
-            |row| row.get::<_, i64>(0),
-          )
-          .unwrap_or(0) as usize;
-        let preview = self.document_preview(&document.id)?;
-
-        Ok(DocumentSummary {
-          id: document.id,
-          title: document.title,
-          block_tint_override: document.block_tint_override,
-          document_surface_tone_override: document.document_surface_tone_override,
-          preview,
-          updated_at: document.updated_at,
-          last_opened_at: document.last_opened_at,
-          block_count,
-        })
-      })
-      .collect()
+    self.collect_document_summaries(documents)
   }
 
   fn list_trash_documents(&self) -> Result<Vec<DocumentSummary>, AppError> {
@@ -84,31 +61,7 @@ impl DocumentRepository for SqliteStore {
       .query_map([], map_document)?
       .collect::<Result<Vec<_>, _>>()?;
 
-    documents
-      .into_iter()
-      .map(|document| {
-        let block_count = self
-          .connection
-          .query_row(
-            "SELECT COUNT(*) FROM blocks WHERE document_id = ?1",
-            params![document.id],
-            |row| row.get::<_, i64>(0),
-          )
-          .unwrap_or(0) as usize;
-        let preview = self.document_preview(&document.id)?;
-
-        Ok(DocumentSummary {
-          id: document.id,
-          title: document.title,
-          block_tint_override: document.block_tint_override,
-          document_surface_tone_override: document.document_surface_tone_override,
-          preview,
-          updated_at: document.updated_at,
-          last_opened_at: document.last_opened_at,
-          block_count,
-        })
-      })
-      .collect()
+    self.collect_document_summaries(documents)
   }
 
   fn get_document(&self, document_id: &str) -> Result<Option<Document>, AppError> {
@@ -151,8 +104,7 @@ impl DocumentRepository for SqliteStore {
     )?;
 
     self.create_empty_block(&document.id, 0, BlockKind::Markdown)?;
-    self.finish_document_mutation(&document.id)?;
-    Ok(document)
+    self.finish_document_structure_mutation(&document.id)
   }
 
   fn rename_document(&mut self, document_id: &str, title: Option<String>) -> Result<Document, AppError> {
@@ -273,7 +225,7 @@ impl DocumentRepository for SqliteStore {
   }
 
   fn mark_document_opened(&mut self, document_id: &str) -> Result<Document, AppError> {
-    self.touch_document_internal(document_id, true)
+    self.finish_document_open(document_id)
   }
 
   fn search_documents(&self, query: &str) -> Result<Vec<SearchResult>, AppError> {
@@ -301,27 +253,10 @@ impl DocumentRepository for SqliteStore {
       })
       .map(|entry| {
         let (document, score) = entry?;
-        let preview = self.document_preview(&document.id)?;
-        let block_count = self
-          .connection
-          .query_row(
-            "SELECT COUNT(*) FROM blocks WHERE document_id = ?1",
-            params![document.id],
-            |row| row.get::<_, i64>(0),
-          )
-          .unwrap_or(0) as usize;
+        let summary = self.document_summary_from_document(document)?;
 
         Ok(SearchResult {
-          summary: DocumentSummary {
-            id: document.id,
-            title: document.title,
-            block_tint_override: document.block_tint_override,
-            document_surface_tone_override: document.document_surface_tone_override,
-            preview,
-            updated_at: document.updated_at,
-            last_opened_at: document.last_opened_at,
-            block_count,
-          },
+          summary,
           score,
         })
       })
@@ -329,6 +264,54 @@ impl DocumentRepository for SqliteStore {
   }
 
   fn touch_document(&mut self, document_id: &str) -> Result<i64, AppError> {
-    Ok(self.touch_document_internal(document_id, false)?.updated_at)
+    Ok(self.touch_document_timestamp(document_id, DocumentTimestampTarget::UpdatedAt)?.updated_at)
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use std::path::PathBuf;
+
+  use super::*;
+
+  fn test_db_path() -> PathBuf {
+    std::env::temp_dir().join(format!("minnote-documents-test-{}.db", uuid::Uuid::new_v4()))
+  }
+
+  fn test_store() -> SqliteStore {
+    SqliteStore::new(&test_db_path()).expect("test store should be created")
+  }
+
+  #[test]
+  fn create_document_builds_summary_from_shared_helper() {
+    let mut store = test_store();
+
+    let created = store
+      .create_document(Some("리팩토링 문서".to_string()))
+      .expect("document should be created");
+    let documents = store.list_documents().expect("documents should load");
+
+    assert_eq!(documents.len(), 1);
+    assert_eq!(documents[0].id, created.id);
+    assert_eq!(documents[0].title.as_deref(), Some("리팩토링 문서"));
+    assert_eq!(documents[0].block_count, 1);
+  }
+
+  #[test]
+  fn mark_document_opened_updates_last_opened_without_mutating_updated_at() {
+    let mut store = test_store();
+    let created = store.create_document(Some("열기 테스트".to_string())).expect("document should be created");
+
+    store.connection.execute(
+      "UPDATE documents SET updated_at = 123, last_opened_at = 456 WHERE id = ?1",
+      params![created.id],
+    ).expect("timestamps should be seeded");
+
+    let opened = store
+      .mark_document_opened(&created.id)
+      .expect("document should be marked opened");
+
+    assert_eq!(opened.updated_at, 123);
+    assert!(opened.last_opened_at >= 456);
   }
 }

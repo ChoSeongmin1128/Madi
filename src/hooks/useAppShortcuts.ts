@@ -158,10 +158,17 @@ export function useAppShortcuts() {
   }, [
     allBlocksSelected,
     blockSelected,
+    copySelectedBlocks,
     currentDocument,
+    deleteSelectedBlocks,
+    flushCurrentDocument,
+    isBlockClipboardText,
+    pasteBlocks,
+    redoBlockOperation,
     selectedBlockId,
     selectedBlockIds.length,
     setAllBlocksSelected,
     setBlockSelected,
+    undoBlockOperation,
   ]);
 }

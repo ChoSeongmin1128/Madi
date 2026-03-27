@@ -104,6 +104,7 @@ pub(crate) fn hydrate_document(
 mod tests {
   use super::*;
 
+  use crate::application::dto::BlockRestoreDto;
   use crate::domain::models::{
     Block,
     BlockKind,

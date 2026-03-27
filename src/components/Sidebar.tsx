@@ -9,7 +9,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useDocumentController, useWorkspaceController } from '../app/controllers';
 import { getVisibleDocumentTitle } from '../lib/documentTitle';
 import { useDocumentSessionStore } from '../stores/documentSessionStore';
@@ -54,7 +54,6 @@ export function Sidebar({
   const setSettingsOpen = useUiStore((state) => state.setSettingsOpen);
   const currentDocument = useDocumentSessionStore((state) => state.currentDocument);
   const [confirmEmptyTrash, setConfirmEmptyTrash] = useState(false);
-  const [shouldFocusSearch, setShouldFocusSearch] = useState(false);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   const isDesktopExpanded = desktopSidebarExpanded;
@@ -68,24 +67,20 @@ export function Sidebar({
     [documents, searchQuery, searchResults],
   );
 
-  useEffect(() => {
-    if (!isPanelVisible || !shouldFocusSearch) {
-      return;
-    }
-
+  const focusSearchInput = () => {
     searchInputRef.current?.focus();
     searchInputRef.current?.select();
-    setShouldFocusSearch(false);
-  }, [isPanelVisible, shouldFocusSearch]);
+  };
 
   const handleSearchTrigger = () => {
-    setShouldFocusSearch(true);
     if (isMobileViewport) {
       onOpenMobile();
+      requestAnimationFrame(focusSearchInput);
       return;
     }
 
     onExpandDesktop();
+    requestAnimationFrame(focusSearchInput);
   };
 
   const handleDocumentOpen = (documentId: string) => {

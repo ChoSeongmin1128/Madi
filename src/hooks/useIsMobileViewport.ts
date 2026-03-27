@@ -17,7 +17,6 @@ export function useIsMobileViewport() {
       setIsMobileViewport(event.matches);
     };
 
-    setIsMobileViewport(mediaQuery.matches);
     mediaQuery.addEventListener('change', handleChange);
     return () => {
       mediaQuery.removeEventListener('change', handleChange);
