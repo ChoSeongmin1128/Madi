@@ -1,72 +1,7 @@
 use super::*;
 
 impl SqliteStore {
-  pub(crate) fn normalize_markdown_storage(raw: &str) -> (String, String, bool) {
-    let normalized_newlines = raw.replace("\r\n", "\n");
-    if let Some(markdown) = Self::legacy_markdown_json_to_markdown(&normalized_newlines) {
-      let search_text = Self::markdown_plain_text(&markdown);
-      return (markdown, search_text, true);
-    }
-
-    let search_text = Self::markdown_plain_text(&normalized_newlines);
-    (normalized_newlines, search_text, false)
-  }
-
-  pub(crate) fn markdown_plain_text(markdown: &str) -> String {
-    markdown
-      .lines()
-      .map(|line| {
-        let trimmed = line.trim();
-        if trimmed.is_empty() || trimmed.starts_with("```") {
-          return String::new();
-        }
-
-        let without_marker = if let Some(rest) = trimmed.strip_prefix("> ") {
-          rest
-        } else if let Some(rest) = trimmed.strip_prefix("- [ ] ") {
-          rest
-        } else if let Some(rest) = trimmed.strip_prefix("- [x] ") {
-          rest
-        } else if let Some(rest) = trimmed.strip_prefix("- [X] ") {
-          rest
-        } else if let Some(rest) = trimmed.strip_prefix("- ") {
-          rest
-        } else if let Some(rest) = trimmed.strip_prefix("* ") {
-          rest
-        } else if let Some(rest) = trimmed.strip_prefix("+ ") {
-          rest
-        } else {
-          let bytes = trimmed.as_bytes();
-          let mut index = 0;
-          while index < bytes.len() && bytes[index].is_ascii_digit() {
-            index += 1;
-          }
-
-          if index > 0 && index + 1 < bytes.len() && bytes[index] == b'.' && bytes[index + 1] == b' ' {
-            &trimmed[(index + 2)..]
-          } else {
-            trimmed.trim_start_matches('#').trim()
-          }
-        };
-
-        without_marker
-          .replace("**", " ")
-          .replace('*', " ")
-          .replace("__", " ")
-          .replace('_', " ")
-          .replace("~~", " ")
-          .replace('`', " ")
-          .replace('[', " ")
-          .replace(']', " ")
-          .replace('(', " ")
-          .replace(')', " ")
-      })
-      .flat_map(|line| line.split_whitespace().map(str::to_string).collect::<Vec<_>>())
-      .collect::<Vec<_>>()
-      .join(" ")
-  }
-
-  fn legacy_markdown_json_to_markdown(raw: &str) -> Option<String> {
+  pub(super) fn legacy_markdown_json_to_markdown(raw: &str) -> Option<String> {
     let value: Value = serde_json::from_str(raw).ok()?;
     let node_type = value
       .as_object()
@@ -258,7 +193,8 @@ impl SqliteStore {
           .filter(|part| !part.trim().is_empty())
           .collect::<Vec<_>>()
           .join("\n\n");
-        Self::legacy_indent_lines(&quoted, &format!("{indent}> "))
+
+        Self::legacy_indent_lines(&quoted, "> ")
       }
       Some("codeBlock") => {
         let language = map
@@ -267,21 +203,19 @@ impl SqliteStore {
           .and_then(|attrs| attrs.get("language"))
           .and_then(Value::as_str)
           .unwrap_or_default();
-        let body = content
-          .iter()
-          .map(Self::serialize_legacy_markdown_inline)
-          .collect::<String>()
-          .trim_end_matches('\n')
-          .to_string();
-        format!("{indent}```{language}\n{body}\n{indent}```")
+        let code = content.iter().map(Self::serialize_legacy_markdown_inline).collect::<String>();
+
+        if language.is_empty() {
+          format!("{indent}```\n{code}\n{indent}```")
+        } else {
+          format!("{indent}```{language}\n{code}\n{indent}```")
+        }
       }
       Some("horizontalRule") => format!("{indent}---"),
       _ => content
         .iter()
-        .map(|child| Self::serialize_legacy_markdown_node(child, indent))
-        .filter(|part| !part.trim().is_empty())
-        .collect::<Vec<_>>()
-        .join("\n\n"),
+        .map(Self::serialize_legacy_markdown_inline)
+        .collect::<String>(),
     }
   }
 }

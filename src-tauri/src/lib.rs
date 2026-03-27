@@ -1,3 +1,4 @@
+mod app_runtime;
 mod application;
 mod commands;
 mod domain;
@@ -7,95 +8,6 @@ mod ports;
 mod state;
 mod window_controls;
 
-use std::fs;
-
-use crate::ports::repositories::AppStateRepository;
-use state::AppState;
-use tauri::{Emitter, Manager};
-use tauri::menu::{MenuBuilder, PredefinedMenuItem};
-use tauri::tray::{TrayIcon, TrayIconBuilder, TrayIconEvent};
-use window_controls::{apply_window_preferences_with_settings, menu_bar_icon, register_saved_global_shortcut, show_main_window, toggle_main_window};
-use tauri_plugin_window_state::{AppHandleExt, StateFlags};
-
-pub(crate) const TRAY_ID: &str = "minnote-tray";
-const APP_SHUTDOWN_REQUESTED_EVENT: &str = "app-shutdown-requested";
-
-fn emit_shutdown_request(app_handle: &tauri::AppHandle) {
-  let _ = app_handle.emit(APP_SHUTDOWN_REQUESTED_EVENT, ());
-}
-
-#[cfg(target_os = "macos")]
-pub(crate) fn setup_activation_listener(app_handle: tauri::AppHandle) {
-  use block2::RcBlock;
-  use objc2_app_kit::NSApplicationDidBecomeActiveNotification;
-  use objc2_foundation::{NSNotification, NSNotificationCenter};
-  use std::ptr::NonNull;
-
-  let observer = unsafe {
-    let center = NSNotificationCenter::defaultCenter();
-    let block = RcBlock::new(move |_notif: NonNull<NSNotification>| {
-      if let Some(window) = app_handle.get_webview_window("main") {
-        if !window.is_visible().unwrap_or(true) {
-          let _ = show_main_window(&app_handle);
-        }
-      }
-    });
-    center.addObserverForName_object_queue_usingBlock(
-      Some(NSApplicationDidBecomeActiveNotification),
-      None,
-      None,
-      &*block,
-    )
-  };
-  // 앱 생명주기 동안 observer 유지
-  std::mem::forget(observer);
-}
-
-pub(crate) fn build_tray_icon(app: &tauri::AppHandle) -> tauri::Result<TrayIcon> {
-  #[cfg(target_os = "macos")]
-  let icon = menu_bar_icon();
-  #[cfg(not(target_os = "macos"))]
-  let icon = app.default_window_icon().cloned().expect("no app icon");
-
-  let menu = MenuBuilder::new(app)
-    .text("show", "열기")
-    .text("settings", "설정...")
-    .item(&PredefinedMenuItem::separator(app)?)
-    .text("quit", "종료")
-    .build()?;
-
-  let builder = TrayIconBuilder::with_id(TRAY_ID)
-    .icon(icon)
-    .tooltip("MinNote")
-    .menu(&menu)
-    .show_menu_on_left_click(false)
-    .on_tray_icon_event(|tray, event| {
-      if let TrayIconEvent::Click { button_state, .. } = event {
-        if button_state == tauri::tray::MouseButtonState::Up {
-          let app = tray.app_handle();
-          let _ = toggle_main_window(app);
-        }
-      }
-    })
-    .on_menu_event(|app, event| {
-      match event.id().as_ref() {
-        "show" => {
-          let _ = show_main_window(app);
-        }
-        "settings" => {
-          if let Some(window) = app.get_webview_window("main") {
-            let _ = show_main_window(app);
-            let _ = window.emit("tray-open-settings", ());
-          }
-        }
-        "quit" => emit_shutdown_request(app),
-        _ => {}
-      }
-    });
-
-  builder.build(app)
-}
-
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
@@ -103,72 +15,8 @@ pub fn run() {
     .plugin(tauri_plugin_process::init())
     .plugin(tauri_plugin_global_shortcut::Builder::new().build())
     .plugin(tauri_plugin_window_state::Builder::default().build())
-    .setup(|app| {
-      let app_dir = app.path().app_data_dir().expect("failed to resolve app data directory");
-      fs::create_dir_all(&app_dir).expect("failed to create app data directory");
-
-      let database_path = app_dir.join("minnote.sqlite3");
-      let app_state = AppState::new(&database_path).expect("failed to initialize app state");
-
-      let settings = app_state
-        .repository
-        .lock()
-        .ok()
-        .and_then(|repo| repo.get_app_settings().ok());
-
-      let menu_bar_icon_enabled = settings.as_ref().map(|s| s.menu_bar_icon_enabled).unwrap_or(false);
-
-      app.manage(app_state);
-
-      if let Some(managed_state) = app.try_state::<AppState>() {
-        if let Ok(settings) = managed_state
-          .repository
-          .lock()
-          .map_err(|_| ())
-          .and_then(|repository| repository.get_app_settings().map_err(|_| ()))
-        {
-          let _ = apply_window_preferences_with_settings(app.handle(), &settings);
-        }
-      }
-
-      if menu_bar_icon_enabled && app.tray_by_id(TRAY_ID).is_none() {
-        let _ = build_tray_icon(app.handle());
-      }
-
-      register_saved_global_shortcut(app.handle());
-
-      #[cfg(target_os = "macos")]
-      setup_activation_listener(app.handle().clone());
-
-      if cfg!(debug_assertions) {
-        app.handle().plugin(
-          tauri_plugin_log::Builder::default()
-            .level(log::LevelFilter::Info)
-            .build(),
-        )?;
-      }
-
-      Ok(())
-    })
-    .on_window_event(|window, event| {
-      if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-        if let Some(state) = window.app_handle().try_state::<AppState>() {
-          if state.shutdown_confirmed() {
-            return;
-          }
-        }
-
-        let tray_enabled = window.app_handle().tray_by_id(TRAY_ID).is_some();
-        if tray_enabled {
-          let _ = window.app_handle().save_window_state(StateFlags::all());
-          api.prevent_close();
-          let _ = window.hide();
-        } else {
-          api.prevent_close();
-          emit_shutdown_request(window.app_handle());
-        }
-      }
-    })
+    .setup(app_runtime::setup_app)
+    .on_window_event(app_runtime::handle_window_event)
     .invoke_handler(tauri::generate_handler![
       commands::workspace::bootstrap_app,
       commands::window_controls::get_window_control_runtime_state,
@@ -205,24 +53,5 @@ pub fn run() {
     ])
     .build(tauri::generate_context!())
     .expect("error building tauri application")
-    .run(|app, event| {
-      match event {
-        // Dock 아이콘 클릭 → 항상 창 복원
-        tauri::RunEvent::Reopen { .. } => {
-          let _ = show_main_window(app);
-        }
-        tauri::RunEvent::ExitRequested { api, .. } => {
-          if let Some(state) = app.try_state::<AppState>() {
-            if state.shutdown_confirmed() {
-              state.set_shutdown_confirmed(false);
-              return;
-            }
-          }
-
-          api.prevent_exit();
-          emit_shutdown_request(app);
-        }
-        _ => {}
-      }
-    });
+    .run(app_runtime::handle_run_event);
 }

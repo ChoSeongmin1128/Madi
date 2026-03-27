@@ -1,12 +1,12 @@
 use tauri::State;
 
+use crate::app_runtime::{build_tray_icon, TRAY_ID};
 use crate::application::services;
 use crate::domain::models::AppSettings;
 use crate::error::AppError;
 use crate::ports::repositories::AppRepository;
 use crate::state::AppState;
 use crate::window_controls::{apply_window_preferences_with_settings, update_global_shortcut_registration};
-use crate::{build_tray_icon, TRAY_ID};
 
 pub(super) fn with_repository<T>(
   state: State<'_, AppState>,
