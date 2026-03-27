@@ -6,7 +6,7 @@ import type { SessionGateway } from '../../ports/sessionGateway';
 import type { UiGateway } from '../../ports/uiGateway';
 import type { WorkspaceGateway } from '../../ports/workspaceGateway';
 import { applyBootstrapPayloadState, applyWindowControlRuntimeState } from '../shared/documentState';
-import { normalizeErrorMessage } from '../shared/errors';
+import { normalizeBootstrapErrorMessage, normalizeErrorMessage } from '../shared/errors';
 
 interface WorkspaceUseCaseDeps {
   backend: BackendPort;
@@ -42,7 +42,7 @@ export function createWorkspaceUseCases({
       workspace.setSearchResults([]);
       workspace.setSearchQuery('');
     } catch (error) {
-      workspace.setError(normalizeErrorMessage(error, '초기화에 실패했습니다.'));
+      workspace.setError(normalizeBootstrapErrorMessage(error, '초기화에 실패했습니다.'));
     } finally {
       workspace.setIsBootstrapping(false);
     }

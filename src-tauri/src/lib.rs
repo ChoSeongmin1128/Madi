@@ -10,7 +10,7 @@ mod window_controls;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-  tauri::Builder::default()
+  let builder = tauri::Builder::default()
     .plugin(tauri_plugin_updater::Builder::new().build())
     .plugin(tauri_plugin_process::init())
     .plugin(tauri_plugin_global_shortcut::Builder::new().build())
@@ -50,8 +50,14 @@ pub fn run() {
       commands::window_controls::preview_window_opacity_percent,
       commands::preferences::set_window_opacity_percent,
       commands::preferences::set_global_toggle_shortcut,
-    ])
-    .build(tauri::generate_context!())
-    .expect("error building tauri application")
-    .run(app_runtime::handle_run_event);
+    ]);
+
+  match builder.build(tauri::generate_context!()) {
+    Ok(app) => app.run(app_runtime::handle_run_event),
+    Err(error) => {
+      let message = error.to_string();
+      log::error!("MinNote startup failed: {message}");
+      app_runtime::show_startup_error_dialog(&message);
+    }
+  }
 }

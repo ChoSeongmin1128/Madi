@@ -19,4 +19,6 @@ export interface PreferencesGateway {
   setGlobalToggleShortcut(value: string | null): void;
   getGlobalShortcutError(): string | null;
   setGlobalShortcutError(value: string | null): void;
+  getMenuBarIconError(): string | null;
+  setMenuBarIconError(value: string | null): void;
 }

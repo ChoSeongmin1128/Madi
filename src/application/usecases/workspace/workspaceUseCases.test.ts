@@ -76,6 +76,8 @@ function createPreferencesGateway() {
     setGlobalToggleShortcut: vi.fn(),
     getGlobalShortcutError: vi.fn(() => null),
     setGlobalShortcutError: vi.fn(),
+    getMenuBarIconError: vi.fn(() => null),
+    setMenuBarIconError: vi.fn(),
   };
 }
 
@@ -89,7 +91,7 @@ describe('workspace usecases', () => {
     const useCases = createWorkspaceUseCases({
       backend: {
         bootstrapApp: vi.fn(async () => payload),
-        getWindowControlRuntimeState: vi.fn(async () => ({ globalShortcutError: 'runtime error' })),
+        getWindowControlRuntimeState: vi.fn(async () => ({ globalShortcutError: 'runtime error', menuBarIconError: 'tray error' })),
         searchDocuments: vi.fn(),
         deleteAllDocuments: vi.fn(),
       } as never,
@@ -106,8 +108,37 @@ describe('workspace usecases', () => {
     expect(preferences.setDefaultBlockKind).toHaveBeenCalledWith('code');
     expect(preferences.setDefaultDocumentSurfaceTonePreset).toHaveBeenCalledWith('default');
     expect(preferences.setGlobalShortcutError).toHaveBeenCalledWith('runtime error');
+    expect(preferences.setMenuBarIconError).toHaveBeenCalledWith('tray error');
     expect(workspace.setSearchResults).toHaveBeenCalledWith([]);
     expect(workspace.setSearchQuery).toHaveBeenCalledWith('');
+  });
+
+  it('normalizes storage bootstrap failures to a user-facing message', async () => {
+    const workspace = createWorkspaceGateway();
+    const preferences = createPreferencesGateway();
+    const session = createSessionGateway();
+    const ui = createUiGateway();
+    const useCases = createWorkspaceUseCases({
+      backend: {
+        bootstrapApp: vi.fn(async () => {
+          throw new Error('database error: malformed');
+        }),
+        getWindowControlRuntimeState: vi.fn(),
+        searchDocuments: vi.fn(),
+        deleteAllDocuments: vi.fn(),
+      } as never,
+      editorPersistence: { clearAll: vi.fn() } as never,
+      preferences: preferences as never,
+      scheduler: { setTimeout: vi.fn(), clearTimeout: vi.fn() },
+      session,
+      ui: ui as never,
+      workspace,
+    });
+
+    await useCases.bootstrapApp();
+
+    expect(workspace.setError).toHaveBeenCalledWith('저장소를 읽지 못했습니다. 앱을 다시 실행해 주세요.');
+    expect(workspace.setIsBootstrapping).toHaveBeenLastCalledWith(false);
   });
 
   it('keeps default block kind in deleteAllDocuments payload sync', async () => {

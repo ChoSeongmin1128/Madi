@@ -42,3 +42,20 @@ fn mark_document_opened_updates_last_opened_without_mutating_updated_at() {
   assert_eq!(opened.updated_at, 123);
   assert!(opened.last_opened_at >= 456);
 }
+
+#[test]
+fn list_documents_does_not_hide_summary_query_failures() {
+  let mut store = test_store();
+  store
+    .create_document(Some("오류 테스트".to_string()))
+    .expect("document should be created");
+
+  store
+    .connection
+    .execute("DROP TABLE blocks", [])
+    .expect("blocks table should be dropped");
+
+  let error = store.list_documents().expect_err("summary failure should surface");
+
+  assert!(error.to_string().contains("database error"));
+}

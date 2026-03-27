@@ -86,4 +86,5 @@ export function applyWindowControlRuntimeState(
   payload: WindowControlRuntimeState,
 ) {
   preferences.setGlobalShortcutError(payload.globalShortcutError);
+  preferences.setMenuBarIconError(payload.menuBarIconError);
 }

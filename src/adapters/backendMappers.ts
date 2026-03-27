@@ -103,5 +103,6 @@ export function mapWindowControlRuntimeStateDto(
 ): WindowControlRuntimeState {
   return {
     globalShortcutError: payload.globalShortcutError,
+    menuBarIconError: payload.menuBarIconError,
   };
 }

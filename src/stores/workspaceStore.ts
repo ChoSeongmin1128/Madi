@@ -24,6 +24,7 @@ interface WorkspaceState {
   windowOpacityPercent: number;
   globalToggleShortcut: string | null;
   globalShortcutError: string | null;
+  menuBarIconError: string | null;
   setDocuments: (documents: DocumentSummaryVm[]) => void;
   setTrashDocuments: (documents: DocumentSummaryVm[]) => void;
   upsertDocumentSummary: (document: DocumentSummaryVm) => void;
@@ -41,6 +42,7 @@ interface WorkspaceState {
   setWindowOpacityPercent: (value: number) => void;
   setGlobalToggleShortcut: (value: string | null) => void;
   setGlobalShortcutError: (value: string | null) => void;
+  setMenuBarIconError: (value: string | null) => void;
 }
 
 function sortDocuments(documents: DocumentSummaryVm[]) {
@@ -64,6 +66,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
   windowOpacityPercent: 100,
   globalToggleShortcut: 'Option+M',
   globalShortcutError: null,
+  menuBarIconError: null,
   setDocuments: (documents) => set({ documents: sortDocuments(documents) }),
   setTrashDocuments: (trashDocuments) => set({ trashDocuments }),
   upsertDocumentSummary: (document) =>
@@ -91,6 +94,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
   setWindowOpacityPercent: (windowOpacityPercent) => set({ windowOpacityPercent }),
   setGlobalToggleShortcut: (globalToggleShortcut) => set({ globalToggleShortcut }),
   setGlobalShortcutError: (globalShortcutError) => set({ globalShortcutError }),
+  setMenuBarIconError: (menuBarIconError) => set({ menuBarIconError }),
 }), {
     name: 'workspace-state',
     storage: createJSONStorage(() => localStorage),

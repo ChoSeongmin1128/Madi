@@ -1,5 +1,7 @@
 use std::fs;
+use std::path::Path;
 
+use crate::error::StartupError;
 use crate::ports::repositories::AppStateRepository;
 use crate::state::AppState;
 use crate::window_controls::{
@@ -92,36 +94,53 @@ pub(crate) fn build_tray_icon(app: &tauri::AppHandle) -> tauri::Result<TrayIcon>
   builder.build(app)
 }
 
-pub(crate) fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
-  let app_dir = app.path().app_data_dir().expect("failed to resolve app data directory");
-  fs::create_dir_all(&app_dir).expect("failed to create app data directory");
-
+fn initialize_app_state(app_dir: &Path) -> Result<AppState, StartupError> {
+  fs::create_dir_all(app_dir).map_err(StartupError::PrepareAppDataDir)?;
   let database_path = app_dir.join("minnote.sqlite3");
-  let app_state = AppState::new(&database_path).expect("failed to initialize app state");
+  AppState::new(&database_path).map_err(StartupError::InitializeState)
+}
+
+pub(crate) fn show_startup_error_dialog(message: &str) {
+  let _ = rfd::MessageDialog::new()
+    .set_title("MinNote 초기화 실패")
+    .set_description(message)
+    .set_level(rfd::MessageLevel::Error)
+    .show();
+}
+
+pub(crate) fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+  let app_dir = app
+    .path()
+    .app_data_dir()
+    .map_err(|_| StartupError::ResolveAppDataDir)?;
+  let app_state = initialize_app_state(&app_dir)?;
 
   let settings = app_state
     .repository
     .lock()
     .ok()
-    .and_then(|repo| repo.get_app_settings().ok());
+    .and_then(|repo| repo.get_app_settings().ok())
+    .ok_or_else(|| StartupError::LoadSettings(crate::error::AppError::StateLock))?;
 
-  let menu_bar_icon_enabled = settings.as_ref().map(|s| s.menu_bar_icon_enabled).unwrap_or(false);
+  let menu_bar_icon_enabled = settings.menu_bar_icon_enabled;
 
   app.manage(app_state);
 
   if let Some(managed_state) = app.try_state::<AppState>() {
-    if let Ok(settings) = managed_state
-      .repository
-      .lock()
-      .map_err(|_| ())
-      .and_then(|repository| repository.get_app_settings().map_err(|_| ()))
-    {
-      let _ = apply_window_preferences_with_settings(app.handle(), &settings);
-    }
-  }
+    apply_window_preferences_with_settings(app.handle(), &settings)
+      .map_err(StartupError::ApplyWindowPreferences)?;
 
-  if menu_bar_icon_enabled && app.tray_by_id(TRAY_ID).is_none() {
-    let _ = build_tray_icon(app.handle());
+    if menu_bar_icon_enabled && app.tray_by_id(TRAY_ID).is_none() {
+      if let Err(error) = build_tray_icon(app.handle()) {
+        let message = format!("메뉴바 아이콘을 초기화하지 못했습니다: {error}");
+        log::warn!("{message}");
+        managed_state.set_menu_bar_icon_error(Some(message));
+      } else {
+        managed_state.set_menu_bar_icon_error(None);
+      }
+    } else {
+      managed_state.set_menu_bar_icon_error(None);
+    }
   }
 
   register_saved_global_shortcut(app.handle());

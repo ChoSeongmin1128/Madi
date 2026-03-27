@@ -70,6 +70,7 @@ pub struct BootstrapPayload {
 #[serde(rename_all = "camelCase")]
 pub struct WindowControlRuntimeStateDto {
   pub global_shortcut_error: Option<String>,
+  pub menu_bar_icon_error: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

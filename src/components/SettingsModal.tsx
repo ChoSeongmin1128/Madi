@@ -67,6 +67,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const alwaysOnTopEnabled = useWorkspaceStore((state) => state.alwaysOnTopEnabled);
   const globalToggleShortcut = useWorkspaceStore((state) => state.globalToggleShortcut);
   const globalShortcutError = useWorkspaceStore((state) => state.globalShortcutError);
+  const menuBarIconError = useWorkspaceStore((state) => state.menuBarIconError);
   const appUpdateStatus = useUpdaterStore((state) => state.appUpdateStatus);
   const { draftOpacity, previewOpacity, commitOpacity } = useWindowOpacityControl();
   const [isConfirmOpen, setConfirmOpen] = useState(false);
@@ -107,6 +108,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           draftOpacity={draftOpacity}
           globalToggleShortcut={globalToggleShortcut}
           globalShortcutError={globalShortcutError}
+          menuBarIconError={menuBarIconError}
           menuBarOptions={MENU_BAR_OPTIONS}
           minOpacityPercent={MIN_WINDOW_OPACITY_PERCENT}
           maxOpacityPercent={MAX_WINDOW_OPACITY_PERCENT}

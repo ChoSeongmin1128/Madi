@@ -10,6 +10,7 @@ pub fn get_window_control_runtime_state(
 ) -> Result<WindowControlRuntimeStateDto, String> {
   Ok(WindowControlRuntimeStateDto {
     global_shortcut_error: state.global_shortcut_error(),
+    menu_bar_icon_error: state.menu_bar_icon_error(),
   })
 }
 

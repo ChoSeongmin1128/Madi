@@ -164,8 +164,7 @@ impl SqliteStore {
         "SELECT COUNT(*) FROM blocks WHERE document_id = ?1",
         params![document.id],
         |row| row.get::<_, i64>(0),
-      )
-      .unwrap_or(0) as usize;
+      )? as usize;
     let preview = self.document_preview(&document.id)?;
 
     Ok(DocumentSummary {

@@ -7,6 +7,7 @@ interface SettingsWindowSectionProps {
   draftOpacity: number;
   globalToggleShortcut: string | null;
   globalShortcutError: string | null;
+  menuBarIconError: string | null;
   menuBarOptions: ReadonlyArray<{ value: 'off' | 'on'; label: string }>;
   minOpacityPercent: number;
   maxOpacityPercent: number;
@@ -23,6 +24,7 @@ export function SettingsWindowSection({
   draftOpacity,
   globalToggleShortcut,
   globalShortcutError,
+  menuBarIconError,
   menuBarOptions,
   minOpacityPercent,
   maxOpacityPercent,
@@ -45,6 +47,7 @@ export function SettingsWindowSection({
           options={menuBarOptions}
           onChange={(nextValue) => onMenuBarIconEnabledChange(nextValue === 'on')}
         />
+        {menuBarIconError ? <span className="shortcut-capture-error">{menuBarIconError}</span> : null}
       </div>
 
       <div className="settings-section">

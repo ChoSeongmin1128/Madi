@@ -41,4 +41,10 @@ export const preferencesGateway: PreferencesGateway = {
   setGlobalShortcutError(value) {
     useWorkspaceStore.getState().setGlobalShortcutError(value);
   },
+  getMenuBarIconError() {
+    return useWorkspaceStore.getState().menuBarIconError;
+  },
+  setMenuBarIconError(value) {
+    useWorkspaceStore.getState().setMenuBarIconError(value);
+  },
 };
