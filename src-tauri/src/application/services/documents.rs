@@ -3,7 +3,7 @@ use crate::domain::models::{BlockTintPreset, DocumentSurfaceTonePreset};
 use crate::error::AppError;
 use crate::ports::repositories::AppRepository;
 
-use super::{build_bootstrap_payload, hydrate_document};
+use super::{build_workspace_payload, hydrate_document, resolve_current_document_id};
 
 pub fn open_document(repository: &mut dyn AppRepository, document_id: &str) -> Result<DocumentDto, AppError> {
   let document = repository.mark_document_opened(document_id)?;
@@ -33,25 +33,11 @@ pub fn delete_document(
 ) -> Result<BootstrapPayload, AppError> {
   repository.delete_document(document_id)?;
   repository.ensure_initial_document()?;
-  let settings = repository.get_app_settings()?;
-
-  let documents = repository.list_documents()?;
-  let trash_documents = repository.list_trash_documents()?;
   let current_document_id = repository
     .get_last_opened_document_id()?
-    .filter(|stored| stored != document_id)
-    .or_else(|| documents.first().map(|document| document.id.clone()));
+    .filter(|stored| stored != document_id);
 
-  if let Some(current_document_id) = current_document_id.as_deref() {
-    repository.set_last_opened_document_id(current_document_id)?;
-  }
-
-  let current_document = current_document_id
-    .as_deref()
-    .map(|id| open_document(repository, id))
-    .transpose()?;
-
-  Ok(build_bootstrap_payload(settings, documents, trash_documents, current_document))
+  build_workspace_payload(repository, current_document_id)
 }
 
 pub fn empty_trash(repository: &mut dyn AppRepository) -> Result<(), AppError> {
@@ -63,37 +49,18 @@ pub fn restore_document_from_trash(
   document_id: &str,
 ) -> Result<BootstrapPayload, AppError> {
   repository.restore_document_from_trash(document_id)?;
-  let settings = repository.get_app_settings()?;
-  let documents = repository.list_documents()?;
-  let trash_documents = repository.list_trash_documents()?;
-
-  let current_document_id = repository
-    .get_last_opened_document_id()?
-    .or_else(|| documents.first().map(|d| d.id.clone()));
-
-  let current_document = current_document_id
-    .as_deref()
-    .map(|id| open_document(repository, id))
-    .transpose()?;
-
-  Ok(build_bootstrap_payload(settings, documents, trash_documents, current_document))
+  let last_opened_document_id = repository.get_last_opened_document_id()?;
+  build_workspace_payload(repository, last_opened_document_id)
 }
 
 pub fn delete_all_documents(repository: &mut dyn AppRepository) -> Result<BootstrapPayload, AppError> {
   repository.delete_all_documents()?;
   repository.ensure_initial_document()?;
-
-  let settings = repository.get_app_settings()?;
   let documents = repository.list_documents()?;
-  let current_document_id = documents
-    .first()
-    .map(|document| document.id.clone())
+  let current_document_id = resolve_current_document_id(&documents, None)
     .ok_or_else(|| AppError::validation("초기 문서를 만들지 못했습니다."))?;
 
-  repository.set_last_opened_document_id(&current_document_id)?;
-  let current_document = open_document(repository, &current_document_id)?;
-
-  Ok(build_bootstrap_payload(settings, documents, vec![], Some(current_document)))
+  build_workspace_payload(repository, Some(current_document_id))
 }
 
 pub fn set_document_block_tint_override(

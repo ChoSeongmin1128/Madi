@@ -1,7 +1,13 @@
 import { relaunch } from '@tauri-apps/plugin-process';
 import { check } from '@tauri-apps/plugin-updater';
-import type { AppUpdateStatus } from './types';
 import { updaterGateway } from '../adapters/updaterGateway';
+import {
+  buildStatus,
+  normalizeUpdateError,
+  setUpdateStatus,
+} from './appUpdater/status';
+
+export { formatUpdateStatusMessage, getHeaderUpdateActionLabel } from './appUpdater/status';
 
 export const APP_UPDATE_CHECK_INTERVAL_MS = 6 * 60 * 60 * 1000;
 export const APP_UPDATE_CHECK_TIMEOUT_MS = 15 * 1000;
@@ -39,41 +45,6 @@ function debugUpdater(message: string, payload?: unknown) {
   console.info(`[updater] ${message}`, payload);
 }
 
-function buildStatus(next: Partial<AppUpdateStatus> & Pick<AppUpdateStatus, 'state'>): AppUpdateStatus {
-  const current = updaterGateway.getStatus();
-
-  return {
-    state: next.state,
-    version: next.version ?? null,
-    percent: next.percent ?? null,
-    message: next.message ?? null,
-    lastCheckedAt: next.lastCheckedAt ?? current.lastCheckedAt,
-  };
-}
-
-function setUpdateStatus(status: AppUpdateStatus) {
-  const current = updaterGateway.getStatus();
-  debugUpdater('status', {
-    from: current,
-    to: status,
-  });
-  updaterGateway.setStatus(status);
-}
-
-function normalizeUpdateError(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
-
-  if (
-    message.includes('latest.json')
-    || message.includes('404')
-    || message.includes('Not Found')
-  ) {
-    return '메타데이터 없음';
-  }
-
-  return message || '오류';
-}
-
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string) {
   let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -108,42 +79,6 @@ async function closeDownloadedUpdate() {
   }
 }
 
-export function formatUpdateStatusMessage(status: AppUpdateStatus) {
-  if (status.state === 'checking') {
-    return '확인 중';
-  }
-
-  if (status.state === 'ready_to_install') {
-    return '준비됨';
-  }
-
-  if (status.state === 'available_downloading') {
-    return '다운로드 중';
-  }
-
-  if (status.state === 'installing') {
-    return '적용 중';
-  }
-
-  if (status.state === 'idle' && status.message === '최신') {
-    return '최신 버전';
-  }
-
-  return status.message;
-}
-
-export function getHeaderUpdateActionLabel(status: AppUpdateStatus) {
-  if (status.state === 'ready_to_install') {
-    return '업데이트';
-  }
-
-  if (status.state === 'installing') {
-    return '업데이트 중';
-  }
-
-  return null;
-}
-
 async function performUpdateCheck(source: string) {
   debugUpdater('check:start', { source });
   await closeDownloadedUpdate();
@@ -154,7 +89,7 @@ async function performUpdateCheck(source: string) {
     version: null,
     percent: null,
     message: null,
-  }));
+  }), debugUpdater);
 
   try {
     const update = await withTimeout(
@@ -172,20 +107,20 @@ async function performUpdateCheck(source: string) {
         percent: null,
         message: '최신',
         lastCheckedAt: checkedAt,
-      });
+      }, debugUpdater);
       return;
     }
 
     let downloaded = 0;
     let total = 0;
     let completed = false;
-    setUpdateStatus({
-      state: 'available_downloading',
-      version: update.version,
-      percent: null,
-      message: null,
-      lastCheckedAt: checkedAt,
-    });
+      setUpdateStatus({
+        state: 'available_downloading',
+        version: update.version,
+        percent: null,
+        message: null,
+        lastCheckedAt: checkedAt,
+      }, debugUpdater);
 
     await withTimeout(
       update.download((event) => {
@@ -202,7 +137,7 @@ async function performUpdateCheck(source: string) {
             percent: 0,
             message: null,
             lastCheckedAt: checkedAt,
-          });
+          }, debugUpdater);
           return;
         }
 
@@ -215,7 +150,7 @@ async function performUpdateCheck(source: string) {
             percent,
             message: null,
             lastCheckedAt: checkedAt,
-          });
+          }, debugUpdater);
           return;
         }
 
@@ -234,7 +169,7 @@ async function performUpdateCheck(source: string) {
             percent: 100,
             message: null,
             lastCheckedAt: checkedAt,
-          });
+          }, debugUpdater);
         }
       }),
       APP_UPDATE_DOWNLOAD_TIMEOUT_MS,
@@ -256,7 +191,7 @@ async function performUpdateCheck(source: string) {
         percent: 100,
         message: null,
         lastCheckedAt: checkedAt,
-      });
+      }, debugUpdater);
     }
   } catch (error) {
     abandoned = true;
@@ -272,7 +207,7 @@ async function performUpdateCheck(source: string) {
       percent: null,
       message: normalizeUpdateError(error),
       lastCheckedAt: Date.now(),
-    });
+    }, debugUpdater);
   }
 }
 
@@ -325,7 +260,7 @@ export async function applyPreparedUpdate() {
       version: current.version,
       percent: null,
       message: null,
-    }));
+    }), debugUpdater);
     await withTimeout(
       preparedUpdateAction(),
       APP_UPDATE_INSTALL_TIMEOUT_MS,
@@ -343,7 +278,7 @@ export async function applyPreparedUpdate() {
       percent: null,
       message: normalizeUpdateError(error),
       lastCheckedAt: Date.now(),
-    }));
+    }), debugUpdater);
   }
 }
 
