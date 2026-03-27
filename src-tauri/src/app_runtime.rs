@@ -124,6 +124,23 @@ pub(crate) fn sync_tray_icon_enabled(app: &tauri::AppHandle, enabled: bool) -> R
   Ok(())
 }
 
+pub(crate) fn sync_menu_bar_icon_runtime_state(
+  state: &AppState,
+  app: &tauri::AppHandle,
+  enabled: bool,
+) -> Result<(), String> {
+  match sync_tray_icon_enabled(app, enabled) {
+    Ok(()) => {
+      state.set_menu_bar_icon_error(None);
+      Ok(())
+    }
+    Err(error) => {
+      state.set_menu_bar_icon_error(Some(error.clone()));
+      Err(error)
+    }
+  }
+}
+
 pub(crate) fn show_startup_error_dialog(message: &str) {
   let _ = rfd::MessageDialog::new()
     .set_title("MinNote 초기화 실패")
@@ -149,7 +166,7 @@ pub(crate) fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::
       .map_err(StartupError::ApplyWindowPreferences)?;
 
     if menu_bar_icon_enabled && app.tray_by_id(TRAY_ID).is_none() {
-      if let Err(error) = sync_tray_icon_enabled(app.handle(), true) {
+      if let Err(error) = sync_menu_bar_icon_runtime_state(&managed_state, app.handle(), true) {
         let message = format!("메뉴바 아이콘을 초기화하지 못했습니다: {error}");
         log::warn!("{message}");
         managed_state.set_menu_bar_icon_error(Some(message));

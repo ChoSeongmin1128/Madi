@@ -1,6 +1,6 @@
 use tauri::State;
 
-use crate::app_runtime::sync_tray_icon_enabled;
+use crate::app_runtime::sync_menu_bar_icon_runtime_state;
 use crate::application::services;
 use crate::domain::models::AppSettings;
 use crate::error::AppError;
@@ -25,23 +25,6 @@ pub(super) fn with_repository_and_settings<T>(
     let settings = repository.get_app_settings()?;
     Ok((result, settings))
   })
-}
-
-fn sync_tray_icon_runtime(
-  state: &AppState,
-  app_handle: &tauri::AppHandle,
-  enabled: bool,
-) -> Result<(), String> {
-  match sync_tray_icon_enabled(app_handle, enabled) {
-    Ok(()) => {
-      state.set_menu_bar_icon_error(None);
-      Ok(())
-    }
-    Err(error) => {
-      state.set_menu_bar_icon_error(Some(error.clone()));
-      Err(error)
-    }
-  }
 }
 
 pub(super) fn persist_window_setting<T>(
@@ -85,14 +68,14 @@ pub(super) fn persist_menu_bar_icon_setting(
     Ok(repository.get_app_settings()?.menu_bar_icon_enabled)
   })?;
 
-  sync_tray_icon_runtime(&state, app_handle, enabled)?;
+  sync_menu_bar_icon_runtime_state(&state, app_handle, enabled)?;
 
   match with_repository(state.clone(), |repository| {
     services::set_menu_bar_icon_enabled(repository, enabled)
   }) {
     Ok(result) => Ok(result),
     Err(error) => {
-      if let Err(rollback_error) = sync_tray_icon_runtime(&state, app_handle, previous_enabled) {
+      if let Err(rollback_error) = sync_menu_bar_icon_runtime_state(&state, app_handle, previous_enabled) {
         return Err(format!("{error} (메뉴바 아이콘 상태를 롤백하지 못했습니다: {rollback_error})"));
       }
       Err(error)
