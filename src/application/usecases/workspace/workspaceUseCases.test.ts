@@ -78,6 +78,8 @@ function createPreferencesGateway() {
     setGlobalShortcutError: vi.fn(),
     getMenuBarIconError: vi.fn(() => null),
     setMenuBarIconError: vi.fn(),
+    getWindowPreferenceError: vi.fn(() => null),
+    setWindowPreferenceError: vi.fn(),
   };
 }
 
@@ -91,7 +93,11 @@ describe('workspace usecases', () => {
     const useCases = createWorkspaceUseCases({
       backend: {
         bootstrapApp: vi.fn(async () => payload),
-        getWindowControlRuntimeState: vi.fn(async () => ({ globalShortcutError: 'runtime error', menuBarIconError: 'tray error' })),
+        getWindowControlRuntimeState: vi.fn(async () => ({
+          globalShortcutError: 'runtime error',
+          menuBarIconError: 'tray error',
+          windowPreferenceError: 'window error',
+        })),
         searchDocuments: vi.fn(),
         deleteAllDocuments: vi.fn(),
       } as never,
@@ -109,6 +115,7 @@ describe('workspace usecases', () => {
     expect(preferences.setDefaultDocumentSurfaceTonePreset).toHaveBeenCalledWith('default');
     expect(preferences.setGlobalShortcutError).toHaveBeenCalledWith('runtime error');
     expect(preferences.setMenuBarIconError).toHaveBeenCalledWith('tray error');
+    expect(preferences.setWindowPreferenceError).toHaveBeenCalledWith('window error');
     expect(workspace.setSearchResults).toHaveBeenCalledWith([]);
     expect(workspace.setSearchQuery).toHaveBeenCalledWith('');
   });

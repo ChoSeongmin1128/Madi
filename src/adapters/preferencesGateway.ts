@@ -47,4 +47,10 @@ export const preferencesGateway: PreferencesGateway = {
   setMenuBarIconError(value) {
     useWorkspaceStore.getState().setMenuBarIconError(value);
   },
+  getWindowPreferenceError() {
+    return useWorkspaceStore.getState().windowPreferenceError;
+  },
+  setWindowPreferenceError(value) {
+    useWorkspaceStore.getState().setWindowPreferenceError(value);
+  },
 };

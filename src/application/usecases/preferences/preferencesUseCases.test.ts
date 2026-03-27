@@ -20,6 +20,8 @@ function createPreferencesGateway() {
     setMenuBarIconEnabled: vi.fn(),
     getMenuBarIconError: vi.fn(() => null),
     setMenuBarIconError: vi.fn(),
+    getWindowPreferenceError: vi.fn(() => null),
+    setWindowPreferenceError: vi.fn(),
     getAlwaysOnTopEnabled: vi.fn(() => false),
     setAlwaysOnTopEnabled: vi.fn(),
     getWindowOpacityPercent: vi.fn(() => opacity),
@@ -120,6 +122,27 @@ describe('preferences usecases', () => {
     expect(preferences.setMenuBarIconEnabled).not.toHaveBeenCalledWith(true);
     expect(preferences.setMenuBarIconError).toHaveBeenCalledWith('메뉴바 아이콘을 초기화하지 못했습니다.');
     expect(workspace.setError).toHaveBeenCalledWith('메뉴바 아이콘을 초기화하지 못했습니다.');
+  });
+
+  it('surfaces window preference runtime error on opacity failure', async () => {
+    const workspace = createWorkspaceGateway();
+    const preferences = createPreferencesGateway();
+    const backend = {
+      setWindowOpacityPercent: vi.fn(async () => {
+        throw new Error('창 상태를 적용하지 못했습니다.');
+      }),
+    };
+
+    const useCases = createPreferencesUseCases({
+      backend: backend as never,
+      preferences: preferences as never,
+      workspace: workspace as never,
+    });
+
+    await expect(useCases.setWindowOpacityPercent(80)).rejects.toThrow('창 상태를 적용하지 못했습니다.');
+
+    expect(preferences.setWindowPreferenceError).toHaveBeenCalledWith('창 상태를 적용하지 못했습니다.');
+    expect(workspace.setError).toHaveBeenCalledWith('창 상태를 적용하지 못했습니다.');
   });
 
 });

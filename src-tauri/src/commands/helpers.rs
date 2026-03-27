@@ -31,10 +31,32 @@ pub(super) fn persist_window_setting<T>(
   state: State<'_, AppState>,
   app_handle: &tauri::AppHandle,
   callback: impl FnOnce(&mut dyn AppRepository) -> Result<T, AppError>,
+  rollback: impl FnOnce(&mut dyn AppRepository, &AppSettings) -> Result<(), AppError>,
 ) -> Result<T, String> {
-  let (result, settings) = with_repository_and_settings(state, callback)?;
-  apply_window_preferences_with_settings(app_handle, &settings)?;
-  Ok(result)
+  let previous_settings = with_repository(state.clone(), |repository| repository.get_app_settings())?;
+  let (result, settings) = with_repository_and_settings(state.clone(), callback)?;
+
+  match apply_window_preferences_with_settings(app_handle, &settings) {
+    Ok(()) => {
+      state.set_window_preference_error(None);
+      Ok(result)
+    }
+    Err(error) => {
+      state.set_window_preference_error(Some(error.clone()));
+      if let Err(rollback_error) = with_repository(state, |repository| {
+        rollback(repository, &previous_settings)?;
+        Ok(())
+      }) {
+        return Err(format!("{error} (창 설정을 롤백하지 못했습니다: {rollback_error})"));
+      }
+
+      if let Err(rollback_apply_error) = apply_window_preferences_with_settings(app_handle, &previous_settings) {
+        return Err(format!("{error} (창 상태를 롤백하지 못했습니다: {rollback_apply_error})"));
+      }
+
+      Err(error)
+    }
+  }
 }
 
 pub(super) fn persist_global_shortcut(

@@ -21,4 +21,6 @@ export interface PreferencesGateway {
   setGlobalShortcutError(value: string | null): void;
   getMenuBarIconError(): string | null;
   setMenuBarIconError(value: string | null): void;
+  getWindowPreferenceError(): string | null;
+  setWindowPreferenceError(value: string | null): void;
 }

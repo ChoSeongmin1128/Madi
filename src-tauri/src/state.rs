@@ -10,6 +10,7 @@ pub struct WindowControlState {
   pub active_global_toggle_shortcut: Option<String>,
   pub global_shortcut_error: Option<String>,
   pub menu_bar_icon_error: Option<String>,
+  pub window_preference_error: Option<String>,
 }
 
 pub struct AppState {
@@ -77,6 +78,20 @@ impl AppState {
   pub fn set_menu_bar_icon_error(&self, error: Option<String>) {
     if let Ok(mut state) = self.window_controls.lock() {
       state.menu_bar_icon_error = error;
+    }
+  }
+
+  pub fn window_preference_error(&self) -> Option<String> {
+    self
+      .window_controls
+      .lock()
+      .ok()
+      .and_then(|state| state.window_preference_error.clone())
+  }
+
+  pub fn set_window_preference_error(&self, error: Option<String>) {
+    if let Ok(mut state) = self.window_controls.lock() {
+      state.window_preference_error = error;
     }
   }
 

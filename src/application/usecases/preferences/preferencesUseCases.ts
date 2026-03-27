@@ -74,14 +74,18 @@ export function createPreferencesUseCases({
   async function setAlwaysOnTopEnabled(enabled: boolean) {
     const previous = preferences.getAlwaysOnTopEnabled();
     preferences.setAlwaysOnTopEnabled(enabled);
+    preferences.setWindowPreferenceError(null);
 
     try {
       const result = await backend.setAlwaysOnTopEnabled(enabled);
       workspace.clearError();
       preferences.setAlwaysOnTopEnabled(result);
+      preferences.setWindowPreferenceError(null);
     } catch (error) {
       preferences.setAlwaysOnTopEnabled(previous);
-      workspace.setError(normalizeErrorMessage(error, '항상 위에 고정 설정을 변경하지 못했습니다.'));
+      const message = normalizeErrorMessage(error, '항상 위에 고정 설정을 변경하지 못했습니다.');
+      workspace.setError(message);
+      preferences.setWindowPreferenceError(message);
       throw error;
     }
   }
@@ -90,7 +94,9 @@ export function createPreferencesUseCases({
     try {
       return await backend.previewWindowOpacityPercent(percent);
     } catch (error) {
-      workspace.setError(normalizeErrorMessage(error, '창 투명도를 미리보기하지 못했습니다.'));
+      const message = normalizeErrorMessage(error, '창 투명도를 미리보기하지 못했습니다.');
+      workspace.setError(message);
+      preferences.setWindowPreferenceError(message);
       throw error;
     }
   }
@@ -106,13 +112,16 @@ export function createPreferencesUseCases({
       }
       workspace.clearError();
       preferences.setWindowOpacityPercent(result);
+      preferences.setWindowPreferenceError(null);
       return result;
     } catch (error) {
       if (requestToken !== opacityRequestToken) {
         return preferences.getWindowOpacityPercent();
       }
       preferences.setWindowOpacityPercent(previous);
-      workspace.setError(normalizeErrorMessage(error, '창 투명도를 변경하지 못했습니다.'));
+      const message = normalizeErrorMessage(error, '창 투명도를 변경하지 못했습니다.');
+      workspace.setError(message);
+      preferences.setWindowPreferenceError(message);
       throw error;
     }
   }

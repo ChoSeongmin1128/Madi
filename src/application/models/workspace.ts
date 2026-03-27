@@ -23,4 +23,5 @@ export interface WorkspaceBootstrapState {
 export interface WindowControlRuntimeState {
   globalShortcutError: string | null;
   menuBarIconError: string | null;
+  windowPreferenceError: string | null;
 }

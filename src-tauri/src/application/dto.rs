@@ -71,6 +71,7 @@ pub struct BootstrapPayload {
 pub struct WindowControlRuntimeStateDto {
   pub global_shortcut_error: Option<String>,
   pub menu_bar_icon_error: Option<String>,
+  pub window_preference_error: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]

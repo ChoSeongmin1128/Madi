@@ -25,6 +25,7 @@ interface WorkspaceState {
   globalToggleShortcut: string | null;
   globalShortcutError: string | null;
   menuBarIconError: string | null;
+  windowPreferenceError: string | null;
   setDocuments: (documents: DocumentSummaryVm[]) => void;
   setTrashDocuments: (documents: DocumentSummaryVm[]) => void;
   upsertDocumentSummary: (document: DocumentSummaryVm) => void;
@@ -43,6 +44,7 @@ interface WorkspaceState {
   setGlobalToggleShortcut: (value: string | null) => void;
   setGlobalShortcutError: (value: string | null) => void;
   setMenuBarIconError: (value: string | null) => void;
+  setWindowPreferenceError: (value: string | null) => void;
 }
 
 function sortDocuments(documents: DocumentSummaryVm[]) {
@@ -67,6 +69,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
   globalToggleShortcut: 'Option+M',
   globalShortcutError: null,
   menuBarIconError: null,
+  windowPreferenceError: null,
   setDocuments: (documents) => set({ documents: sortDocuments(documents) }),
   setTrashDocuments: (trashDocuments) => set({ trashDocuments }),
   upsertDocumentSummary: (document) =>
@@ -95,6 +98,7 @@ export const useWorkspaceStore = create<WorkspaceState>()(
   setGlobalToggleShortcut: (globalToggleShortcut) => set({ globalToggleShortcut }),
   setGlobalShortcutError: (globalShortcutError) => set({ globalShortcutError }),
   setMenuBarIconError: (menuBarIconError) => set({ menuBarIconError }),
+  setWindowPreferenceError: (windowPreferenceError) => set({ windowPreferenceError }),
 }), {
     name: 'workspace-state',
     storage: createJSONStorage(() => localStorage),

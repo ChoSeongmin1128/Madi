@@ -11,6 +11,7 @@ pub fn get_window_control_runtime_state(
   Ok(WindowControlRuntimeStateDto {
     global_shortcut_error: state.global_shortcut_error(),
     menu_bar_icon_error: state.menu_bar_icon_error(),
+    window_preference_error: state.window_preference_error(),
   })
 }
 

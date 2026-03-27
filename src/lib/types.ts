@@ -67,6 +67,7 @@ export interface BootstrapPayload {
 export interface WindowControlRuntimeStateDto {
   globalShortcutError: string | null;
   menuBarIconError: string | null;
+  windowPreferenceError: string | null;
 }
 
 export interface SearchResultDto extends DocumentSummaryDto {

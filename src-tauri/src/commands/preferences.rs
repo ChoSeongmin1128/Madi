@@ -86,6 +86,9 @@ pub fn set_always_on_top_enabled(
 ) -> Result<bool, String> {
   persist_window_setting(state, &app_handle, |repository| {
     services::set_always_on_top_enabled(repository, enabled)
+  }, |repository, previous_settings| {
+    services::set_always_on_top_enabled(repository, previous_settings.always_on_top_enabled)?;
+    Ok(())
   })
 }
 
@@ -97,6 +100,9 @@ pub fn set_window_opacity_percent(
 ) -> Result<u8, String> {
   persist_window_setting(state, &app_handle, |repository| {
     services::set_window_opacity_percent(repository, percent)
+  }, |repository, previous_settings| {
+    services::set_window_opacity_percent(repository, previous_settings.window_opacity_percent)?;
+    Ok(())
   })
 }
 
