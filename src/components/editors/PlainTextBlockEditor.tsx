@@ -2,7 +2,6 @@ import {
   forwardRef,
   useCallback,
   useEffect,
-  useImperativeHandle,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -17,6 +16,8 @@ import {
 } from '../../lib/blockOptions';
 import type { BlockEditorHandle } from '../../lib/editorHandle';
 import type { BlockCaretPlacement } from '../../lib/types';
+import { getLineEnd, getLineStart, syncTextareaHeight } from './plainTextEditorUtils';
+import { usePlainTextEditorHandle } from './usePlainTextEditorHandle';
 
 interface PlainTextBlockEditorProps {
   mode: 'code' | 'text';
@@ -30,24 +31,6 @@ interface PlainTextBlockEditorProps {
   onNavigatePrevious: (caret: BlockCaretPlacement) => void;
   onNavigateNext: (caret: BlockCaretPlacement) => void;
   onDeleteIfEmpty: () => void;
-}
-
-function getLineStart(value: string, position: number) {
-  return value.lastIndexOf('\n', Math.max(position - 1, 0)) + 1;
-}
-
-function getLineEnd(value: string, position: number) {
-  const nextBreak = value.indexOf('\n', position);
-  return nextBreak === -1 ? value.length : nextBreak;
-}
-
-function syncTextareaHeight(textarea: HTMLTextAreaElement | null) {
-  if (!textarea) {
-    return;
-  }
-
-  textarea.style.height = '0px';
-  textarea.style.height = `${Math.max(textarea.scrollHeight, 36)}px`;
 }
 
 export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlockEditorProps>(function PlainTextBlockEditor({
@@ -150,92 +133,14 @@ export const PlainTextBlockEditor = forwardRef<BlockEditorHandle, PlainTextBlock
 
   const getVal = useCallback(() => textareaRef.current?.value ?? currentValueRef.current, []);
 
-  useImperativeHandle(
+  usePlainTextEditorHandle({
     ref,
-    () => ({
-      async cut() {
-        const textarea = textareaRef.current;
-        if (!textarea) return false;
-
-        const { selectionStart, selectionEnd } = textarea;
-        if (selectionStart === selectionEnd) return false;
-
-        const val = getVal();
-        const text = val.slice(selectionStart, selectionEnd);
-        await navigator.clipboard.writeText(text);
-        const nextValue = `${val.slice(0, selectionStart)}${val.slice(selectionEnd)}`;
-        textarea.value = nextValue;
-        emitChange(nextValue);
-        textarea.focus();
-        textarea.setSelectionRange(selectionStart, selectionStart);
-        syncTextareaHeight(textarea);
-        return true;
-      },
-      async copy() {
-        const textarea = textareaRef.current;
-        if (!textarea) return false;
-
-        const { selectionStart, selectionEnd } = textarea;
-        if (selectionStart === selectionEnd) return false;
-
-        await navigator.clipboard.writeText(getVal().slice(selectionStart, selectionEnd));
-        return true;
-      },
-      async paste() {
-        const textarea = textareaRef.current;
-        if (!textarea) return false;
-
-        const text = await navigator.clipboard.readText();
-        const { selectionStart, selectionEnd } = textarea;
-        const val = getVal();
-        const nextValue = `${val.slice(0, selectionStart)}${text}${val.slice(selectionEnd)}`;
-        const nextCaret = selectionStart + text.length;
-        textarea.value = nextValue;
-        emitChange(nextValue);
-        textarea.focus();
-        textarea.setSelectionRange(nextCaret, nextCaret);
-        syncTextareaHeight(textarea);
-        return true;
-      },
-      selectAll() {
-        const textarea = textareaRef.current;
-        if (!textarea) return false;
-
-        textarea.focus();
-        textarea.setSelectionRange(0, textarea.value.length);
-        return true;
-      },
-      canUndo() {
-        return undoStackRef.current.length > 0;
-      },
-      undo() {
-        const prev = undoStackRef.current.pop();
-        if (prev === undefined) return;
-        redoStackRef.current.push(currentValueRef.current);
-        emitChange(prev, true);
-        const textarea = textareaRef.current;
-        if (textarea) {
-          textarea.value = prev;
-          syncTextareaHeight(textarea);
-        }
-      },
-      canRedo() {
-        return redoStackRef.current.length > 0;
-      },
-      redo() {
-        const next = redoStackRef.current.pop();
-        if (next === undefined) return;
-        undoStackRef.current.push(currentValueRef.current);
-        emitChange(next, true);
-        const textarea = textareaRef.current;
-        if (textarea) {
-          textarea.value = next;
-          syncTextareaHeight(textarea);
-        }
-      },
-    }),
-    [emitChange, getVal],
-  );
+    textareaRef,
+    emitChange,
+    getValue: getVal,
+    undoStackRef,
+    redoStackRef,
+  });
 
   return (
     <div className={`block-editor block-editor-shell ${mode === 'code' ? 'is-code' : 'is-text'}`}>
