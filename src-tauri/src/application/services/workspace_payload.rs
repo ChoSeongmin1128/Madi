@@ -39,6 +39,9 @@ pub(crate) fn build_bootstrap_payload(
     always_on_top_enabled: settings.always_on_top_enabled,
     window_opacity_percent: settings.window_opacity_percent,
     global_toggle_shortcut: settings.global_toggle_shortcut,
+    global_shortcut_error: None,
+    menu_bar_icon_error: None,
+    window_preference_error: None,
   }
 }
 

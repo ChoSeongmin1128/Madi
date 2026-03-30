@@ -5,7 +5,7 @@ import type { SchedulerPort } from '../../ports/schedulerPort';
 import type { SessionGateway } from '../../ports/sessionGateway';
 import type { UiGateway } from '../../ports/uiGateway';
 import type { WorkspaceGateway } from '../../ports/workspaceGateway';
-import { applyBootstrapPayloadState, applyWindowControlRuntimeState } from '../shared/documentState';
+import { applyBootstrapPayloadState } from '../shared/documentState';
 import { normalizeBootstrapErrorMessage, normalizeErrorMessage } from '../shared/errors';
 
 interface WorkspaceUseCaseDeps {
@@ -36,9 +36,7 @@ export function createWorkspaceUseCases({
 
     try {
       const payload = await backend.bootstrapApp();
-      const runtimeState = await backend.getWindowControlRuntimeState();
       applyBootstrapPayloadState(preferences, workspace, session, payload, 'always');
-      applyWindowControlRuntimeState(preferences, runtimeState);
       workspace.setSearchResults([]);
       workspace.setSearchQuery('');
     } catch (error) {

@@ -20,6 +20,9 @@ function createPayload(defaultBlockKind: WorkspaceBootstrapState['defaultBlockKi
     alwaysOnTopEnabled: false,
     windowOpacityPercent: 100,
     globalToggleShortcut: 'Option+M',
+    globalShortcutError: 'runtime error',
+    menuBarIconError: 'tray error',
+    windowPreferenceError: 'window error',
   };
 }
 
@@ -101,11 +104,7 @@ describe('workspace usecases', () => {
     const useCases = createWorkspaceUseCases({
       backend: {
         bootstrapApp: vi.fn(async () => payload),
-        getWindowControlRuntimeState: vi.fn(async () => ({
-          globalShortcutError: 'runtime error',
-          menuBarIconError: 'tray error',
-          windowPreferenceError: 'window error',
-        })),
+        getWindowControlRuntimeState: vi.fn(),
         searchDocuments: vi.fn(),
         deleteAllDocuments: vi.fn(),
       } as never,

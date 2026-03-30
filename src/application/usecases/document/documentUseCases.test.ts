@@ -20,6 +20,9 @@ function createPayload(defaultBlockKind: WorkspaceBootstrapState['defaultBlockKi
     alwaysOnTopEnabled: false,
     windowOpacityPercent: 100,
     globalToggleShortcut: 'Option+M',
+    globalShortcutError: null,
+    menuBarIconError: null,
+    windowPreferenceError: null,
   };
 }
 
@@ -84,6 +87,10 @@ function createPreferencesGateway() {
     setGlobalToggleShortcut: vi.fn(),
     getGlobalShortcutError: vi.fn(() => null),
     setGlobalShortcutError: vi.fn(),
+    getMenuBarIconError: vi.fn(() => null),
+    setMenuBarIconError: vi.fn(),
+    getWindowPreferenceError: vi.fn(() => null),
+    setWindowPreferenceError: vi.fn(),
   };
 }
 

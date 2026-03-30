@@ -99,6 +99,9 @@ export function mapBootstrapPayloadToState(payload: BootstrapPayload): Workspace
     alwaysOnTopEnabled: payload.alwaysOnTopEnabled,
     windowOpacityPercent: payload.windowOpacityPercent,
     globalToggleShortcut: payload.globalToggleShortcut,
+    globalShortcutError: payload.globalShortcutError,
+    menuBarIconError: payload.menuBarIconError,
+    windowPreferenceError: payload.windowPreferenceError,
   };
 }
 

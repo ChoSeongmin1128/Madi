@@ -68,6 +68,9 @@ export interface BootstrapPayload {
   alwaysOnTopEnabled: boolean;
   windowOpacityPercent: number;
   globalToggleShortcut: string | null;
+  globalShortcutError: string | null;
+  menuBarIconError: string | null;
+  windowPreferenceError: string | null;
 }
 
 export interface WindowControlRuntimeStateDto {

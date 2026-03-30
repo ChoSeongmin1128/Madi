@@ -53,6 +53,9 @@ export function applyBootstrapPayloadState(
   preferences.setAlwaysOnTopEnabled(payload.alwaysOnTopEnabled);
   preferences.setWindowOpacityPercent(payload.windowOpacityPercent);
   preferences.setGlobalToggleShortcut(payload.globalToggleShortcut);
+  preferences.setGlobalShortcutError(payload.globalShortcutError);
+  preferences.setMenuBarIconError(payload.menuBarIconError);
+  preferences.setWindowPreferenceError(payload.windowPreferenceError);
 
   const nextDocument = payload.currentDocument;
   if (currentDocumentStrategy === 'always') {

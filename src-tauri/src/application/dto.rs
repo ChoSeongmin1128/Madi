@@ -68,6 +68,9 @@ pub struct BootstrapPayload {
   pub always_on_top_enabled: bool,
   pub window_opacity_percent: u8,
   pub global_toggle_shortcut: Option<String>,
+  pub global_shortcut_error: Option<String>,
+  pub menu_bar_icon_error: Option<String>,
+  pub window_preference_error: Option<String>,
 }
 
 #[derive(Debug, Serialize)]

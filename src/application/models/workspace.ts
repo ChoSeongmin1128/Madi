@@ -24,6 +24,9 @@ export interface WorkspaceBootstrapState {
   alwaysOnTopEnabled: boolean;
   windowOpacityPercent: number;
   globalToggleShortcut: string | null;
+  globalShortcutError: string | null;
+  menuBarIconError: string | null;
+  windowPreferenceError: string | null;
 }
 
 export interface WindowControlRuntimeState {

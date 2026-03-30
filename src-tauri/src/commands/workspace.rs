@@ -2,13 +2,22 @@ use tauri::State;
 
 use crate::application::dto::{BootstrapPayload, DocumentDto, DocumentSummaryDto, SearchResultDto};
 use crate::application::services;
+use crate::error::AppError;
 use crate::state::AppState;
 
 use super::helpers::with_repository;
 
 #[tauri::command]
 pub fn bootstrap_app(state: State<'_, AppState>) -> Result<BootstrapPayload, String> {
-  with_repository(state, services::bootstrap_app)
+  let mut repository = state
+    .repository
+    .lock()
+    .map_err(|_| AppError::StateLock.to_string())?;
+  let mut payload = services::bootstrap_app(&mut *repository).map_err(|error| error.to_string())?;
+  payload.global_shortcut_error = state.global_shortcut_error();
+  payload.menu_bar_icon_error = state.menu_bar_icon_error();
+  payload.window_preference_error = state.window_preference_error();
+  Ok(payload)
 }
 
 #[tauri::command]
