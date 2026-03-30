@@ -21,8 +21,17 @@ pub(crate) fn toggle_main_window(app: &AppHandle) -> Result<(), String> {
   let is_visible = window.is_visible().map_err(|error| error.to_string())?;
   let is_minimized = window.is_minimized().map_err(|error| error.to_string())?;
   let is_focused = window.is_focused().map_err(|error| error.to_string())?;
+  let settings = app
+    .state::<AppState>()
+    .repository
+    .lock()
+    .map_err(|_| "설정 저장소를 잠글 수 없습니다.".to_string())?
+    .get_app_settings()
+    .map_err(|error| error.to_string())?;
 
-  if is_visible && !is_minimized && is_focused {
+  let should_hide_when_visible = is_focused || settings.always_on_top_enabled;
+
+  if is_visible && !is_minimized && should_hide_when_visible {
     window.hide().map_err(|error| error.to_string())?;
     return Ok(());
   }

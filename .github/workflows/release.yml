@@ -244,7 +244,7 @@ jobs:
           do
             DMG_PATH="dist/MinNote_${VERSION}_${ARCH}.dmg"
             xcrun stapler validate "$DMG_PATH"
-            spctl -a -vv -t open "$DMG_PATH"
+            spctl --assess --type open --context context:primary-signature --verbose=4 "$DMG_PATH"
           done
 
       - name: Upload DMG to release
