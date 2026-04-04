@@ -1,7 +1,8 @@
 import { MoonStar, MonitorCog, SunMedium, X } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { usePreferencesController, useWorkspaceController } from '../app/controllers';
 import { useEditorTypographyControl } from '../hooks/useEditorTypographyControl';
+import { useICloudSyncDebugInfo } from '../hooks/useICloudSyncDebugInfo';
 import { BLOCK_TINT_PRESETS } from '../lib/blockTint';
 import { DOCUMENT_SURFACE_TONE_PRESETS } from '../lib/documentSurfaceTone';
 import {
@@ -22,6 +23,7 @@ import { useWindowOpacityControl } from '../hooks/useWindowOpacityControl';
 import { useUpdaterStore } from '../stores/updaterStore';
 import { SettingsDangerZoneSection } from './settings/SettingsDangerZoneSection';
 import { SettingsFontSection } from './settings/SettingsFontSection';
+import { SettingsICloudSection } from './settings/SettingsICloudSection';
 import { SettingsThemeDefaultsSection } from './settings/SettingsThemeDefaultsSection';
 import { SettingsUpdateSection } from './settings/SettingsUpdateSection';
 import { SettingsWindowSection } from './settings/SettingsWindowSection';
@@ -67,7 +69,9 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     setGlobalToggleShortcut,
     setBodyFontFamily,
     setCodeFontFamily,
+    setICloudSyncEnabled,
     setMenuBarIconEnabled,
+    runICloudSync,
     setThemeMode,
   } = usePreferencesController();
   const { deleteAllDocuments } = useWorkspaceController();
@@ -83,6 +87,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const globalShortcutError = useWorkspaceStore((state) => state.globalShortcutError);
   const menuBarIconError = useWorkspaceStore((state) => state.menuBarIconError);
   const windowPreferenceError = useWorkspaceStore((state) => state.windowPreferenceError);
+  const icloudSyncStatus = useWorkspaceStore((state) => state.icloudSyncStatus);
   const appUpdateStatus = useUpdaterStore((state) => state.appUpdateStatus);
   const { draftOpacity, previewOpacity, commitOpacity } = useWindowOpacityControl();
   const {
@@ -93,7 +98,33 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     previewCodeFontSizePx,
     commitCodeFontSizePx,
   } = useEditorTypographyControl();
+  const {
+    debugInfo: icloudDebugInfo,
+    error: icloudDebugError,
+    isLoading: isIcloudDebugLoading,
+    refresh: refreshIcloudDebugInfo,
+  } = useICloudSyncDebugInfo(isOpen);
   const [isConfirmOpen, setConfirmOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.key !== 'Escape') {
+        return;
+      }
+
+      event.preventDefault();
+      onClose();
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
 
   if (!isOpen) {
     return null;
@@ -160,6 +191,22 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           onPreviewOpacity={previewOpacity}
           onCommitOpacity={commitOpacity}
           onGlobalToggleShortcutCommit={setGlobalToggleShortcut}
+        />
+
+        <SettingsICloudSection
+          status={icloudSyncStatus}
+          debugInfo={icloudDebugInfo}
+          debugError={icloudDebugError}
+          debugLoading={isIcloudDebugLoading}
+          onEnabledChange={(enabled) => {
+            void setICloudSyncEnabled(enabled);
+          }}
+          onRunSync={() => {
+            void runICloudSync();
+          }}
+          onRefreshDebug={() => {
+            void refreshIcloudDebugInfo();
+          }}
         />
 
         <SettingsUpdateSection appUpdateStatus={appUpdateStatus} />

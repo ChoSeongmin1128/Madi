@@ -1461,6 +1461,17 @@ button {
   gap: 12px;
 }
 
+.settings-modal-header {
+  position: sticky;
+  top: -20px;
+  z-index: 2;
+  margin: -20px -20px 0;
+  padding: 20px 20px 12px;
+  background:
+    linear-gradient(180deg, var(--panel-bg) 0%, var(--panel-bg) 82%, color-mix(in srgb, var(--panel-bg) 0%, transparent) 100%);
+  backdrop-filter: blur(10px);
+}
+
 .settings-title {
   margin: 0;
   font-size: 1.05rem;
@@ -1519,6 +1530,26 @@ button {
   font-weight: 600;
 }
 
+.settings-title-stack {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.settings-experimental-badge {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid color-mix(in srgb, CanvasText 10%, transparent);
+  border-radius: 999px;
+  padding: 2px 8px;
+  color: var(--text-tertiary);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
 .settings-toggle-row {
   display: flex;
   align-items: center;
@@ -1542,10 +1573,32 @@ button {
 
 .settings-range-group,
 .settings-shortcut-group,
-.settings-font-group {
+.settings-font-group,
+.settings-icloud-debug {
   display: flex;
   flex-direction: column;
   gap: 7px;
+}
+
+.settings-debug-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 12px;
+  border: 1px solid color-mix(in srgb, CanvasText 8%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg) 96%, var(--bg-muted) 4%);
+  padding: 10px 12px;
+  font-size: 0.8rem;
+}
+
+.settings-debug-grid span:nth-child(odd) {
+  color: var(--text-tertiary);
+}
+
+.settings-field-hint {
+  margin: 0;
+  color: var(--text-tertiary);
+  font-size: 0.8rem;
 }
 
 .opacity-slider {
