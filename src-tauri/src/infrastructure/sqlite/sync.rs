@@ -260,8 +260,9 @@ impl SqliteStore {
     bridge.ensure_zone(ICLOUD_ZONE_NAME)?;
 
     let current_state = self.read_cloudkit_state()?;
-    let changes = self.fetch_remote_changes_with_zone_retry(bridge, current_state.server_change_token)?;
+    let changes = self.fetch_remote_changes_with_zone_retry(bridge, current_state.server_change_token.clone())?;
     self.apply_remote_changes(&changes)?;
+    self.seed_cloud_from_local_if_needed(&current_state, &changes)?;
 
     let built = self.build_apply_operations()?;
     let mut apply_stats = ApplyResponseStats::default();
@@ -310,6 +311,18 @@ impl SqliteStore {
       }
       Err(error) => Err(error),
     }
+  }
+
+  fn seed_cloud_from_local_if_needed(
+    &mut self,
+    current_state: &StoredCloudKitState,
+    changes: &FetchChangesResponse,
+  ) -> Result<(), AppError> {
+    if current_state.server_change_token.is_some() || !changes.is_empty() {
+      return Ok(());
+    }
+
+    self.queue_all_active_documents_for_sync()
   }
 
   pub(crate) fn purge_expired_tombstones(&mut self, now_ms: i64) -> Result<(), AppError> {
@@ -390,6 +403,25 @@ impl SqliteStore {
         &block_id,
         SyncOutboxOp::DeleteSourceRecord,
       )?;
+    }
+
+    Ok(())
+  }
+
+  fn queue_all_active_documents_for_sync(&mut self) -> Result<(), AppError> {
+    let document_ids = self
+      .connection
+      .prepare(
+        "SELECT id
+         FROM documents
+         WHERE deleted_at IS NULL
+         ORDER BY updated_at DESC, id DESC",
+      )?
+      .query_map([], |row| row.get::<_, String>(0))?
+      .collect::<Result<Vec<_>, _>>()?;
+
+    for document_id in document_ids {
+      self.queue_document_snapshot(&document_id)?;
     }
 
     Ok(())
@@ -804,6 +836,7 @@ impl SqliteStore {
 
   fn apply_remote_changes(&mut self, changes: &FetchChangesResponse) -> Result<(), AppError> {
     let mut affected_documents = HashSet::new();
+    let mut next_temp_position = 1_000_000_000_i64;
 
     for document in &changes.documents {
       if self.apply_remote_document(document)? {
@@ -818,7 +851,7 @@ impl SqliteStore {
     }
 
     for block in &changes.blocks {
-      if self.apply_remote_block(block)? {
+      if self.apply_remote_block(block, &mut next_temp_position)? {
         affected_documents.insert(block.document_id.clone());
       }
     }
@@ -988,7 +1021,11 @@ impl SqliteStore {
     Ok(false)
   }
 
-  fn apply_remote_block(&mut self, remote: &BridgeBlockRecord) -> Result<bool, AppError> {
+  fn apply_remote_block(
+    &mut self,
+    remote: &BridgeBlockRecord,
+    next_temp_position: &mut i64,
+  ) -> Result<bool, AppError> {
     self.ensure_document_placeholder(&remote.document_id, remote.updated_at_ms, &remote.updated_by_device_id)?;
     let local = self.fetch_block(&remote.block_id).ok();
     let tombstone = self.read_tombstone(SyncEntityType::BlockTombstone, &remote.block_id)?;
@@ -1025,6 +1062,13 @@ impl SqliteStore {
       }
       BlockKind::Code | BlockKind::Text => remote.content.clone(),
     };
+
+    self.displace_conflicting_block_positions(
+      &remote.document_id,
+      remote.position,
+      &remote.block_id,
+      next_temp_position,
+    )?;
 
     if local.is_some() {
       self.connection.execute(
@@ -1089,6 +1133,37 @@ impl SqliteStore {
       Some(SyncOutboxOp::Upsert),
     )?;
     Ok(true)
+  }
+
+  fn displace_conflicting_block_positions(
+    &self,
+    document_id: &str,
+    target_position: i64,
+    keep_block_id: &str,
+    next_temp_position: &mut i64,
+  ) -> Result<(), AppError> {
+    let conflicting_ids = self
+      .connection
+      .prepare(
+        "SELECT id
+         FROM blocks
+         WHERE document_id = ?1
+           AND position = ?2
+           AND id != ?3
+         ORDER BY id ASC",
+      )?
+      .query_map(params![document_id, target_position, keep_block_id], |row| row.get::<_, String>(0))?
+      .collect::<Result<Vec<_>, _>>()?;
+
+    for block_id in conflicting_ids {
+      self.connection.execute(
+        "UPDATE blocks SET position = ?1 WHERE id = ?2",
+        params![*next_temp_position, block_id],
+      )?;
+      *next_temp_position += 1;
+    }
+
+    Ok(())
   }
 
   fn apply_remote_block_tombstone(
@@ -1264,6 +1339,15 @@ fn compare_logical_clock(
   }
 }
 
+impl FetchChangesResponse {
+  fn is_empty(&self) -> bool {
+    self.documents.is_empty()
+      && self.blocks.is_empty()
+      && self.document_tombstones.is_empty()
+      && self.block_tombstones.is_empty()
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use std::path::PathBuf;
@@ -1383,5 +1467,131 @@ mod tests {
       .last_error_message
       .as_deref()
       .is_some_and(|message| message.contains("2건")));
+  }
+
+  #[test]
+  fn applying_remote_block_reorder_avoids_position_uniqueness_conflicts() {
+    let mut store = test_store();
+    let document = store
+      .create_document(Some("재정렬 테스트".to_string()))
+      .expect("document should be created");
+    let blocks = store
+      .create_block_below(&document.id, None, BlockKind::Text)
+      .expect("second block should be created");
+    let blocks = store
+      .create_block_below(&document.id, Some(&blocks[1].id), BlockKind::Code)
+      .expect("third block should be created");
+
+    let original = blocks;
+    let reordered = vec![
+      original[2].clone(),
+      original[0].clone(),
+      original[1].clone(),
+    ];
+    let remote_updated_at = SqliteStore::now() + 10_000;
+
+    store
+      .apply_remote_changes(&FetchChangesResponse {
+        documents: vec![],
+        blocks: reordered
+          .iter()
+          .enumerate()
+          .map(|(position, block)| BridgeBlockRecord {
+            block_id: block.id.clone(),
+            document_id: document.id.clone(),
+            kind: block.kind.as_str().to_string(),
+            content: block.content.clone(),
+            language: block.language.clone(),
+            position: position as i64,
+            updated_at_ms: remote_updated_at + position as i64,
+            updated_by_device_id: "remote-device".to_string(),
+          })
+          .collect(),
+        document_tombstones: vec![],
+        block_tombstones: vec![],
+        next_server_change_token: None,
+      })
+      .expect("remote reorder should apply");
+
+    let final_blocks = store.list_blocks(&document.id).expect("blocks should load");
+    let final_ids = final_blocks.iter().map(|block| block.id.as_str()).collect::<Vec<_>>();
+    let final_positions = final_blocks.iter().map(|block| block.position).collect::<Vec<_>>();
+
+    assert_eq!(
+      final_ids,
+      reordered.iter().map(|block| block.id.as_str()).collect::<Vec<_>>()
+    );
+    assert_eq!(final_positions, vec![0, 1, 2]);
+  }
+
+  #[test]
+  fn first_sync_with_empty_cloud_backfills_all_local_documents() {
+    let mut store = test_store();
+    let first = store
+      .create_document(Some("첫 문서".to_string()))
+      .expect("first document should be created");
+    let second = store
+      .create_document(Some("둘째 문서".to_string()))
+      .expect("second document should be created");
+
+    store
+      .connection
+      .execute("DELETE FROM sync_outbox", [])
+      .expect("outbox should clear");
+
+    let state = store.read_cloudkit_state().expect("state should load");
+    store
+      .seed_cloud_from_local_if_needed(
+        &state,
+        &FetchChangesResponse {
+          documents: vec![],
+          blocks: vec![],
+          document_tombstones: vec![],
+          block_tombstones: vec![],
+          next_server_change_token: None,
+        },
+      )
+      .expect("backfill should queue local documents");
+
+    let outbox = store.list_outbox().expect("outbox should load");
+    assert!(outbox.iter().any(|entry| entry.entity_id == first.id));
+    assert!(outbox.iter().any(|entry| entry.entity_id == second.id));
+  }
+
+  #[test]
+  fn first_sync_with_remote_records_skips_local_backfill() {
+    let mut store = test_store();
+    let local = store
+      .create_document(Some("로컬 문서".to_string()))
+      .expect("local document should be created");
+
+    store
+      .connection
+      .execute("DELETE FROM sync_outbox", [])
+      .expect("outbox should clear");
+
+    let state = store.read_cloudkit_state().expect("state should load");
+    store
+      .seed_cloud_from_local_if_needed(
+        &state,
+        &FetchChangesResponse {
+          documents: vec![BridgeDocumentRecord {
+            document_id: "remote-doc".to_string(),
+            title: "원격 문서".to_string(),
+            block_tint_override: None,
+            document_surface_tone_override: None,
+            updated_at_ms: SqliteStore::now(),
+            updated_by_device_id: "remote-device".to_string(),
+          }],
+          blocks: vec![],
+          document_tombstones: vec![],
+          block_tombstones: vec![],
+          next_server_change_token: None,
+        },
+      )
+      .expect("remote-first sync should skip backfill");
+
+    let outbox = store.list_outbox().expect("outbox should load");
+    assert!(!outbox.iter().any(|entry| entry.entity_id == local.id));
   }
 }
