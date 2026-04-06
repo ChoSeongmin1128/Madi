@@ -112,7 +112,13 @@ export interface ICloudSyncDebugInfoDto {
   zoneName: string;
   serverChangeTokenPresent: boolean;
   pendingOperationCount: number;
+  processingOperationCount: number;
+  failedOperationCount: number;
+  coalescedIntentCount: number;
   tombstoneCount: number;
+  runtimePhase: string;
+  backoffAttempt: number;
+  nextRetryAtMs: number | null;
   deviceIdSuffix: string;
 }
 

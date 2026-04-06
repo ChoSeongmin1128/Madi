@@ -33,6 +33,18 @@ function formatTimestamp(value: number | null) {
   }).format(new Date(value))}`;
 }
 
+function formatDebugTimestamp(value: number | null) {
+  if (!value) {
+    return '-';
+  }
+
+  return new Intl.DateTimeFormat('ko-KR', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).format(new Date(value));
+}
+
 function getPresentation(status: ICloudSyncStatus): ICloudPresentation {
   if (!status.enabled) {
     return {
@@ -199,10 +211,22 @@ export function SettingsICloudSection({
                   <span>{debugInfo.zoneName}</span>
                   <span>Token</span>
                   <span>{debugInfo.serverChangeTokenPresent ? '있음' : '없음'}</span>
-                  <span>Pending</span>
+                  <span>Raw Pending</span>
                   <span>{debugInfo.pendingOperationCount}</span>
+                  <span>Processing</span>
+                  <span>{debugInfo.processingOperationCount}</span>
+                  <span>Failed</span>
+                  <span>{debugInfo.failedOperationCount}</span>
+                  <span>Intents</span>
+                  <span>{debugInfo.coalescedIntentCount}</span>
                   <span>Tombstones</span>
                   <span>{debugInfo.tombstoneCount}</span>
+                  <span>Runtime</span>
+                  <span>{debugInfo.runtimePhase}</span>
+                  <span>Backoff</span>
+                  <span>{debugInfo.backoffAttempt}</span>
+                  <span>Next Retry</span>
+                  <span>{formatDebugTimestamp(debugInfo.nextRetryAtMs)}</span>
                   <span>Device</span>
                   <span>{debugInfo.deviceIdSuffix}</span>
                 </div>
