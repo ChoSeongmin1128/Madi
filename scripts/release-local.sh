@@ -138,6 +138,7 @@ for TARGET in "${TARGETS[@]}"; do
 
   APP_PATH="$ROOT_DIR/src-tauri/target/$TARGET/release/bundle/macos/MinNote.app"
   DIST_DIR="$RELEASE_DIR/dist/$ARCH_LABEL"
+  APP_ZIP_PATH="$RELEASE_DIR/MinNote_${ARCH_LABEL}.app.zip"
 
   if [ -n "$APPLE_PROVISIONING_PROFILE_RESOLVED" ]; then
     cp "$APPLE_PROVISIONING_PROFILE_RESOLVED" "$APP_PATH/Contents/embedded.provisionprofile"
@@ -145,6 +146,14 @@ for TARGET in "${TARGETS[@]}"; do
   sign_helper_app "$APP_PATH"
   codesign --force --sign "$APPLE_SIGNING_IDENTITY_REF" --options runtime --entitlements "$APP_ENTITLEMENTS_PATH" "$APP_PATH/Contents/MacOS/minnote"
   codesign --force --sign "$APPLE_SIGNING_IDENTITY_REF" --options runtime --entitlements "$APP_ENTITLEMENTS_PATH" "$APP_PATH"
+  rm -f "$APP_ZIP_PATH"
+  ditto -c -k --keepParent --sequesterRsrc "$APP_PATH" "$APP_ZIP_PATH"
+  xcrun notarytool submit "$APP_ZIP_PATH" \
+    --apple-id "$APPLE_ID" \
+    --password "$APPLE_PASSWORD" \
+    --team-id "$APPLE_TEAM_ID" \
+    --wait
+  xcrun stapler staple "$APP_PATH"
   codesign --verify --deep --strict --verbose=2 "$APP_PATH"
   xcrun stapler validate "$APP_PATH"
   spctl -a -vv -t exec "$APP_PATH"
