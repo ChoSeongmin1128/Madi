@@ -323,6 +323,26 @@ fn block_tombstone_record_name_for(tombstone: &BridgeBlockTombstoneRecord) -> St
 }
 
 impl SqliteStore {
+    fn local_active_document_wins_against_remote_tombstone(
+        &self,
+        remote: &BridgeDocumentTombstoneRecord,
+    ) -> Result<bool, AppError> {
+        let Some(local) = self.get_document(&remote.document_id)? else {
+            return Ok(false);
+        };
+
+        if local.deleted_at.is_some() {
+            return Ok(false);
+        }
+
+        Ok(compare_logical_clock(
+            local.updated_at,
+            local.updated_by_device_id.as_deref().unwrap_or(""),
+            remote.deleted_at_ms,
+            &remote.deleted_by_device_id,
+        ) > 0)
+    }
+
     pub(crate) fn begin_icloud_sync_run(&mut self) -> Result<SyncRunPreparation, AppError> {
         self.cleanup_orphaned_sync_operations()?;
         self.connection.execute(
@@ -2313,6 +2333,15 @@ impl SqliteStore {
         let mut next_temp_position = 1_000_000_000_i64;
         let mut documents_changed = false;
         let mut trash_changed = false;
+        let document_tombstone_local_wins = changes
+            .document_tombstones
+            .iter()
+            .filter_map(|tombstone| {
+                self.local_active_document_wins_against_remote_tombstone(tombstone)
+                    .ok()
+                    .and_then(|wins| wins.then_some(tombstone.document_id.clone()))
+            })
+            .collect::<HashSet<_>>();
 
         for document in &changes.documents {
             let was_trashed = self
@@ -2334,6 +2363,10 @@ impl SqliteStore {
         }
 
         for block in &changes.blocks {
+            if document_tombstone_local_wins.contains(&block.document_id) {
+                self.enqueue_document_projection_operations(&block.document_id)?;
+                continue;
+            }
             if self.apply_remote_block(block, &mut next_temp_position)? {
                 affected_documents.insert(block.document_id.clone());
                 documents_changed = true;
@@ -2341,6 +2374,10 @@ impl SqliteStore {
         }
 
         for tombstone in &changes.block_tombstones {
+            if document_tombstone_local_wins.contains(&tombstone.document_id) {
+                self.enqueue_document_projection_operations(&tombstone.document_id)?;
+                continue;
+            }
             if self.apply_remote_block_tombstone(tombstone)? {
                 affected_documents.insert(tombstone.document_id.clone());
                 documents_changed = true;
@@ -2700,6 +2737,22 @@ impl SqliteStore {
         &mut self,
         remote: &BridgeBlockTombstoneRecord,
     ) -> Result<bool, AppError> {
+        if self
+            .get_document(&remote.document_id)?
+            .is_some_and(|document| document.deleted_at.is_some())
+        {
+            self.upsert_tombstone(
+                SyncEntityType::BlockTombstone,
+                &remote.block_id,
+                Some(&remote.document_id),
+                remote.deleted_at_ms,
+                &remote.deleted_by_device_id,
+            )?;
+            self.discard_pending_operations(SyncEntityType::Block, &remote.block_id)?;
+            self.discard_pending_operations(SyncEntityType::BlockTombstone, &remote.block_id)?;
+            return Ok(false);
+        }
+
         let local = self.fetch_block(&remote.block_id).ok();
         let local_tombstone =
             self.read_tombstone(SyncEntityType::BlockTombstone, &remote.block_id)?;
@@ -3286,6 +3339,61 @@ mod tests {
         assert!(summary.documents_changed);
         assert!(summary.trash_changed);
         assert_eq!(summary.affected_document_ids, vec![document.id]);
+    }
+
+    #[test]
+    fn document_tombstone_local_win_does_not_allow_child_block_tombstones_to_strip_active_document() {
+        let mut store = test_store();
+        let document = store
+            .create_document(Some("문서 tombstone 우선".to_string()))
+            .expect("document should be created");
+        let block_id = store
+            .list_blocks(&document.id)
+            .expect("blocks should load")
+            .first()
+            .expect("initial block should exist")
+            .id
+            .clone();
+
+        store
+            .update_markdown_block(&block_id, "로컬 최신".to_string())
+            .expect("local block update should succeed");
+        let local_document = store
+            .get_document(&document.id)
+            .expect("document should load")
+            .expect("document should exist");
+        let remote_deleted_at = local_document.updated_at - 1;
+
+        let summary = store
+            .apply_remote_changes(&FetchChangesResponse {
+                documents: vec![],
+                blocks: vec![],
+                document_tombstones: vec![BridgeDocumentTombstoneRecord {
+                    document_id: document.id.clone(),
+                    deleted_at_ms: remote_deleted_at,
+                    deleted_by_device_id: "remote-device".to_string(),
+                }],
+                block_tombstones: vec![BridgeBlockTombstoneRecord {
+                    block_id: block_id.clone(),
+                    document_id: document.id.clone(),
+                    deleted_at_ms: remote_deleted_at,
+                    deleted_by_device_id: "remote-device".to_string(),
+                }],
+                next_server_change_token: None,
+            })
+            .expect("remote tombstones should apply without stripping active document");
+
+        let local_after = store
+            .get_document(&document.id)
+            .expect("document should load")
+            .expect("document should still exist");
+        let block_after = store
+            .fetch_block(&block_id)
+            .expect("block should still exist because local document won");
+
+        assert!(local_after.deleted_at.is_none());
+        assert_eq!(block_after.id, block_id);
+        assert!(!summary.documents_changed);
     }
 
     #[test]

@@ -1,9 +1,10 @@
-use tauri::State;
+use tauri::{AppHandle, State};
 
 use crate::app_runtime::sync_menu_bar_icon_runtime_state;
 use crate::application::services;
 use crate::domain::models::AppSettings;
 use crate::error::AppError;
+use crate::infrastructure::sync_engine::SyncEngine;
 use crate::ports::repositories::AppRepository;
 use crate::state::AppState;
 use crate::window_controls::{apply_window_preferences_with_settings, update_global_shortcut_registration};
@@ -103,4 +104,12 @@ pub(super) fn persist_menu_bar_icon_setting(
       Err(error)
     }
   }
+}
+
+pub(super) fn schedule_sync_after_mutation(
+  state: &State<'_, AppState>,
+  app_handle: &AppHandle,
+) {
+  state.schedule_sync(false);
+  SyncEngine::emit_current_status(app_handle, state.inner());
 }

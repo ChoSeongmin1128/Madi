@@ -2,6 +2,7 @@ import {
   reorderDocumentBlocks,
   replaceBlockInDocument,
   type BlockVm,
+  type DocumentVm,
 } from '../../models/document';
 import type { BlockKind } from '../../../lib/types';
 import type { CodeLanguageId } from '../../../lib/codeLanguageRegistry';
@@ -10,6 +11,26 @@ import { setDocumentWithFocus, updateDocumentState } from '../shared/documentSta
 import { executeWithErrorHandling, normalizeErrorMessage } from '../shared/errors';
 import { findEditableBlock, queueAndApplyBlockUpdate } from './shared';
 import type { BlockUseCaseDeps } from './types';
+
+function removeBlockFromDocument(
+  document: DocumentVm,
+  blockId: string,
+  updatedAt: number,
+): DocumentVm {
+  const blocks = document.blocks
+    .filter((block) => block.id !== blockId)
+    .map((block, index) => ({
+      ...block,
+      position: index,
+    }));
+
+  return {
+    ...document,
+    updatedAt,
+    blockCount: blocks.length,
+    blocks,
+  };
+}
 
 async function clearBlockContent(
   backend: BlockUseCaseDeps['backend'],
@@ -125,17 +146,38 @@ export function createBlockEditingActions({
       const currentDocument = session.getCurrentDocument();
       if (!currentDocument || currentDocument.blocks.length <= 1) return;
 
-      const deletedIndex = currentDocument.blocks.findIndex((block) => block.id === blockId);
-      const previousBlock = deletedIndex > 0 ? currentDocument.blocks[deletedIndex - 1] : null;
-      const nextBlock = deletedIndex >= 0 ? currentDocument.blocks[deletedIndex + 1] ?? null : null;
+      await flushCurrentDocument();
 
-      editorPersistence.clearBlock(currentDocument.id, blockId);
-      const nextDocument = await backend.deleteBlock(blockId);
+      const latestDocument = session.getCurrentDocument();
+      if (!latestDocument || latestDocument.blocks.length <= 1) return;
+
+      const deletedIndex = latestDocument.blocks.findIndex((block) => block.id === blockId);
+      const previousBlock = deletedIndex > 0 ? latestDocument.blocks[deletedIndex - 1] : null;
+      const nextBlock = deletedIndex >= 0 ? latestDocument.blocks[deletedIndex + 1] ?? null : null;
+      const focusTarget = previousBlock?.id ?? nextBlock?.id ?? null;
+      const optimisticDocument = removeBlockFromDocument(latestDocument, blockId, Date.now());
+
+      setDocumentWithFocus(
+        session,
+        workspace,
+        optimisticDocument,
+        focusTarget,
+        previousBlock ? 'end' : 'start',
+        { persisted: false },
+      );
+
+      editorPersistence.clearBlock(latestDocument.id, blockId);
+      let nextDocument;
+      try {
+        nextDocument = await backend.deleteBlock(blockId);
+      } catch (error) {
+        setDocumentWithFocus(session, workspace, latestDocument, blockId, 'start');
+        throw error;
+      }
       workspace.clearError();
       session.markLocalMutation(nextDocument.updatedAt);
       updateDocumentState(session, workspace, nextDocument);
 
-      const focusTarget = previousBlock?.id ?? nextBlock?.id;
       if (focusTarget) {
         session.requestBlockFocus(focusTarget, previousBlock ? 'end' : 'start');
       }

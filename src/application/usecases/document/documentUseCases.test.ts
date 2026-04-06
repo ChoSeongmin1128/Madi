@@ -65,6 +65,31 @@ function createSessionGateway(currentDocument: DocumentVm | null = null) {
   };
 }
 
+function createCurrentDocument(): DocumentVm {
+  return {
+    id: 'doc-1',
+    title: null,
+    blockTintOverride: null,
+    documentSurfaceToneOverride: null,
+    preview: '',
+    updatedAt: 1,
+    lastOpenedAt: 1,
+    blockCount: 1,
+    blocks: [
+      {
+        id: 'block-1',
+        documentId: 'doc-1',
+        kind: 'markdown',
+        position: 0,
+        content: '',
+        language: null,
+        createdAt: 1,
+        updatedAt: 1,
+      },
+    ],
+  };
+}
+
 function createWorkspaceGateway() {
   return {
     setDocuments: vi.fn(),
@@ -147,6 +172,39 @@ describe('document usecases', () => {
     expect(preferences.setDefaultBlockKind).toHaveBeenCalledWith('code');
     expect(preferences.setDefaultDocumentSurfaceTonePreset).toHaveBeenCalledWith('default');
     expect(ui.setSettingsOpen).toHaveBeenCalledWith(false);
+  });
+
+  it('flushes the current document before deleting a document', async () => {
+    const currentDocument = createCurrentDocument();
+    const workspace = createWorkspaceGateway();
+    const preferences = createPreferencesGateway();
+    const session = createSessionGateway(currentDocument);
+    const backendDeleteDocument = vi.fn(async () => createPayload('code'));
+    const editorPersistence = {
+      clearDocument: vi.fn(),
+      flushDocument: vi.fn(async () => null),
+      clearAll: vi.fn(),
+    };
+    const ui = createUiGateway();
+    const useCases = createDocumentUseCases({
+      backend: {
+        deleteDocument: backendDeleteDocument,
+      } as never,
+      editorPersistence: editorPersistence as never,
+      history: { clear: vi.fn() } as never,
+      preferences: preferences as never,
+      session,
+      ui: ui as never,
+      workspace,
+    });
+
+    await useCases.deleteDocument('doc-1');
+
+    expect(editorPersistence.flushDocument).toHaveBeenCalledWith('doc-1');
+    expect(editorPersistence.clearDocument).toHaveBeenCalledWith('doc-1');
+    expect(editorPersistence.flushDocument.mock.invocationCallOrder[0]).toBeLessThan(
+      backendDeleteDocument.mock.invocationCallOrder[0],
+    );
   });
 
   it('keeps current document while still syncing default block kind during restore', async () => {

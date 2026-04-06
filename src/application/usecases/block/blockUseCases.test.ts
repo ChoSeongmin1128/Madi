@@ -27,6 +27,35 @@ function createCurrentDocument(): DocumentVm {
   };
 }
 
+function createDocumentWithTwoBlocks(): DocumentVm {
+  return {
+    ...createCurrentDocument(),
+    blockCount: 2,
+    blocks: [
+      {
+        id: 'block-1',
+        documentId: 'doc-1',
+        kind: 'markdown',
+        position: 0,
+        content: '첫 블록',
+        language: null,
+        createdAt: 100,
+        updatedAt: 100,
+      },
+      {
+        id: 'block-2',
+        documentId: 'doc-1',
+        kind: 'text',
+        position: 1,
+        content: '둘째 블록',
+        language: null,
+        createdAt: 100,
+        updatedAt: 100,
+      },
+    ],
+  };
+}
+
 describe('block usecases', () => {
   it('normalizes null code language to plaintext when queueing a save', () => {
     const currentDocument = createCurrentDocument();
@@ -83,5 +112,68 @@ describe('block usecases', () => {
     ]);
     expect(session.setCurrentDocumentState).toHaveBeenCalled();
     expect(workspace.upsertDocumentSummary).toHaveBeenCalled();
+  });
+
+  it('flushes the current document before deleting a single block', async () => {
+    const currentDocument = createDocumentWithTwoBlocks();
+    const flushCurrentDocument = vi.fn(async () => {});
+    const backendDeleteBlock = vi.fn(async () => ({
+      ...currentDocument,
+      blockCount: 1,
+      blocks: [currentDocument.blocks[1]],
+    }));
+    const session = {
+      getCurrentDocument: vi.fn(() => currentDocument),
+      getSelectionState: vi.fn(() => ({
+        selectedBlockId: null,
+        selectedBlockIds: [],
+        blockSelected: false,
+        allBlocksSelected: false,
+      })),
+      setCurrentDocument: vi.fn(),
+      setCurrentDocumentState: vi.fn(),
+      setDocumentWithFocus: vi.fn(),
+      clearBlockSelection: vi.fn(),
+      requestBlockFocus: vi.fn(),
+      clearActiveEditorRef: vi.fn(),
+      setIsFlushing: vi.fn(),
+      startSaving: vi.fn(),
+      finishSaving: vi.fn(),
+      setLastSavedAt: vi.fn(),
+      setSaveError: vi.fn(),
+      markLocalMutation: vi.fn(),
+    };
+    const workspace = {
+      upsertDocumentSummary: vi.fn(),
+      clearError: vi.fn(),
+      setError: vi.fn(),
+      setSyncNotice: vi.fn(),
+    };
+    const editorPersistence = {
+      queueBlockSave: vi.fn(),
+      flushDocument: vi.fn(),
+      clearDocument: vi.fn(),
+      clearAll: vi.fn(),
+      clearBlock: vi.fn(),
+      setErrorHandler: vi.fn(),
+    };
+    const useCases = createBlockUseCases({
+      backend: {
+        deleteBlock: backendDeleteBlock,
+      } as never,
+      clipboard: {} as never,
+      editorPersistence: editorPersistence as never,
+      flushCurrentDocument,
+      history: { pushUndo: vi.fn() } as never,
+      session: session as never,
+      workspace: workspace as never,
+    });
+
+    await useCases.deleteBlock('block-1');
+
+    expect(flushCurrentDocument.mock.invocationCallOrder[0]).toBeLessThan(
+      backendDeleteBlock.mock.invocationCallOrder[0],
+    );
+    expect(editorPersistence.clearBlock).toHaveBeenCalledWith('doc-1', 'block-1');
   });
 });

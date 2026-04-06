@@ -108,9 +108,14 @@ export function createDocumentUseCases({
 
   async function deleteDocument(documentId: string) {
     try {
+      const currentDocument = session.getCurrentDocument();
+      if (currentDocument) {
+        await flushCurrentDocument();
+      }
+
+      editorPersistence.clearDocument(documentId);
       const payload = await backend.deleteDocument(documentId);
       workspace.clearError();
-      editorPersistence.clearDocument(documentId);
       applyBootstrapPayloadState(preferences, workspace, session, payload, 'always');
       session.markLocalMutation();
       ui.setSettingsOpen(false);
