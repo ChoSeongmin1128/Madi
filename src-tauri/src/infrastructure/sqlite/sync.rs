@@ -264,6 +264,7 @@ struct ApplyResponseStats {
 
 impl SqliteStore {
     pub(crate) fn begin_icloud_sync_run(&mut self) -> Result<SyncRunPreparation, AppError> {
+        self.cleanup_orphaned_sync_operations()?;
         self.connection.execute(
             "DELETE FROM sync_operations WHERE status = 'superseded'",
             [],
@@ -465,6 +466,13 @@ impl SqliteStore {
                     .read_tombstone(SyncEntityType::BlockTombstone, &entity_id)?
                     .and_then(|row| row.parent_document_id),
             };
+            if matches!(
+                entity_type,
+                SyncEntityType::DocumentTombstone | SyncEntityType::BlockTombstone
+            ) && document_id.is_none()
+            {
+                continue;
+            }
             self.connection.execute(
                 "INSERT INTO sync_operations (
            operation_type,
@@ -498,6 +506,49 @@ impl SqliteStore {
         }
 
         self.connection.execute("DELETE FROM sync_outbox", [])?;
+        Ok(())
+    }
+
+    pub(crate) fn cleanup_orphaned_sync_operations(&self) -> Result<(), AppError> {
+        let operations = self.list_sync_operations_with_statuses(&["pending", "processing", "failed"])?;
+        let mut delete_ids = Vec::new();
+
+        for operation in operations {
+            let is_orphaned = match operation.entity_type {
+                SyncEntityType::DocumentTombstone => self
+                    .read_tombstone(SyncEntityType::DocumentTombstone, &operation.entity_id)?
+                    .is_none(),
+                SyncEntityType::BlockTombstone => self
+                    .read_tombstone(SyncEntityType::BlockTombstone, &operation.entity_id)?
+                    .is_none(),
+                SyncEntityType::Document => {
+                    self.get_document(&operation.entity_id)?.is_none()
+                        && !matches!(operation.operation_type, SyncOperationType::DocumentDeleted)
+                }
+                SyncEntityType::Block => {
+                    self.fetch_block(&operation.entity_id).is_err()
+                        && !matches!(operation.operation_type, SyncOperationType::BlockDeleted)
+                }
+            };
+
+            let migrated_legacy = operation
+                .payload_json
+                .get("migratedFrom")
+                .and_then(Value::as_str)
+                == Some("sync_outbox");
+
+            if is_orphaned || (migrated_legacy && operation.document_id.is_none()) {
+                delete_ids.push(operation.id);
+            }
+        }
+
+        for operation_id in delete_ids {
+            self.connection.execute(
+                "DELETE FROM sync_operations WHERE id = ?1",
+                params![operation_id],
+            )?;
+        }
+
         Ok(())
     }
 
@@ -2862,5 +2913,47 @@ mod tests {
 
         assert_eq!(built.request.save_blocks.len(), 2);
         assert_eq!(built.coalesced_intent_count(), 1);
+    }
+
+    #[test]
+    fn cleanup_orphaned_legacy_tombstone_operations_removes_pending_rows() {
+        let store = test_store();
+        store
+            .connection
+            .execute(
+                "INSERT INTO sync_operations (
+                   operation_type,
+                   entity_type,
+                   entity_id,
+                   document_id,
+                   payload_json,
+                   logical_clock,
+                   created_at_ms,
+                   attempt_count,
+                   last_error_code,
+                   status
+                 ) VALUES (?1, ?2, ?3, NULL, ?4, ?5, ?5, 0, NULL, 'pending')",
+                params![
+                    SyncOperationType::BlockDeleted.as_str(),
+                    SyncEntityType::BlockTombstone.as_str(),
+                    "orphan-block-id",
+                    json!({ "migratedFrom": "sync_outbox", "legacyOp": "upsert" }).to_string(),
+                    SqliteStore::now(),
+                ],
+            )
+            .expect("legacy orphan row should insert");
+
+        store
+            .cleanup_orphaned_sync_operations()
+            .expect("orphan cleanup should succeed");
+
+        let count = store
+            .connection
+            .query_row("SELECT COUNT(*) FROM sync_operations", [], |row| {
+                row.get::<_, i64>(0)
+            })
+            .expect("operation count should load");
+
+        assert_eq!(count, 0);
     }
 }

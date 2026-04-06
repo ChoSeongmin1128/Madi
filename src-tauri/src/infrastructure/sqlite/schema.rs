@@ -121,6 +121,7 @@ impl SqliteStore {
     self.ensure_device_state_row()?;
     self.ensure_sync_operations_defaults()?;
     self.migrate_legacy_sync_outbox_to_operations()?;
+    self.cleanup_orphaned_sync_operations()?;
     self.cleanup_removed_sync_state()?;
 
     Ok(())
