@@ -6,11 +6,64 @@ on:
       - 'v*'
 
 jobs:
-  release_app:
+  release_preflight:
+    runs-on: macos-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate hosted release secrets
+        env:
+          APPLE_PROVISIONING_PROFILE_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE_BASE64 }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          [ -n "${APPLE_PROVISIONING_PROFILE_BASE64:-}" ] || { echo "APPLE_PROVISIONING_PROFILE_BASE64 secret is required."; exit 1; }
+          [ -n "${TAURI_SIGNING_PRIVATE_KEY:-}" ] || { echo "TAURI_SIGNING_PRIVATE_KEY secret is required."; exit 1; }
+          [ -n "${TAURI_SIGNING_PRIVATE_KEY_PASSWORD:-}" ] || { echo "TAURI_SIGNING_PRIVATE_KEY_PASSWORD secret is required."; exit 1; }
+
+      - name: Decode and validate provisioning profile
+        env:
+          APPLE_PROVISIONING_PROFILE_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          PROFILE_PATH="$RUNNER_TEMP/minnote-cloudkit.provisionprofile"
+          printf '%s' "$APPLE_PROVISIONING_PROFILE_BASE64" | base64 --decode > "$PROFILE_PATH"
+          PROFILE_PLIST="$RUNNER_TEMP/minnote-cloudkit.plist"
+          security cms -D -i "$PROFILE_PATH" > "$PROFILE_PLIST"
+          /usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.aps-environment" "$PROFILE_PLIST" >/dev/null
+          /usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.icloud-services:0" "$PROFILE_PLIST" >/dev/null
+          [ -x ./scripts/package-notarized-app.sh ] || { echo "scripts/package-notarized-app.sh must be executable."; exit 1; }
+          [ -x ./scripts/package-notarized-dmg.sh ] || { echo "scripts/package-notarized-dmg.sh must be executable."; exit 1; }
+
+      - name: Import Apple certificate
+        uses: apple-actions/import-codesign-certs@v6
+        with:
+          p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
+          p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+
+      - name: Resolve codesign identity fingerprint
+        env:
+          APPLE_SIGNING_IDENTITY: "Developer ID Application: SEONGMIN CHO (5YG4V2PLZV)"
+        run: |
+          APPLE_SIGNING_IDENTITY_REF="$(security find-identity -v -p codesigning | grep "\"$APPLE_SIGNING_IDENTITY\"" | awk 'NR == 1 { print $2 }')"
+          [ -n "$APPLE_SIGNING_IDENTITY_REF" ] || { echo "Unable to resolve codesigning identity fingerprint for $APPLE_SIGNING_IDENTITY"; exit 1; }
+
+  release_app_matrix:
+    needs: release_preflight
     runs-on: macos-latest
     timeout-minutes: 30
     permissions:
-      contents: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: aarch64-apple-darwin
+            arch_label: aarch64
+          - target: x86_64-apple-darwin
+            arch_label: x86_64
     steps:
       - uses: actions/checkout@v4
 
@@ -34,95 +87,89 @@ jobs:
           p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
           p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
 
-      - name: Build, sign, notarize, and package app bundles
+      - name: Resolve signing identity and provisioning profile
         env:
-          CI: true
+          APPLE_SIGNING_IDENTITY: "Developer ID Application: SEONGMIN CHO (5YG4V2PLZV)"
+          APPLE_PROVISIONING_PROFILE_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE_BASE64 }}
+        run: |
+          APPLE_SIGNING_IDENTITY_REF="$(security find-identity -v -p codesigning | grep "\"$APPLE_SIGNING_IDENTITY\"" | awk 'NR == 1 { print $2 }')"
+          [ -n "$APPLE_SIGNING_IDENTITY_REF" ] || { echo "Unable to resolve codesigning identity fingerprint for $APPLE_SIGNING_IDENTITY"; exit 1; }
+          echo "APPLE_SIGNING_IDENTITY_REF=$APPLE_SIGNING_IDENTITY_REF" >> "$GITHUB_ENV"
+          PROFILE_PATH="$RUNNER_TEMP/minnote-cloudkit.provisionprofile"
+          printf '%s' "$APPLE_PROVISIONING_PROFILE_BASE64" | base64 --decode > "$PROFILE_PATH"
+          echo "PROFILE_PATH=$PROFILE_PATH" >> "$GITHUB_ENV"
+          echo "TARGET=${{ matrix.target }}" >> "$GITHUB_ENV"
+          echo "ARCH_LABEL=${{ matrix.arch_label }}" >> "$GITHUB_ENV"
+
+      - name: Build app bundle
+        run: ./scripts/package-notarized-app.sh build "$TARGET"
+
+      - name: Embed provisioning profile
+        run: ./scripts/package-notarized-app.sh embed-profile "$TARGET" "$PROFILE_PATH"
+
+      - name: Sign helper bundle
+        env:
+          APPLE_SIGNING_IDENTITY_REF: ${{ env.APPLE_SIGNING_IDENTITY_REF }}
+        run: ./scripts/package-notarized-app.sh sign-helper "$TARGET"
+
+      - name: Sign app bundle
+        env:
+          APPLE_SIGNING_IDENTITY_REF: ${{ env.APPLE_SIGNING_IDENTITY_REF }}
+        run: ./scripts/package-notarized-app.sh sign-app "$TARGET"
+
+      - name: Zip app for notarization
+        run: |
+          APP_ZIP_PATH="$(./scripts/package-notarized-app.sh zip-for-notarization "$TARGET" "$ARCH_LABEL" "$PWD")"
+          echo "APP_ZIP_PATH=$APP_ZIP_PATH" >> "$GITHUB_ENV"
+
+      - name: Submit app for notarization
+        env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-          APPLE_SIGNING_IDENTITY: "Developer ID Application: SEONGMIN CHO (5YG4V2PLZV)"
-          APPLE_PROVISIONING_PROFILE_BASE64: ${{ secrets.APPLE_PROVISIONING_PROFILE_BASE64 }}
+        run: ./scripts/package-notarized-app.sh notarize "$APP_ZIP_PATH"
+
+      - name: Staple and verify app
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: ./scripts/package-notarized-app.sh staple-and-verify "$TARGET"
+
+      - name: Package updater artifacts
+        env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: |
-          unset TAURI_SIGNING_PRIVATE_KEY_PATH
-          APP_ENTITLEMENTS_PATH="src-tauri/Entitlements.plist"
-          HELPER_ENTITLEMENTS_PATH="src-tauri/Entitlements.Helper.plist"
-          APPLE_SIGNING_IDENTITY_REF="$(security find-identity -v -p codesigning | grep "\"$APPLE_SIGNING_IDENTITY\"" | awk 'NR == 1 { print $2 }')"
-          if [ -z "$APPLE_SIGNING_IDENTITY_REF" ]; then
-            echo "Unable to resolve codesigning identity fingerprint for $APPLE_SIGNING_IDENTITY"
-            exit 1
-          fi
-          if [ -z "${APPLE_PROVISIONING_PROFILE_BASE64:-}" ]; then
-            echo "APPLE_PROVISIONING_PROFILE_BASE64 secret is required for CloudKit-enabled release builds."
-            exit 1
-          fi
-          PROFILE_PATH="$RUNNER_TEMP/minnote-cloudkit.provisionprofile"
-          printf '%s' "$APPLE_PROVISIONING_PROFILE_BASE64" | base64 --decode > "$PROFILE_PATH"
-
-          for TARGET in aarch64-apple-darwin x86_64-apple-darwin
-          do
-            case "$TARGET" in
-              aarch64-apple-darwin) ARCH_LABEL="aarch64" ;;
-              x86_64-apple-darwin) ARCH_LABEL="x86_64" ;;
-            esac
-
-            pnpm exec tauri build --bundles app --target "$TARGET" --no-sign --verbose
-
-            APP_PATH="src-tauri/target/$TARGET/release/bundle/macos/MinNote.app"
-            APP_ZIP_PATH="MinNote_${ARCH_LABEL}.app.zip"
-            APP_TAR_PATH="MinNote_${ARCH_LABEL}.app.tar.gz"
-
-            if [ ! -d "$APP_PATH" ]; then
-              echo "MinNote.app not found for $TARGET"
-              exit 1
-            fi
-
-            xattr -crs "$APP_PATH"
-            cp "$PROFILE_PATH" "$APP_PATH/Contents/embedded.provisionprofile"
-            HELPER_APP_PATH="$APP_PATH/Contents/Resources/minnote-cloudkit-bridge.app"
-            HELPER_EXEC_PATH="$HELPER_APP_PATH/Contents/MacOS/minnote-cloudkit-bridge"
-            if [ -f "$HELPER_EXEC_PATH" ]; then
-              cp "$PROFILE_PATH" "$HELPER_APP_PATH/Contents/embedded.provisionprofile"
-              codesign --force --sign "$APPLE_SIGNING_IDENTITY_REF" --options runtime --entitlements "$HELPER_ENTITLEMENTS_PATH" "$HELPER_EXEC_PATH"
-              codesign --force --sign "$APPLE_SIGNING_IDENTITY_REF" --options runtime --entitlements "$HELPER_ENTITLEMENTS_PATH" "$HELPER_APP_PATH"
-            fi
-            codesign --force --sign "$APPLE_SIGNING_IDENTITY_REF" --options runtime --entitlements "$APP_ENTITLEMENTS_PATH" "$APP_PATH/Contents/MacOS/minnote"
-            codesign --force --sign "$APPLE_SIGNING_IDENTITY_REF" --options runtime --entitlements "$APP_ENTITLEMENTS_PATH" "$APP_PATH"
-
-            rm -f "$APP_ZIP_PATH"
-            ditto -c -k --keepParent --sequesterRsrc "$APP_PATH" "$APP_ZIP_PATH"
-
-            xcrun notarytool submit "$APP_ZIP_PATH" \
-              --apple-id "$APPLE_ID" \
-              --password "$APPLE_PASSWORD" \
-              --team-id "$APPLE_TEAM_ID" \
-              --wait
-
-            xcrun stapler staple "$APP_PATH"
-
-            SIGN_INFO="$(codesign -dv --verbose=4 "$APP_PATH" 2>&1)"
-            echo "$SIGN_INFO"
-            echo "$SIGN_INFO" | grep -q "Authority=Developer ID Application: SEONGMIN CHO ($APPLE_TEAM_ID)"
-            echo "$SIGN_INFO" | grep -q "TeamIdentifier=$APPLE_TEAM_ID"
-
-            codesign --verify --deep --strict --verbose=2 "$APP_PATH"
-            xcrun stapler validate "$APP_PATH"
-            spctl -a -vv -t exec "$APP_PATH"
-
-            tar -czf "$APP_TAR_PATH" -C "$(dirname "$APP_PATH")" "$(basename "$APP_PATH")"
-            pnpm exec tauri signer sign "$APP_TAR_PATH"
-          done
+        run: ./scripts/package-notarized-app.sh package-updater "$TARGET" "$ARCH_LABEL" "$PWD"
 
       - name: Upload notarized app artifact
         uses: actions/upload-artifact@v4
         with:
-          name: notarized-app-bundle
+          name: notarized-app-${{ matrix.arch_label }}
           path: |
-            MinNote_aarch64.app.tar.gz
-            MinNote_x86_64.app.tar.gz
+            MinNote_${{ matrix.arch_label }}.app.tar.gz
+            MinNote_${{ matrix.arch_label }}.app.tar.gz.sig
           if-no-files-found: error
           retention-days: 1
+
+  release_release_assets:
+    needs: release_app_matrix
+    runs-on: macos-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Download notarized app artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: notarized-app-*
+          merge-multiple: true
 
       - name: Create or update draft GitHub release
         env:
@@ -136,12 +183,23 @@ jobs:
             RELEASE_ID="$(gh api repos/${{ github.repository }}/releases/tags/$TAG --jq '.id')"
             gh api repos/${{ github.repository }}/releases/"$RELEASE_ID" \
               --method PATCH \
-              -f draft=true \
               -f name="$TITLE" \
               -f body="$NOTES" >/dev/null
           else
             gh release create "$TAG" --draft --title "$TITLE" --notes "$NOTES"
           fi
+
+      - name: Validate updater release assets
+        run: |
+          for FILE in \
+            MinNote_aarch64.app.tar.gz \
+            MinNote_aarch64.app.tar.gz.sig \
+            MinNote_x86_64.app.tar.gz \
+            MinNote_x86_64.app.tar.gz.sig
+          do
+            [ -f "$FILE" ] || { echo "Missing release asset: $FILE"; exit 1; }
+            [ -s "$FILE" ] || { echo "Empty release asset: $FILE"; exit 1; }
+          done
 
       - name: Upload updater release assets
         env:
@@ -153,14 +211,6 @@ jobs:
           ARM_SIG_FILE="MinNote_aarch64.app.tar.gz.sig"
           X64_APP_TAR_FILE="MinNote_x86_64.app.tar.gz"
           X64_SIG_FILE="MinNote_x86_64.app.tar.gz.sig"
-
-          for FILE in "$ARM_APP_TAR_FILE" "$ARM_SIG_FILE" "$X64_APP_TAR_FILE" "$X64_SIG_FILE"
-          do
-            if [ ! -f "$FILE" ]; then
-              echo "Missing release asset: $FILE"
-              exit 1
-            fi
-          done
 
           gh release upload "$TAG" "$ARM_APP_TAR_FILE#MinNote_aarch64.app.tar.gz" --clobber
           gh release upload "$TAG" "$ARM_SIG_FILE#MinNote_aarch64.app.tar.gz.sig" --clobber
@@ -191,10 +241,26 @@ jobs:
               }
             }' > latest.json
 
+          jq -e '.version and .pub_date and .platforms["darwin-aarch64"] and .platforms["darwin-x86_64"]' latest.json >/dev/null
+          grep -q "MinNote_aarch64.app.tar.gz" latest.json
+          grep -q "MinNote_x86_64.app.tar.gz" latest.json
+
           gh release upload "$TAG" latest.json --clobber
 
+      - name: Write updater release summary
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          RELEASE_URL="$(gh release view "${{ github.ref_name }}" --json url --jq '.url')"
+          {
+            echo "## Updater assets uploaded"
+            echo ""
+            echo "- Release: $RELEASE_URL"
+            echo "- Assets: MinNote_aarch64.app.tar.gz, MinNote_aarch64.app.tar.gz.sig, MinNote_x86_64.app.tar.gz, MinNote_x86_64.app.tar.gz.sig, latest.json"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   release_dmg:
-    needs: release_app
+    needs: release_app_matrix
     runs-on:
       - self-hosted
       - macOS
@@ -210,17 +276,25 @@ jobs:
         with:
           node-version: 22
 
-      - name: Download notarized app artifact
+      - name: Download notarized app artifacts
         uses: actions/download-artifact@v4
         with:
-          name: notarized-app-bundle
+          pattern: notarized-app-*
+          merge-multiple: true
 
-      - name: Check self-hosted tooling
+      - name: Check self-hosted tooling and identity
+        env:
+          APPLE_SIGNING_IDENTITY: "Developer ID Application: SEONGMIN CHO (5YG4V2PLZV)"
         run: |
           command -v gh
           command -v codesign
           command -v xcrun
+          command -v hdiutil
           xcrun notarytool --version
+          [ -x ./scripts/create-dmg.sh ] || { echo "scripts/create-dmg.sh must be executable."; exit 1; }
+          [ -x ./scripts/package-notarized-dmg.sh ] || { echo "scripts/package-notarized-dmg.sh must be executable."; exit 1; }
+          APPLE_SIGNING_IDENTITY_REF="$(security find-identity -v -p codesigning | grep "\"$APPLE_SIGNING_IDENTITY\"" | awk 'NR == 1 { print $2 }')"
+          [ -n "$APPLE_SIGNING_IDENTITY_REF" ] || { echo "Unable to resolve codesigning identity fingerprint for $APPLE_SIGNING_IDENTITY"; exit 1; }
 
       - name: Import Apple certificate
         uses: apple-actions/import-codesign-certs@v6
@@ -242,33 +316,16 @@ jobs:
           APPLE_SIGNING_IDENTITY: "Developer ID Application: SEONGMIN CHO (5YG4V2PLZV)"
         run: |
           APPLE_SIGNING_IDENTITY_REF="$(security find-identity -v -p codesigning | grep "\"$APPLE_SIGNING_IDENTITY\"" | awk 'NR == 1 { print $2 }')"
-          if [ -z "$APPLE_SIGNING_IDENTITY_REF" ]; then
-            echo "Unable to resolve codesigning identity fingerprint for $APPLE_SIGNING_IDENTITY"
-            exit 1
-          fi
+          [ -n "$APPLE_SIGNING_IDENTITY_REF" ] || { echo "Unable to resolve codesigning identity fingerprint for $APPLE_SIGNING_IDENTITY"; exit 1; }
           VERSION="${{ github.ref_name }}"
           VERSION="${VERSION#v}"
           for ARCH in aarch64 x86_64
           do
-            DMG_PATH="$(./scripts/create-dmg.sh "dist/$ARCH/MinNote.app" dist "$VERSION" "$ARCH")"
-            codesign --force --sign "$APPLE_SIGNING_IDENTITY_REF" "$DMG_PATH"
-            xcrun notarytool submit "$DMG_PATH" \
-              --apple-id "$APPLE_ID" \
-              --password "$APPLE_PASSWORD" \
-              --team-id "$APPLE_TEAM_ID" \
-              --wait
-            xcrun stapler staple "$DMG_PATH"
-          done
-
-      - name: Verify DMG
-        run: |
-          VERSION="${{ github.ref_name }}"
-          VERSION="${VERSION#v}"
-          for ARCH in aarch64 x86_64
-          do
-            DMG_PATH="dist/MinNote_${VERSION}_${ARCH}.dmg"
-            xcrun stapler validate "$DMG_PATH"
-            spctl --assess --type open --context context:primary-signature --verbose=4 "$DMG_PATH"
+            APPLE_SIGNING_IDENTITY_REF="$APPLE_SIGNING_IDENTITY_REF" \
+            APPLE_ID="$APPLE_ID" \
+            APPLE_PASSWORD="$APPLE_PASSWORD" \
+            APPLE_TEAM_ID="$APPLE_TEAM_ID" \
+            ./scripts/package-notarized-dmg.sh full "dist/$ARCH/MinNote.app" dist "$VERSION" "$ARCH"
           done
 
       - name: Upload DMG to release
@@ -282,17 +339,60 @@ jobs:
             "dist/MinNote_${VERSION}_x86_64.dmg#MinNote_${VERSION}_x86_64.dmg" \
             --clobber
 
-      - name: Publish release
+      - name: Write DMG release summary
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release edit "${{ github.ref_name }}" --draft=false
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          RELEASE_URL="$(gh release view "${{ github.ref_name }}" --json url --jq '.url')"
+          {
+            echo "## DMG assets uploaded"
+            echo ""
+            echo "- Release: $RELEASE_URL"
+            echo "- Assets: MinNote_${VERSION}_aarch64.dmg, MinNote_${VERSION}_x86_64.dmg"
+          } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Publish GitHub release
+  finalize_release:
+    needs:
+      - release_release_assets
+      - release_dmg
+    runs-on: macos-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Verify release assets and publish release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          RELEASE_ID="$(gh api repos/${{ github.repository }}/releases/tags/${{ github.ref_name }} --jq '.id')"
-          gh api repos/${{ github.repository }}/releases/"$RELEASE_ID" \
-            --method PATCH \
-            -f draft=false >/dev/null
+          TAG="${{ github.ref_name }}"
+          VERSION="${TAG#v}"
+          ASSETS_JSON="$(gh release view "$TAG" --json url,assets)"
+          for ASSET in \
+            "MinNote_${VERSION}_aarch64.dmg" \
+            "MinNote_${VERSION}_x86_64.dmg" \
+            "MinNote_aarch64.app.tar.gz" \
+            "MinNote_aarch64.app.tar.gz.sig" \
+            "MinNote_x86_64.app.tar.gz" \
+            "MinNote_x86_64.app.tar.gz.sig" \
+            "latest.json"
+          do
+            echo "$ASSETS_JSON" | jq -e --arg name "$ASSET" '.assets[] | select(.name == $name)' >/dev/null || {
+              echo "Missing release asset: $ASSET"
+              exit 1
+            }
+          done
+
+          gh release edit "$TAG" --draft=false
+
+          RELEASE_URL="$(echo "$ASSETS_JSON" | jq -r '.url')"
+          {
+            echo "## Release finalized"
+            echo ""
+            echo "- Version: $VERSION"
+            echo "- Release: $RELEASE_URL"
+            echo "- DMG: MinNote_${VERSION}_aarch64.dmg, MinNote_${VERSION}_x86_64.dmg"
+            echo "- Updater assets: MinNote_aarch64.app.tar.gz, MinNote_aarch64.app.tar.gz.sig, MinNote_x86_64.app.tar.gz, MinNote_x86_64.app.tar.gz.sig, latest.json"
+            echo "- Draft: false"
+          } >> "$GITHUB_STEP_SUMMARY"
