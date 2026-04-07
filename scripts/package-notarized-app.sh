@@ -180,7 +180,6 @@ package_updater_artifacts() {
   app_tar_path="$output_dir/MinNote_${arch_label}.app.tar.gz"
   staging_dir="$(mktemp -d "${TMPDIR:-/tmp}/minnote-updater-stage.XXXXXX")"
   extract_dir="$(mktemp -d "${TMPDIR:-/tmp}/minnote-updater-extract.XXXXXX")"
-  trap 'cleanup_temp_dir "$staging_dir"; cleanup_temp_dir "$extract_dir"' RETURN
 
   ditto "$app_path" "$staging_dir/MinNote.app"
   xattr -cr "$staging_dir/MinNote.app"
@@ -223,7 +222,6 @@ PY
     pnpm exec tauri signer sign "$app_tar_path"
   fi
 
-  trap - RETURN
   cleanup_temp_dir "$staging_dir"
   cleanup_temp_dir "$extract_dir"
 }
