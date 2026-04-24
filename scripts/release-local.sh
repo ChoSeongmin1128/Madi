@@ -118,7 +118,7 @@ APPLE_SIGNING_IDENTITY_REF="$APPLE_SIGNING_IDENTITY_REF" \
 APPLE_ID="$APPLE_ID" \
 APPLE_PASSWORD="$APPLE_PASSWORD" \
 APPLE_TEAM_ID="$APPLE_TEAM_ID" \
-./scripts/package-notarized-dmg.sh full "$APP_PATH" "$RELEASE_DIR" "$VERSION" "$ARCH_LABEL"
+./scripts/package-notarized-dmg.sh full "$APP_PATH" "$RELEASE_DIR" "$VERSION"
 
 echo "[5/8] latest.json 생성"
 PUB_DATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
@@ -184,7 +184,7 @@ fi
 
 echo "[8/8] GitHub release 업로드"
 gh release upload "$TAG" \
-  "$RELEASE_DIR/MinNote_${VERSION}_aarch64.dmg#MinNote_${VERSION}_aarch64.dmg" \
+  "$RELEASE_DIR/MinNote_${VERSION}.dmg#MinNote_${VERSION}.dmg" \
   "$RELEASE_DIR/MinNote_aarch64.app.tar.gz#MinNote_aarch64.app.tar.gz" \
   "$RELEASE_DIR/MinNote_aarch64.app.tar.gz.sig#MinNote_aarch64.app.tar.gz.sig" \
   "$RELEASE_DIR/latest.json#latest.json" \

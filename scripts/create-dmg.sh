@@ -2,8 +2,8 @@
 
 set -euo pipefail
 
-if [ "$#" -lt 3 ]; then
-  echo "usage: $0 <app-path> <output-dir> <version> [arch]"
+if [ "$#" -ne 3 ]; then
+  echo "usage: $0 <app-path> <output-dir> <version>"
   exit 1
 fi
 
@@ -14,7 +14,6 @@ BACKGROUND_PNG="${BACKGROUND_PNG:-$ROOT_DIR/scripts/dmg-assets/background.png}"
 APP_PATH="$1"
 OUTPUT_DIR="$2"
 VERSION="$3"
-ARCH="${4:-aarch64}"
 VOLUME_NAME="${VOLUME_NAME:-Install MinNote}"
 WINDOW_W="${WINDOW_W:-640}"
 WINDOW_H="${WINDOW_H:-420}"
@@ -25,7 +24,7 @@ APPS_ICON_Y="${APPS_ICON_Y:-230}"
 
 mkdir -p "$OUTPUT_DIR"
 
-FINAL_DMG="$OUTPUT_DIR/MinNote_${VERSION}_${ARCH}.dmg"
+FINAL_DMG="$OUTPUT_DIR/MinNote_${VERSION}.dmg"
 rm -f "$FINAL_DMG"
 
 if [ ! -d "$APP_PATH" ]; then

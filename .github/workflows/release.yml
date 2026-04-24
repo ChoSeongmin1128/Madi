@@ -314,8 +314,8 @@ jobs:
 
       - name: Extract notarized app bundle
         run: |
-          mkdir -p dist/aarch64
-          tar -xzf MinNote_aarch64.app.tar.gz -C dist/aarch64
+          mkdir -p dist/app
+          tar -xzf MinNote_aarch64.app.tar.gz -C dist/app
 
       - name: Create signed and notarized DMG
         env:
@@ -332,7 +332,7 @@ jobs:
           APPLE_ID="$APPLE_ID" \
           APPLE_PASSWORD="$APPLE_PASSWORD" \
           APPLE_TEAM_ID="$APPLE_TEAM_ID" \
-          ./scripts/package-notarized-dmg.sh full "dist/aarch64/MinNote.app" dist "$VERSION" "aarch64"
+          ./scripts/package-notarized-dmg.sh full "dist/app/MinNote.app" dist "$VERSION"
 
       - name: Upload DMG to release
         env:
@@ -341,7 +341,7 @@ jobs:
           VERSION="${{ github.ref_name }}"
           VERSION="${VERSION#v}"
           gh release upload "${{ github.ref_name }}" \
-            "dist/MinNote_${VERSION}_aarch64.dmg#MinNote_${VERSION}_aarch64.dmg" \
+            "dist/MinNote_${VERSION}.dmg#MinNote_${VERSION}.dmg" \
             --clobber
 
       - name: Write DMG release summary
@@ -355,7 +355,7 @@ jobs:
             echo "## DMG assets uploaded"
             echo ""
             echo "- Release: $RELEASE_URL"
-            echo "- Assets: MinNote_${VERSION}_aarch64.dmg"
+            echo "- Assets: MinNote_${VERSION}.dmg"
           } >> "$GITHUB_STEP_SUMMARY"
 
   finalize_release:
@@ -376,7 +376,7 @@ jobs:
           VERSION="${TAG#v}"
           ASSETS_JSON="$(gh release view "$TAG" --repo "$GH_REPO" --json url,assets)"
           for ASSET in \
-            "MinNote_${VERSION}_aarch64.dmg" \
+            "MinNote_${VERSION}.dmg" \
             "MinNote_aarch64.app.tar.gz" \
             "MinNote_aarch64.app.tar.gz.sig" \
             "latest.json"
@@ -395,7 +395,7 @@ jobs:
             echo ""
             echo "- Version: $VERSION"
             echo "- Release: $RELEASE_URL"
-            echo "- DMG: MinNote_${VERSION}_aarch64.dmg"
+            echo "- DMG: MinNote_${VERSION}.dmg"
             echo "- Updater assets: MinNote_aarch64.app.tar.gz, MinNote_aarch64.app.tar.gz.sig, latest.json"
             echo "- Draft: false"
           } >> "$GITHUB_STEP_SUMMARY"

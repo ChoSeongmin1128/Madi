@@ -8,10 +8,10 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 usage() {
   cat <<'EOF'
 usage:
-  package-notarized-dmg.sh create <app-path> <output-dir> <version> <arch>
+  package-notarized-dmg.sh create <app-path> <output-dir> <version>
   package-notarized-dmg.sh notarize <dmg-path>
   package-notarized-dmg.sh verify <dmg-path>
-  package-notarized-dmg.sh full <app-path> <output-dir> <version> <arch>
+  package-notarized-dmg.sh full <app-path> <output-dir> <version>
 EOF
 }
 
@@ -27,8 +27,7 @@ create_dmg() {
   local app_path="$1"
   local output_dir="$2"
   local version="$3"
-  local arch="$4"
-  "$ROOT_DIR/scripts/create-dmg.sh" "$app_path" "$output_dir" "$version" "$arch"
+  "$ROOT_DIR/scripts/create-dmg.sh" "$app_path" "$output_dir" "$version"
 }
 
 notarize_dmg() {
@@ -64,10 +63,9 @@ package_full() {
   local app_path="$1"
   local output_dir="$2"
   local version="$3"
-  local arch="$4"
   local dmg_path
 
-  dmg_path="$(create_dmg "$app_path" "$output_dir" "$version" "$arch")"
+  dmg_path="$(create_dmg "$app_path" "$output_dir" "$version")"
   notarize_dmg "$dmg_path"
   verify_dmg "$dmg_path"
 }
@@ -82,8 +80,8 @@ shift
 
 case "$command" in
   create)
-    [ "$#" -eq 4 ] || { usage; exit 1; }
-    create_dmg "$1" "$2" "$3" "$4"
+    [ "$#" -eq 3 ] || { usage; exit 1; }
+    create_dmg "$1" "$2" "$3"
     ;;
   notarize)
     [ "$#" -eq 1 ] || { usage; exit 1; }
@@ -94,8 +92,8 @@ case "$command" in
     verify_dmg "$1"
     ;;
   full)
-    [ "$#" -eq 4 ] || { usage; exit 1; }
-    package_full "$1" "$2" "$3" "$4"
+    [ "$#" -eq 3 ] || { usage; exit 1; }
+    package_full "$1" "$2" "$3"
     ;;
   *)
     usage
