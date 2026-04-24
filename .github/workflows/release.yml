@@ -299,6 +299,7 @@ jobs:
           command -v codesign
           command -v xcrun
           command -v hdiutil
+          command -v dmgbuild
           xcrun notarytool --version
           [ -x ./scripts/create-dmg.sh ] || { echo "scripts/create-dmg.sh must be executable."; exit 1; }
           [ -x ./scripts/package-notarized-dmg.sh ] || { echo "scripts/package-notarized-dmg.sh must be executable."; exit 1; }
