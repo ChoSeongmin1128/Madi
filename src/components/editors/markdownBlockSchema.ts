@@ -9,6 +9,7 @@ export const markdownSchema = BlockNoteSchema.create({
     checkListItem: defaultBlockSpecs.checkListItem,
     quote: defaultBlockSpecs.quote,
     codeBlock: defaultBlockSpecs.codeBlock,
+    divider: defaultBlockSpecs.divider,
   },
 });
 

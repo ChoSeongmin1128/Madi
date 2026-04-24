@@ -154,6 +154,7 @@ function serializeMarkdownNode(node: JsonValue | string, indent = ''): string {
       return `${indent}\`\`\`${language}\n${body}\n${indent}\`\`\``;
     }
     case 'horizontalRule':
+    case 'divider':
       return `${indent}---`;
     default:
       return content

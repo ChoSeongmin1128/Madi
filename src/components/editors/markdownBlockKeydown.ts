@@ -6,11 +6,13 @@ import {
   isBlockNoteSelectionEmpty,
   nestBlockNote,
   replaceBlockNoteArrowShortcut,
+  replaceBlockNoteTaskShortcut,
   selectAllBlockNote,
   unnestBlockNote,
   type BlockNoteEditorLike,
 } from '../../lib/blocknoteBridge';
 import { shouldReplaceMarkdownArrow } from '../../lib/markdownEditorBehavior';
+import { detectMarkdownListShortcut } from '../../lib/markdownEditorBehavior';
 import { isMarkdownContentEmpty } from '../../lib/markdown';
 import { scheduleBlockDeletion } from '../../lib/backspaceHoldState';
 import type { BlockCaretPlacement } from '../../lib/types';
@@ -62,6 +64,17 @@ export function createMarkdownKeydownHandler({
 
     if (event.key === '>' && replaceBlockNoteArrowShortcut(editor, shouldReplaceMarkdownArrow)) {
       event.preventDefault();
+      isWholeBlockSelectedRef.current = false;
+      emitSelectionVisualState();
+      return;
+    }
+
+    if (
+      event.key === ' ' &&
+      replaceBlockNoteTaskShortcut(editor, (text) => detectMarkdownListShortcut(text)?.kind === 'task')
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
       isWholeBlockSelectedRef.current = false;
       emitSelectionVisualState();
       return;

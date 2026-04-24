@@ -66,10 +66,13 @@ describe('markdown utilities', () => {
             },
           ],
         },
+        {
+          type: 'divider',
+        },
       ],
     });
 
-    expect(markdown).toBe('## 제목\n\n- 항목');
+    expect(markdown).toBe('## 제목\n\n- 항목\n\n---');
   });
 
   it('serializes document blocks into markdown document', () => {

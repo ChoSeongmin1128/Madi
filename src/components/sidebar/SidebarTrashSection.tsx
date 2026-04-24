@@ -29,62 +29,68 @@ export function SidebarTrashSection({
 
   return (
     <div className="trash-section">
-      <button
-        className="trash-section-summary"
-        type="button"
-        aria-expanded={isExpanded}
-        onClick={onToggleExpanded}
-      >
-        <span className="trash-section-summary-copy">
-          <span className="trash-section-summary-title">휴지통</span>
-          <span className="trash-section-summary-count">
-            {trashCount > 0 ? `${trashCount}개 문서` : '비어 있음'}
+      <div className="trash-section-summary-row">
+        <button
+          className="trash-section-summary"
+          type="button"
+          aria-expanded={isExpanded}
+          onClick={onToggleExpanded}
+        >
+          <span className="trash-section-summary-copy">
+            <span className="trash-section-summary-title">휴지통</span>
+            <span className="trash-section-summary-count">
+              {trashCount > 0 ? `${trashCount}개 문서` : '비어 있음'}
+            </span>
           </span>
-        </span>
-        <ChevronDown
-          size={14}
-          className={`trash-section-summary-chevron${isExpanded ? ' is-expanded' : ''}`}
-        />
-      </button>
+          <ChevronDown
+            size={14}
+            className={`trash-section-summary-chevron${isExpanded ? ' is-expanded' : ''}`}
+          />
+        </button>
+
+        {trashCount > 0 && !confirmEmptyTrash ? (
+          <button
+            className="ghost-button trash-empty-header-button"
+            type="button"
+            onClick={() => setConfirmEmptyTrash(true)}
+          >
+            <Trash2 size={12} />
+            <span>비우기</span>
+          </button>
+        ) : null}
+      </div>
+
+      {trashCount > 0 && confirmEmptyTrash ? (
+        <div className="trash-empty-confirm-card" role="group" aria-label="휴지통 비우기 확인">
+          <span className="trash-empty-confirm-label">
+            휴지통의 {trashCount}개 문서를 영구 삭제할까요?
+          </span>
+          <div className="trash-empty-confirm-actions">
+            <button
+              className="ghost-button trash-empty-cancel"
+              type="button"
+              onClick={() => setConfirmEmptyTrash(false)}
+            >
+              취소
+            </button>
+            <button
+              className="ghost-button trash-empty-confirm"
+              type="button"
+              onClick={() => {
+                setConfirmEmptyTrash(false);
+                onEmptyTrash();
+              }}
+            >
+              비우기
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {isExpanded ? (
         <div className="trash-section-panel">
           {trashCount > 0 ? (
             <>
-              <div className="trash-section-header">
-                {confirmEmptyTrash ? (
-                  <div className="trash-empty-header-actions">
-                    <span className="trash-empty-confirm-label">정말 비울까요?</span>
-                    <button
-                      className="ghost-button trash-empty-cancel"
-                      type="button"
-                      onClick={() => setConfirmEmptyTrash(false)}
-                    >
-                      취소
-                    </button>
-                    <button
-                      className="ghost-button trash-empty-confirm"
-                      type="button"
-                      onClick={() => {
-                        setConfirmEmptyTrash(false);
-                        onEmptyTrash();
-                      }}
-                    >
-                      비우기
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    className="ghost-button trash-empty-header-button"
-                    type="button"
-                    onClick={() => setConfirmEmptyTrash(true)}
-                  >
-                    <Trash2 size={12} />
-                    <span>휴지통 비우기</span>
-                  </button>
-                )}
-              </div>
-
               {documents.map((document) => (
                 <div key={document.id} className="trash-card">
                   <div className="trash-card-info">

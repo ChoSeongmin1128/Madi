@@ -9,6 +9,8 @@ export type BlockNoteEditorLike = {
   setTextCursorPosition: (blockId: string, placement: 'start' | 'end') => void;
   getSelectedText: () => string;
   pasteMarkdown: (markdown: string) => void;
+  updateBlock?: (blockOrId: any, update: any) => void;
+  getTextCursorPosition?: () => { block?: any };
   canNestBlock?: () => boolean;
   nestBlock?: () => void;
   canUnnestBlock?: () => boolean;
@@ -121,6 +123,39 @@ export function replaceBlockNoteArrowShortcut(editor: BlockNoteEditorLike, shoul
 
   const transaction = editor._tiptapEditor.state.tr.insertText('→', selection.from - 1, selection.from);
   dispatchTransaction(editor, transaction);
+  return true;
+}
+
+export function replaceBlockNoteTaskShortcut(editor: BlockNoteEditorLike, shouldReplace: (text: string) => boolean) {
+  if (typeof editor.updateBlock !== 'function' || typeof editor.getTextCursorPosition !== 'function') {
+    return false;
+  }
+
+  const selection = getSelection(editor);
+  if (!selection.empty) {
+    return false;
+  }
+
+  const { $from } = selection;
+  if (!$from.parent.isTextblock) {
+    return false;
+  }
+
+  const beforeText = $from.parent.textBetween(0, $from.parentOffset, undefined, '\uFFFC');
+  const afterText = $from.parent.textBetween($from.parentOffset, $from.parent.content.size, undefined, '\uFFFC');
+  if (!shouldReplace(beforeText) || afterText.trim().length > 0) {
+    return false;
+  }
+
+  const block = editor.getTextCursorPosition().block;
+  if (!block) {
+    return false;
+  }
+
+  editor.updateBlock(block, {
+    type: 'checkListItem',
+    content: [],
+  });
   return true;
 }
 

@@ -92,7 +92,14 @@ impl BlockRepository for SqliteStore {
             params![device_id, new_block.id],
         )?;
         ordered_ids.insert(target_index, new_block.id.clone());
+        let order_updated_at = Self::next_block_ordering_timestamp(&transaction, &ordered_ids)?;
         Self::rewrite_positions(&transaction, document_id, &ordered_ids)?;
+        Self::touch_block_ordering_metadata(
+            &transaction,
+            &ordered_ids,
+            order_updated_at,
+            &device_id,
+        )?;
         transaction.commit()?;
 
         self.finish_document_mutation(document_id)?;
@@ -137,12 +144,20 @@ impl BlockRepository for SqliteStore {
             return Ok(blocks);
         }
 
+        let device_id = self.current_device_id()?;
         let mut ordered_ids = blocks.into_iter().map(|block| block.id).collect::<Vec<_>>();
         let block_id = ordered_ids.remove(current_index);
         ordered_ids.insert(clamped_target, block_id.clone());
 
         let transaction = self.connection.transaction()?;
+        let order_updated_at = Self::next_block_ordering_timestamp(&transaction, &ordered_ids)?;
         Self::rewrite_positions(&transaction, document_id, &ordered_ids)?;
+        Self::touch_block_ordering_metadata(
+            &transaction,
+            &ordered_ids,
+            order_updated_at,
+            &device_id,
+        )?;
         transaction.commit()?;
 
         self.finish_document_mutation(document_id)?;

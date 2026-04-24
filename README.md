@@ -45,12 +45,13 @@ MinNote는 macOS 단독 데스크톱 노트 앱입니다. 현재 방향은 Heyno
 ## 현재 상태
 
 - 이 저장소는 `Tauri + React + TypeScript + Rust + SQLite` 기반의 macOS 앱 구현을 포함합니다.
-- 프런트엔드에는 문서 목록, 블록 셸, Markdown/Code/Text 편집기, autosave, 검색 UI, 휴지통, 업데이트 UI가 들어 있습니다.
+- 프런트엔드에는 문서 목록, 블록 셸, Markdown/Code/Text 편집기, autosave, 검색 UI, 휴지통, iCloud 동기화 상태 UI, 업데이트 UI가 들어 있습니다.
 - 앱은 초기 로딩이 끝나면 업데이트를 한 번 확인하고, 이후 `6시간` 간격으로 다시 확인합니다.
 - 새 버전이 있으면 백그라운드 다운로드를 먼저 진행하고, 헤더 우측의 작은 버튼으로 `업데이트 적용`을 실행합니다.
 - 설정의 업데이트 영역은 상태 확인과 수동 `업데이트 확인` 버튼을 위한 보조 UI입니다.
-- 백엔드에는 SQLite schema, Tauri command facade, 문서/블록 저장 로직, FTS 기반 검색 인덱스, updater 연동이 들어 있습니다.
-- 현재 앱 데이터는 로컬 SQLite에만 저장됩니다. iCloud/CloudKit 동기화 기능은 제거된 상태입니다.
+- 백엔드에는 SQLite schema, Tauri command facade, 문서/블록 저장 로직, FTS 기반 검색 인덱스, iCloud/CloudKit 동기화 엔진, updater 연동이 들어 있습니다.
+- 앱 데이터의 canonical source는 로컬 SQLite입니다. iCloud/CloudKit 동기화는 로컬 변경을 raw operation queue에 기록한 뒤 sync 직전에 coalesced intent로 압축해 CloudKit에 반영합니다.
+- iCloud 동기화는 CloudKit bridge helper와 Push 권한이 포함된 provisioning profile을 전제로 합니다. 원격 변경이 적용되면 `workspace-documents-changed` 이벤트로 문서 목록과 휴지통 목록을 경량 갱신합니다.
 - AI 전용 세부 맥락은 루트 `AGENTS.md`와 `.agents/skills/` 아래 skill들에 둡니다.
 
 ## 실행 방법
@@ -69,16 +70,19 @@ MinNote는 macOS 단독 데스크톱 노트 앱입니다. 현재 방향은 Heyno
 
 - `/.env.release.local`
 - `/.local-release/minnote-updater.key`
+- `/.local-release/MinNote_Developer_ID_CloudKit.provisionprofile` 또는 `/.local-release/minnote-cloudkit.provisionprofile`
 
-`pnpm tauri:dev:signed`와 `pnpm tauri:build`는 위 파일 중 필요한 값을 자동으로 읽습니다. provisioning profile은 더 이상 전제하지 않습니다.
+`pnpm tauri:dev:signed`와 `pnpm tauri:build`는 위 파일 중 필요한 값을 자동으로 읽습니다. iCloud/Push가 포함된 실제 배포 빌드는 CloudKit 권한과 `aps-environment` 권한이 들어 있는 provisioning profile을 필요로 합니다.
 
 ## 릴리스 흐름
 
-- updater 기준 산출물은 `MinNote_aarch64.app.tar.gz`, `MinNote_aarch64.app.tar.gz.sig`, `latest.json`입니다.
+- 공식 설치 채널은 DMG입니다. 앱 내 업데이트는 Tauri updater용 `latest.json + .app.tar.gz + .sig` 산출물을 사용합니다.
+- DMG 산출물은 `MinNote_<version>_aarch64.dmg`, `MinNote_<version>_x86_64.dmg`입니다.
+- updater 기준 산출물은 `MinNote_aarch64.app.tar.gz`, `MinNote_aarch64.app.tar.gz.sig`, `MinNote_x86_64.app.tar.gz`, `MinNote_x86_64.app.tar.gz.sig`, `latest.json`입니다.
 - 자동 릴리스 워크플로우는 [`.github/workflows/release.yml`](/Users/seongmin/Personal/MinNote/.github/workflows/release.yml)에 남아 있습니다.
 - 다만 현재 기준으로 가장 안정적으로 검증된 배포 경로는 `로컬 Mac에서 빌드/서명/공증/검증 후 gh release로 업로드`하는 방식입니다.
 - 자동 워크플로우를 쓸 때는 `GitHub hosted macOS runner`가 공증된 `.app`과 updater 산출물을 만들고, `self-hosted Mac runner`가 DMG 생성과 release publish를 담당합니다.
-- 수동 릴리스에서는 `pnpm tauri:build` 후 DMG를 추가 공증/staple하고, 검증된 산출물만 release에 업로드합니다.
+- 수동 릴리스에서는 [`scripts/release-local.sh`](/Users/seongmin/Personal/MinNote/scripts/release-local.sh)가 검증, 양 아키텍처 app 빌드/서명/공증, updater 산출물 생성, DMG 공증, `latest.json` 생성, release 업로드를 한 번에 수행합니다.
 - DMG 생성 스크립트는 [`scripts/create-dmg.sh`](/Users/seongmin/Personal/MinNote/scripts/create-dmg.sh) 기준으로 유지합니다.
 - release는 DMG가 첨부되기 전까지 완료로 보지 않습니다.
 

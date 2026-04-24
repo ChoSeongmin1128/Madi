@@ -3257,6 +3257,112 @@ mod tests {
     }
 
     #[test]
+    fn stale_remote_blocks_do_not_revert_local_reorder() {
+        let mut store = test_store();
+        let document = store
+            .create_document(Some("로컬 재정렬 유지".to_string()))
+            .expect("document should be created");
+        let blocks = store
+            .create_block_below(&document.id, None, BlockKind::Text)
+            .expect("second block should be created");
+        let blocks = store
+            .create_block_below(&document.id, Some(&blocks[1].id), BlockKind::Code)
+            .expect("third block should be created");
+        let stale_cloud_blocks = blocks
+            .iter()
+            .map(|block| BridgeBlockRecord {
+                block_id: block.id.clone(),
+                document_id: document.id.clone(),
+                kind: block.kind.as_str().to_string(),
+                content: block.content.clone(),
+                language: block.language.clone(),
+                position: block.position,
+                updated_at_ms: block.updated_at,
+                updated_by_device_id: block.updated_by_device_id.clone().unwrap_or_default(),
+            })
+            .collect::<Vec<_>>();
+
+        store
+            .move_block(&document.id, &blocks[2].id, 0)
+            .expect("local reorder should succeed");
+
+        store
+            .apply_remote_changes(&FetchChangesResponse {
+                documents: vec![],
+                blocks: stale_cloud_blocks,
+                document_tombstones: vec![],
+                block_tombstones: vec![],
+                next_server_change_token: None,
+            })
+            .expect("stale remote blocks should be ignored");
+
+        let final_ids = store
+            .list_blocks(&document.id)
+            .expect("blocks should load")
+            .into_iter()
+            .map(|block| block.id)
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            final_ids,
+            vec![blocks[2].id.clone(), blocks[0].id.clone(), blocks[1].id.clone()],
+            "stale CloudKit block positions must not undo a local move"
+        );
+    }
+
+    #[test]
+    fn stale_remote_blocks_do_not_move_newly_inserted_block() {
+        let mut store = test_store();
+        let document = store
+            .create_document(Some("새 블록 위치 유지".to_string()))
+            .expect("document should be created");
+        let original_blocks = store
+            .create_block_below(&document.id, None, BlockKind::Text)
+            .expect("second block should be created");
+        let stale_cloud_blocks = original_blocks
+            .iter()
+            .map(|block| BridgeBlockRecord {
+                block_id: block.id.clone(),
+                document_id: document.id.clone(),
+                kind: block.kind.as_str().to_string(),
+                content: block.content.clone(),
+                language: block.language.clone(),
+                position: block.position,
+                updated_at_ms: block.updated_at,
+                updated_by_device_id: block.updated_by_device_id.clone().unwrap_or_default(),
+            })
+            .collect::<Vec<_>>();
+
+        let with_inserted = store
+            .create_block_below(&document.id, Some(&original_blocks[0].id), BlockKind::Markdown)
+            .expect("middle block should be inserted");
+        let inserted_id = with_inserted[1].id.clone();
+
+        store
+            .apply_remote_changes(&FetchChangesResponse {
+                documents: vec![],
+                blocks: stale_cloud_blocks,
+                document_tombstones: vec![],
+                block_tombstones: vec![],
+                next_server_change_token: None,
+            })
+            .expect("stale remote blocks should not move local insertion");
+
+        let final_ids = store
+            .list_blocks(&document.id)
+            .expect("blocks should load")
+            .into_iter()
+            .map(|block| block.id)
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            final_ids,
+            vec![original_blocks[0].id.clone(), inserted_id, original_blocks[1].id.clone()],
+            "stale CloudKit positions must not push a newly inserted block elsewhere"
+        );
+    }
+
+    #[test]
     fn existing_local_documents_queue_even_when_server_token_exists() {
         let mut store = test_store();
         let first = store

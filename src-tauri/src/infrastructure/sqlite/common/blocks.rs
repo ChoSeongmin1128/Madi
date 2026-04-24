@@ -123,14 +123,63 @@ impl SqliteStore {
     Ok(())
   }
 
+  pub(crate) fn touch_block_ordering_metadata(
+    connection: &Connection,
+    ordered_ids: &[String],
+    updated_at: i64,
+    updated_by_device_id: &str,
+  ) -> Result<(), AppError> {
+    for block_id in ordered_ids {
+      connection.execute(
+        "UPDATE blocks
+         SET updated_at = ?1,
+             updated_by_device_id = ?2
+         WHERE id = ?3",
+        params![updated_at, updated_by_device_id, block_id],
+      )?;
+    }
+
+    Ok(())
+  }
+
+  pub(crate) fn next_block_ordering_timestamp(
+    connection: &Connection,
+    ordered_ids: &[String],
+  ) -> Result<i64, AppError> {
+    let mut next_timestamp = Self::now();
+
+    for block_id in ordered_ids {
+      if let Some(updated_at) = connection
+        .query_row(
+          "SELECT updated_at FROM blocks WHERE id = ?1",
+          params![block_id],
+          |row| row.get::<_, i64>(0),
+        )
+        .optional()?
+      {
+        next_timestamp = next_timestamp.max(updated_at + 1);
+      }
+    }
+
+    Ok(next_timestamp)
+  }
+
   pub(crate) fn normalize_positions(&mut self, document_id: &str) -> Result<(), AppError> {
+    let updated_by_device_id = self.current_device_id()?;
     let transaction = self.connection.transaction()?;
     let block_ids = transaction
       .prepare("SELECT id FROM blocks WHERE document_id = ?1 ORDER BY position ASC")?
       .query_map(params![document_id], |row| row.get::<_, String>(0))?
       .collect::<Result<Vec<_>, _>>()?;
+    let updated_at = Self::next_block_ordering_timestamp(&transaction, &block_ids)?;
 
     Self::rewrite_positions(&transaction, document_id, &block_ids)?;
+    Self::touch_block_ordering_metadata(
+      &transaction,
+      &block_ids,
+      updated_at,
+      &updated_by_device_id,
+    )?;
     transaction.commit()?;
     Ok(())
   }

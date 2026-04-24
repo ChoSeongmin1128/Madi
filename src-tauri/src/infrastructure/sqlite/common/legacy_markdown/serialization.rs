@@ -211,7 +211,7 @@ impl SqliteStore {
           format!("{indent}```{language}\n{code}\n{indent}```")
         }
       }
-      Some("horizontalRule") => format!("{indent}---"),
+      Some("horizontalRule") | Some("divider") => format!("{indent}---"),
       _ => content
         .iter()
         .map(Self::serialize_legacy_markdown_inline)
