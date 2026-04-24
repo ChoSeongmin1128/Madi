@@ -10,13 +10,12 @@ HELPER_ENTITLEMENTS_PATH="$ROOT_DIR/src-tauri/Entitlements.Helper.plist"
 
 usage() {
   cat <<'EOF'
-usage: ./scripts/run-signed-dev-app.sh [--release] [--target <triple>] [--no-open] [--strict-gatekeeper]
+usage: ./scripts/run-signed-dev-app.sh [--release] [--no-open] [--strict-gatekeeper]
 
 Build a signed MinNote.app bundle for local verification and optionally open it.
 
 Options:
   --release         Build the release app bundle instead of debug
-  --target <triple> Build for a specific target triple. Only aarch64-apple-darwin is supported.
   --no-open         Skip launching the built app bundle
   --strict-gatekeeper Fail if spctl rejects the app
 EOF
@@ -25,26 +24,13 @@ EOF
 BUILD_MODE="debug"
 OPEN_APP="yes"
 STRICT_GATEKEEPER="no"
-TARGET_ARGS=(--target aarch64-apple-darwin)
+TARGET="aarch64-apple-darwin"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --release)
       BUILD_MODE="release"
       shift
-      ;;
-    --target)
-      if [ "$#" -lt 2 ]; then
-        echo "--target requires a value"
-        exit 1
-      fi
-      if [ "$2" != "aarch64-apple-darwin" ]; then
-        echo "Unsupported target: $2"
-        echo "MinNote signed app checks support Apple Silicon macOS only."
-        exit 1
-      fi
-      TARGET_ARGS=(--target "$2")
-      shift 2
       ;;
     --no-open)
       OPEN_APP="no"
@@ -144,23 +130,15 @@ if [ "$BUILD_MODE" = "debug" ]; then
   HELPER_CODESIGN_ARGS+=(--timestamp=none)
 fi
 
-BUILD_ARGS=(--bundles app --no-sign)
+BUILD_ARGS=(--bundles app --no-sign --target "$TARGET")
 if [ "$BUILD_MODE" = "debug" ]; then
   BUILD_ARGS+=(--debug)
-fi
-if [ "${#TARGET_ARGS[@]}" -gt 0 ]; then
-  BUILD_ARGS+=("${TARGET_ARGS[@]}")
 fi
 
 echo "[1/4] app bundle build"
 pnpm exec tauri build "${BUILD_ARGS[@]}"
 
-APP_PATH="$ROOT_DIR/src-tauri/target"
-if [ "${#TARGET_ARGS[@]}" -gt 0 ]; then
-  APP_PATH="$APP_PATH/${TARGET_ARGS[2]}/$BUILD_MODE/bundle/macos/MinNote.app"
-else
-  APP_PATH="$APP_PATH/$BUILD_MODE/bundle/macos/MinNote.app"
-fi
+APP_PATH="$ROOT_DIR/src-tauri/target/$TARGET/$BUILD_MODE/bundle/macos/MinNote.app"
 
 if [ ! -d "$APP_PATH" ]; then
   echo "MinNote.app not found: $APP_PATH"

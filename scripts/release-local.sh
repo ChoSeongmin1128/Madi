@@ -14,19 +14,8 @@ fi
 VERSION="$1"
 TAG="v$VERSION"
 RELEASE_DIR="/tmp/minnote-release-$VERSION"
-TARGETS=(
-  "aarch64-apple-darwin"
-)
-
-arch_label() {
-  case "$1" in
-    aarch64-apple-darwin) echo "aarch64" ;;
-    *)
-      echo "unsupported target: $1" >&2
-      exit 1
-      ;;
-  esac
-}
+TARGET="aarch64-apple-darwin"
+ARCH_LABEL="aarch64"
 
 if [ ! -f "$ENV_FILE" ]; then
   echo ".env.release.local 파일이 필요합니다."
@@ -112,30 +101,24 @@ echo "[3/8] 앱 빌드 및 공증"
 rm -rf "$RELEASE_DIR"
 mkdir -p "$RELEASE_DIR"
 
-for TARGET in "${TARGETS[@]}"; do
-  ARCH_LABEL="$(arch_label "$TARGET")"
-  echo "  - $TARGET"
+echo "  - $TARGET"
 
-  APPLE_SIGNING_IDENTITY_REF="$APPLE_SIGNING_IDENTITY_REF" \
-  APPLE_ID="$APPLE_ID" \
-  APPLE_PASSWORD="$APPLE_PASSWORD" \
-  APPLE_TEAM_ID="$APPLE_TEAM_ID" \
-  TAURI_SIGNING_PRIVATE_KEY_PATH="$TAURI_SIGNING_PRIVATE_KEY_PATH" \
-  TAURI_SIGNING_PRIVATE_KEY_PASSWORD="$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" \
-  ./scripts/package-notarized-app.sh full "$TARGET" "$ARCH_LABEL" "$APPLE_PROVISIONING_PROFILE_RESOLVED" "$RELEASE_DIR"
-done
+APPLE_SIGNING_IDENTITY_REF="$APPLE_SIGNING_IDENTITY_REF" \
+APPLE_ID="$APPLE_ID" \
+APPLE_PASSWORD="$APPLE_PASSWORD" \
+APPLE_TEAM_ID="$APPLE_TEAM_ID" \
+TAURI_SIGNING_PRIVATE_KEY_PATH="$TAURI_SIGNING_PRIVATE_KEY_PATH" \
+TAURI_SIGNING_PRIVATE_KEY_PASSWORD="$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" \
+./scripts/package-notarized-app.sh full "$TARGET" "$ARCH_LABEL" "$APPLE_PROVISIONING_PROFILE_RESOLVED" "$RELEASE_DIR"
 
 echo "[4/8] DMG 생성 및 공증"
-for TARGET in "${TARGETS[@]}"; do
-  ARCH_LABEL="$(arch_label "$TARGET")"
-  APP_PATH="$ROOT_DIR/src-tauri/target/$TARGET/release/bundle/macos/MinNote.app"
+APP_PATH="$ROOT_DIR/src-tauri/target/$TARGET/release/bundle/macos/MinNote.app"
 
-  APPLE_SIGNING_IDENTITY_REF="$APPLE_SIGNING_IDENTITY_REF" \
-  APPLE_ID="$APPLE_ID" \
-  APPLE_PASSWORD="$APPLE_PASSWORD" \
-  APPLE_TEAM_ID="$APPLE_TEAM_ID" \
-  ./scripts/package-notarized-dmg.sh full "$APP_PATH" "$RELEASE_DIR" "$VERSION" "$ARCH_LABEL"
-done
+APPLE_SIGNING_IDENTITY_REF="$APPLE_SIGNING_IDENTITY_REF" \
+APPLE_ID="$APPLE_ID" \
+APPLE_PASSWORD="$APPLE_PASSWORD" \
+APPLE_TEAM_ID="$APPLE_TEAM_ID" \
+./scripts/package-notarized-dmg.sh full "$APP_PATH" "$RELEASE_DIR" "$VERSION" "$ARCH_LABEL"
 
 echo "[5/8] latest.json 생성"
 PUB_DATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"

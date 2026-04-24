@@ -50,18 +50,15 @@ jobs:
           APPLE_SIGNING_IDENTITY_REF="$(security find-identity -v -p codesigning | grep "\"$APPLE_SIGNING_IDENTITY\"" | awk 'NR == 1 { print $2 }')"
           [ -n "$APPLE_SIGNING_IDENTITY_REF" ] || { echo "Unable to resolve codesigning identity fingerprint for $APPLE_SIGNING_IDENTITY"; exit 1; }
 
-  release_app_matrix:
+  release_app:
     needs: release_preflight
     runs-on: macos-latest
     timeout-minutes: 30
     permissions:
       contents: read
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - target: aarch64-apple-darwin
-            arch_label: aarch64
+    env:
+      TARGET: aarch64-apple-darwin
+      ARCH_LABEL: aarch64
     steps:
       - uses: actions/checkout@v4
 
@@ -97,8 +94,6 @@ jobs:
           {
             echo "APPLE_SIGNING_IDENTITY_REF=$APPLE_SIGNING_IDENTITY_REF"
             echo "PROFILE_PATH=$PROFILE_PATH"
-            echo "TARGET=${{ matrix.target }}"
-            echo "ARCH_LABEL=${{ matrix.arch_label }}"
           } >> "$GITHUB_ENV"
 
       - name: Build app bundle
@@ -143,15 +138,15 @@ jobs:
       - name: Upload notarized app artifact
         uses: actions/upload-artifact@v4
         with:
-          name: notarized-app-${{ matrix.arch_label }}
+          name: notarized-app
           path: |
-            MinNote_${{ matrix.arch_label }}.app.tar.gz
-            MinNote_${{ matrix.arch_label }}.app.tar.gz.sig
+            MinNote_aarch64.app.tar.gz
+            MinNote_aarch64.app.tar.gz.sig
           if-no-files-found: error
           retention-days: 1
 
   release_release_assets:
-    needs: release_app_matrix
+    needs: release_app
     runs-on: macos-latest
     timeout-minutes: 30
     permissions:
@@ -168,8 +163,7 @@ jobs:
       - name: Download notarized app artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: notarized-app-*
-          merge-multiple: true
+          name: notarized-app
 
       - name: Create or update draft GitHub release
         env:
@@ -276,7 +270,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   release_dmg:
-    needs: release_app_matrix
+    needs: release_app
     runs-on:
       - self-hosted
       - macOS
@@ -295,8 +289,7 @@ jobs:
       - name: Download notarized app artifacts
         uses: actions/download-artifact@v4
         with:
-          pattern: notarized-app-*
-          merge-multiple: true
+          name: notarized-app
 
       - name: Check self-hosted tooling and identity
         env:
