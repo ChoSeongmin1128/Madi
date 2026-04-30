@@ -1,11 +1,11 @@
 ---
 name: ui-product
-description: Use this skill when designing or reviewing editor UX, block interactions, Markdown behavior, or product decisions that affect MinNote's editing feel and simplicity.
+description: Use this skill when designing or reviewing editor UX, block interactions, Markdown behavior, or product decisions that affect Madi's editing feel and simplicity.
 ---
 
 # UI Product
 
-이 skill은 MinNote의 편집 경험과 제품 상호작용 원칙을 다룹니다.
+이 skill은 Madi의 편집 경험과 제품 상호작용 원칙을 다룹니다.
 
 다음 상황에서 먼저 사용합니다.
 - 블록 UI나 편집 인터랙션을 설계할 때

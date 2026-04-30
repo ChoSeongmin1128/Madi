@@ -32,8 +32,8 @@ const DEFAULT_ALWAYS_ON_TOP_ENABLED: &str = "false";
 const DEFAULT_WINDOW_OPACITY_PERCENT: &str = "100";
 const DEFAULT_GLOBAL_TOGGLE_SHORTCUT: &str = "Option+M";
 pub(crate) const ICLOUD_SCOPE_PRIVATE: &str = "private";
-pub(crate) const ICLOUD_ZONE_NAME: &str = "MinNoteZone";
-pub(crate) const ICLOUD_ZONE_SUBSCRIPTION_ID: &str = "minnote-zone-subscription";
+pub(crate) const ICLOUD_ZONE_NAME: &str = "MadiZone";
+pub(crate) const ICLOUD_ZONE_SUBSCRIPTION_ID: &str = "madi-zone-subscription";
 
 pub struct SqliteStore {
   pub(crate) connection: Connection,

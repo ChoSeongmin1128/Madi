@@ -13,7 +13,7 @@ fi
 
 VERSION="$1"
 TAG="v$VERSION"
-RELEASE_DIR="/tmp/minnote-release-$VERSION"
+RELEASE_DIR="/tmp/madi-release-$VERSION"
 TARGET="aarch64-apple-darwin"
 ARCH_LABEL="aarch64"
 
@@ -62,14 +62,34 @@ resolve_provisioning_profile_path() {
   fi
 
   for candidate in \
-    "$ROOT_DIR/.local-release/MinNote_Developer_ID_CloudKit.provisionprofile" \
-    "$ROOT_DIR/.local-release/minnote-cloudkit.provisionprofile"
+    "$ROOT_DIR/.local-release/Madi_Developer_ID_CloudKit.provisionprofile" \
+    "$ROOT_DIR/.local-release/madi-cloudkit.provisionprofile"
   do
     if [ -f "$candidate" ]; then
       echo "$candidate"
       return
     fi
   done
+}
+
+plist_array_contains() {
+  local plist_path="$1"
+  local key_path="$2"
+  local expected_value="$3"
+
+  /usr/libexec/PlistBuddy -c "Print $key_path" "$plist_path" 2>/dev/null | grep -Fq "$expected_value"
+}
+
+require_profile_entitlement() {
+  local plist_path="$1"
+  local key_path="$2"
+  local expected_value="$3"
+  local failure_message="$4"
+
+  if ! plist_array_contains "$plist_path" "$key_path" "$expected_value"; then
+    echo "$failure_message"
+    exit 1
+  fi
 }
 
 APPLE_SIGNING_IDENTITY_REF="$(resolve_signing_identity_ref "$APPLE_SIGNING_IDENTITY")"
@@ -87,10 +107,21 @@ if [ -z "$APPLE_PROVISIONING_PROFILE_RESOLVED" ] || [ ! -f "$APPLE_PROVISIONING_
   echo "CloudKit 및 Push 권한이 포함된 provisioning profile이 필요합니다."
   exit 1
 fi
-/usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.aps-environment" /dev/stdin <<<"$(security cms -D -i "$APPLE_PROVISIONING_PROFILE_RESOLVED")" >/dev/null
 PROFILE_PLIST="$(mktemp)"
+trap 'rm -f "${PROFILE_PLIST:-}"' EXIT
 security cms -D -i "$APPLE_PROVISIONING_PROFILE_RESOLVED" > "$PROFILE_PLIST"
+/usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.aps-environment" "$PROFILE_PLIST" >/dev/null
 /usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.icloud-services" "$PROFILE_PLIST" >/dev/null
+require_profile_entitlement \
+  "$PROFILE_PLIST" \
+  ":Entitlements:com.apple.developer.icloud-container-identifiers" \
+  "iCloud.com.seongmin.madi" \
+  "Madi iCloud container가 포함된 provisioning profile이 필요합니다."
+require_profile_entitlement \
+  "$PROFILE_PLIST" \
+  ":Entitlements:com.apple.developer.icloud-container-identifiers" \
+  "iCloud.com.seongmin.minnote" \
+  "Phase 1 migration release에는 legacy iCloud container가 포함된 provisioning profile이 필요합니다."
 rm -f "$PROFILE_PLIST"
 if [ -z "$APPLE_SIGNING_IDENTITY_REF" ]; then
   echo "codesign identity fingerprint를 해석할 수 없습니다."
@@ -112,7 +143,7 @@ TAURI_SIGNING_PRIVATE_KEY_PASSWORD="$TAURI_SIGNING_PRIVATE_KEY_PASSWORD" \
 ./scripts/package-notarized-app.sh full "$TARGET" "$ARCH_LABEL" "$APPLE_PROVISIONING_PROFILE_RESOLVED" "$RELEASE_DIR"
 
 echo "[4/8] DMG 생성 및 공증"
-APP_PATH="$ROOT_DIR/src-tauri/target/$TARGET/release/bundle/macos/MinNote.app"
+APP_PATH="$ROOT_DIR/src-tauri/target/$TARGET/release/bundle/macos/Madi.app"
 
 APPLE_SIGNING_IDENTITY_REF="$APPLE_SIGNING_IDENTITY_REF" \
 APPLE_ID="$APPLE_ID" \
@@ -122,12 +153,12 @@ APPLE_TEAM_ID="$APPLE_TEAM_ID" \
 
 echo "[5/8] latest.json 생성"
 PUB_DATE="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-SIG_AARCH64="$(cat "$RELEASE_DIR/MinNote_aarch64.app.tar.gz.sig")"
-URL_AARCH64="https://github.com/ChoSeongmin1128/MinNote/releases/download/$TAG/MinNote_aarch64.app.tar.gz"
+SIG_AARCH64="$(cat "$RELEASE_DIR/Madi_aarch64.app.tar.gz.sig")"
+URL_AARCH64="https://github.com/ChoSeongmin1128/Madi/releases/download/$TAG/Madi_aarch64.app.tar.gz"
 
 jq -n \
   --arg version "$VERSION" \
-  --arg notes "MinNote $TAG 업데이트" \
+  --arg notes "Madi $TAG 업데이트" \
   --arg pub_date "$PUB_DATE" \
   --arg sig_arm "$SIG_AARCH64" \
   --arg url_arm "$URL_AARCH64" \
@@ -144,7 +175,7 @@ jq -n \
   }' > "$RELEASE_DIR/latest.json"
 
 jq -e '.version and .pub_date and .platforms["darwin-aarch64"]' "$RELEASE_DIR/latest.json" >/dev/null
-[ -s "$RELEASE_DIR/MinNote_aarch64.app.tar.gz.sig" ]
+[ -s "$RELEASE_DIR/Madi_aarch64.app.tar.gz.sig" ]
 
 python3 - "$RELEASE_DIR" <<'PY'
 import pathlib
@@ -153,7 +184,7 @@ import tarfile
 
 release_dir = pathlib.Path(sys.argv[1])
 for archive_path in (
-    release_dir / "MinNote_aarch64.app.tar.gz",
+    release_dir / "Madi_aarch64.app.tar.gz",
 ):
     with tarfile.open(archive_path, "r:gz") as archive:
         invalid = [
@@ -177,16 +208,16 @@ git push origin main
 git tag -f "$TAG"
 git push origin "$TAG" --force
 if gh release view "$TAG" >/dev/null 2>&1; then
-  gh release edit "$TAG" --title "MinNote $TAG" --notes "MinNote $TAG 업데이트"
+  gh release edit "$TAG" --title "Madi $TAG" --notes "Madi $TAG 업데이트"
 else
-  gh release create "$TAG" --title "MinNote $TAG" --notes "MinNote $TAG 업데이트"
+  gh release create "$TAG" --title "Madi $TAG" --notes "Madi $TAG 업데이트"
 fi
 
 echo "[8/8] GitHub release 업로드"
 gh release upload "$TAG" \
-  "$RELEASE_DIR/MinNote_${VERSION}.dmg#MinNote_${VERSION}.dmg" \
-  "$RELEASE_DIR/MinNote_aarch64.app.tar.gz#MinNote_aarch64.app.tar.gz" \
-  "$RELEASE_DIR/MinNote_aarch64.app.tar.gz.sig#MinNote_aarch64.app.tar.gz.sig" \
+  "$RELEASE_DIR/Madi_${VERSION}.dmg#Madi_${VERSION}.dmg" \
+  "$RELEASE_DIR/Madi_aarch64.app.tar.gz#Madi_aarch64.app.tar.gz" \
+  "$RELEASE_DIR/Madi_aarch64.app.tar.gz.sig#Madi_aarch64.app.tar.gz.sig" \
   "$RELEASE_DIR/latest.json#latest.json" \
   --clobber
 

@@ -1,5 +1,5 @@
 import { ChevronDown, RotateCcw, Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { DocumentSummaryVm } from '../../application/models/document';
 import { getVisibleDocumentTitle } from '../../lib/documentTitle';
 
@@ -21,12 +21,6 @@ export function SidebarTrashSection({
   const [confirmEmptyTrash, setConfirmEmptyTrash] = useState(false);
   const trashCount = documents.length;
 
-  useEffect(() => {
-    if (!isExpanded) {
-      setConfirmEmptyTrash(false);
-    }
-  }, [isExpanded]);
-
   return (
     <div className="trash-section">
       <div className="trash-section-summary-row">
@@ -34,7 +28,12 @@ export function SidebarTrashSection({
           className="trash-section-summary"
           type="button"
           aria-expanded={isExpanded}
-          onClick={onToggleExpanded}
+          onClick={() => {
+            if (isExpanded) {
+              setConfirmEmptyTrash(false);
+            }
+            onToggleExpanded();
+          }}
         >
           <span className="trash-section-summary-copy">
             <span className="trash-section-summary-title">휴지통</span>

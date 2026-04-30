@@ -19,6 +19,8 @@ export function AppUpdateButton({ status }: AppUpdateButtonProps) {
     <button
       className={`update-pill${isBusy ? ' is-progress' : ' is-ready'}`}
       type="button"
+      aria-label={label}
+      title={label}
       disabled={isBusy}
       onClick={() => {
         if (!isBusy) {
@@ -27,7 +29,7 @@ export function AppUpdateButton({ status }: AppUpdateButtonProps) {
       }}
     >
       {isBusy ? <LoaderCircle className="spin" size={13} /> : <Download size={13} />}
-      <span>{label}</span>
+      <span className="update-pill-label">{label}</span>
     </button>
   );
 }

@@ -108,7 +108,7 @@ describe('runUpdateCheck', () => {
 
   it('maps unpack failures to a user-facing install message', async () => {
     checkMock.mockRejectedValueOnce(
-      new Error("failed to unpack `._MinNote.app` into `/var/folders/.../tauri_updated_app123/`"),
+      new Error("failed to unpack `._Madi.app` into `/var/folders/.../tauri_updated_app123/`"),
     );
 
     await runUpdateCheck();

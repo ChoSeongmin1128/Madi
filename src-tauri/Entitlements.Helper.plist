@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>com.apple.application-identifier</key>
-    <string>5YG4V2PLZV.com.seongmin.minnote</string>
+    <string>5YG4V2PLZV.com.seongmin.madi</string>
 
     <key>com.apple.security.network.client</key>
     <true/>
@@ -19,6 +19,7 @@
 
 	<key>com.apple.developer.icloud-container-identifiers</key>
 	<array>
+		<string>iCloud.com.seongmin.madi</string>
 		<string>iCloud.com.seongmin.minnote</string>
 	</array>
 

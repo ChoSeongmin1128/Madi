@@ -1,51 +1,30 @@
 import { SlidersHorizontal } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
-import { usePreferencesController } from '../app/controllers';
+import { useRef, useState } from 'react';
 import {
   MAX_WINDOW_OPACITY_PERCENT,
   MIN_WINDOW_OPACITY_PERCENT,
 } from '../lib/globalShortcut';
 import { useWindowOpacityControl } from '../hooks/useWindowOpacityControl';
-import { useWorkspaceStore } from '../stores/workspaceStore';
+import { useDismissibleLayer } from '../hooks/useDismissibleLayer';
 
 export function WindowMenu() {
-  const { setAlwaysOnTopEnabled } = usePreferencesController();
   const [isOpen, setIsOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
-  const alwaysOnTopEnabled = useWorkspaceStore((state) => state.alwaysOnTopEnabled);
   const { draftOpacity, previewOpacity, commitOpacity } = useWindowOpacityControl();
 
-  useEffect(() => {
-    if (!isOpen) {
-      return;
-    }
-
-    const onPointerDown = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        setIsOpen(false);
-      }
-    };
-
-    window.addEventListener('mousedown', onPointerDown);
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      window.removeEventListener('mousedown', onPointerDown);
-      window.removeEventListener('keydown', onKeyDown);
-    };
-  }, [isOpen]);
+  useDismissibleLayer({
+    enabled: isOpen,
+    layerRef: rootRef,
+    onDismiss: () => setIsOpen(false),
+  });
 
   return (
     <div className="window-menu" ref={rootRef}>
       <button
         className="icon-button"
         type="button"
-        aria-label="앱 창 메뉴"
+        aria-label="창 투명도 메뉴"
+        aria-haspopup="dialog"
         aria-expanded={isOpen}
         onClick={() => setIsOpen((value) => !value)}
       >
@@ -53,19 +32,7 @@ export function WindowMenu() {
       </button>
 
       {isOpen ? (
-        <div className="window-menu-popover" role="menu">
-          <label className="window-menu-toggle" htmlFor="always-on-top-toggle">
-            <span>항상 위에 고정</span>
-            <input
-              id="always-on-top-toggle"
-              type="checkbox"
-              checked={alwaysOnTopEnabled}
-              onChange={(event) => {
-                void setAlwaysOnTopEnabled(event.target.checked);
-              }}
-            />
-          </label>
-
+        <div className="window-menu-popover" role="dialog" aria-label="창 투명도">
           <div className="window-menu-slider">
             <div className="window-menu-slider-header">
               <div className="window-menu-slider-title-group">

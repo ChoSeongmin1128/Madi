@@ -1,0 +1,66 @@
+.settings-switch-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  min-height: 44px;
+  border: 1px solid transparent;
+  border-radius: var(--madi-radius-md);
+  padding: 7px 2px;
+}
+
+.settings-switch-row:hover {
+  background: var(--madi-settings-row-hover);
+}
+
+.settings-switch-input {
+  position: absolute;
+  right: 0;
+  width: 42px;
+  height: 26px;
+  margin: 0;
+  opacity: 0;
+}
+
+.settings-switch-track {
+  position: relative;
+  display: inline-flex;
+  width: 42px;
+  height: 26px;
+  flex-shrink: 0;
+  align-items: center;
+  border: 1px solid color-mix(in srgb, CanvasText 12%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, CanvasText 10%, transparent);
+  padding: 2px;
+  transition: background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.settings-switch-thumb {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: Canvas;
+  box-shadow: 0 1px 2px color-mix(in srgb, CanvasText 16%, transparent);
+  transform: translateX(0);
+  transition: transform 140ms ease;
+}
+
+.settings-switch-input:checked + .settings-switch-track {
+  border-color: color-mix(in srgb, var(--brand-500) 34%, transparent);
+  background: color-mix(in srgb, var(--brand-500) 82%, Canvas 18%);
+}
+
+.settings-switch-input:checked + .settings-switch-track .settings-switch-thumb {
+  transform: translateX(16px);
+}
+
+.settings-switch-input:focus-visible + .settings-switch-track {
+  box-shadow: var(--madi-focus-glow);
+}
+
+.settings-switch-input:disabled + .settings-switch-track {
+  opacity: 0.48;
+}

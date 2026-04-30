@@ -1,5 +1,5 @@
 import { ShortcutCaptureField } from '../ShortcutCaptureField';
-import { SegmentedSelector } from '../SegmentedSelector';
+import { SettingsSwitch } from './SettingsSwitch';
 
 interface SettingsWindowSectionProps {
   menuBarIconEnabled: boolean;
@@ -9,7 +9,6 @@ interface SettingsWindowSectionProps {
   globalShortcutError: string | null;
   menuBarIconError: string | null;
   windowPreferenceError: string | null;
-  menuBarOptions: ReadonlyArray<{ value: 'off' | 'on'; label: string }>;
   minOpacityPercent: number;
   maxOpacityPercent: number;
   onMenuBarIconEnabledChange: (enabled: boolean) => void;
@@ -27,7 +26,6 @@ export function SettingsWindowSection({
   globalShortcutError,
   menuBarIconError,
   windowPreferenceError,
-  menuBarOptions,
   minOpacityPercent,
   maxOpacityPercent,
   onMenuBarIconEnabledChange,
@@ -42,12 +40,12 @@ export function SettingsWindowSection({
         <div className="settings-section-header">
           <span className="settings-section-title">메뉴바 아이콘</span>
         </div>
-        <SegmentedSelector
-          ariaLabel="메뉴바 아이콘 선택"
-          tone="settings"
-          value={menuBarIconEnabled ? 'on' : 'off'}
-          options={menuBarOptions}
-          onChange={(nextValue) => onMenuBarIconEnabledChange(nextValue === 'on')}
+        <SettingsSwitch
+          id="settings-menu-bar-icon"
+          checked={menuBarIconEnabled}
+          label="메뉴바에서 열기"
+          description="Madi를 닫아도 메뉴바에서 다시 열 수 있게 둡니다."
+          onChange={onMenuBarIconEnabledChange}
         />
         {menuBarIconError ? <span className="shortcut-capture-error">{menuBarIconError}</span> : null}
       </div>
@@ -57,22 +55,15 @@ export function SettingsWindowSection({
           <span className="settings-section-title">창 제어</span>
         </div>
 
-        <label className="settings-toggle-row" htmlFor="settings-always-on-top">
-          <span className="settings-toggle-copy">
-            <span className="settings-toggle-title">항상 위에 고정</span>
-            <span className="document-menu-option-description">
-              다른 앱으로 전환해도 MinNote 창을 위에 유지합니다.
-            </span>
-          </span>
-          <input
-            id="settings-always-on-top"
-            type="checkbox"
-            checked={alwaysOnTopEnabled}
-            onChange={(event) => {
-              void onAlwaysOnTopEnabledChange(event.target.checked);
-            }}
-          />
-        </label>
+        <SettingsSwitch
+          id="settings-always-on-top"
+          checked={alwaysOnTopEnabled}
+          label="항상 위에 고정"
+          description="다른 앱으로 전환해도 Madi 창을 위에 유지합니다."
+          onChange={(checked) => {
+            void onAlwaysOnTopEnabledChange(checked);
+          }}
+        />
 
         <div className="settings-range-group">
           <div className="settings-range-header">

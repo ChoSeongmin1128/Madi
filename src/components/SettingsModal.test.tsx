@@ -145,7 +145,7 @@ describe('SettingsModal', () => {
   it('renders a close button inside the sticky header', () => {
     render(<SettingsModal isOpen onClose={vi.fn()} />);
 
-    const header = screen.getByText('전체 설정').closest('.settings-modal-header');
+    const header = screen.getByText('설정').closest('.settings-modal-header');
     expect(header).not.toBeNull();
     expect(within(header as HTMLElement).getByRole('button', { name: '설정 닫기' })).toBeInTheDocument();
   });

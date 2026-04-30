@@ -1,4 +1,4 @@
-# MinNote DMG build settings consumed by dmgbuild.
+# Madi DMG build settings consumed by dmgbuild.
 #
 # This writes Finder metadata directly into the image, avoiding AppleScript and
 # Finder timing/cache issues when arranging the installer window.

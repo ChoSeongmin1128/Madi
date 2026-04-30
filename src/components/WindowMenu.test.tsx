@@ -5,14 +5,12 @@ import { WindowMenu } from './WindowMenu';
 import { useWorkspaceStore } from '../stores/workspaceStore';
 
 const actions = vi.hoisted(() => ({
-  setAlwaysOnTopEnabled: vi.fn(),
   previewWindowOpacityPercent: vi.fn(),
   setWindowOpacityPercent: vi.fn(),
 }));
 
 vi.mock('../app/controllers', () => ({
   usePreferencesController: () => ({
-    setAlwaysOnTopEnabled: actions.setAlwaysOnTopEnabled,
     previewWindowOpacityPercent: actions.previewWindowOpacityPercent,
     setWindowOpacityPercent: actions.setWindowOpacityPercent,
   }),
@@ -20,7 +18,6 @@ vi.mock('../app/controllers', () => ({
 
 describe('WindowMenu', () => {
   beforeEach(() => {
-    actions.setAlwaysOnTopEnabled.mockReset();
     actions.previewWindowOpacityPercent.mockReset();
     actions.setWindowOpacityPercent.mockReset();
     actions.previewWindowOpacityPercent.mockImplementation(async (value: number) => value);
@@ -34,13 +31,9 @@ describe('WindowMenu', () => {
   it('renders quick app window controls and dispatches changes', async () => {
     render(<WindowMenu />);
 
-    await userEvent.click(screen.getByRole('button', { name: '앱 창 메뉴' }));
+    await userEvent.click(screen.getByRole('button', { name: '창 투명도 메뉴' }));
 
-    const checkbox = screen.getByRole('checkbox');
-    expect(checkbox).not.toBeChecked();
-
-    await userEvent.click(checkbox);
-    expect(actions.setAlwaysOnTopEnabled).toHaveBeenCalledWith(true);
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
 
     const slider = screen.getByRole('slider');
     fireEvent.input(slider, { target: { value: '82' } });

@@ -2,6 +2,7 @@ import { createPortal } from 'react-dom';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { BLOCK_KIND_OPTIONS } from '../lib/blockOptions';
 import type { BlockKind } from '../lib/types';
+import { useDismissibleLayer } from '../hooks/useDismissibleLayer';
 
 interface TypeMenuProps {
   anchorRect: DOMRect | null;
@@ -31,16 +32,11 @@ export function TypeMenu({ anchorRect, onSelect, onClose }: TypeMenuProps) {
     rootRef.current?.focus();
   }, []);
 
-  useEffect(() => {
-    const onPointerDown = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        onClose();
-      }
-    };
-
-    window.addEventListener('mousedown', onPointerDown);
-    return () => window.removeEventListener('mousedown', onPointerDown);
-  }, [onClose]);
+  useDismissibleLayer({
+    enabled: true,
+    layerRef: rootRef,
+    onDismiss: onClose,
+  });
 
   const selectedOption = useMemo(
     () => BLOCK_KIND_OPTIONS[selectedIndex] ?? BLOCK_KIND_OPTIONS[0],
@@ -52,6 +48,7 @@ export function TypeMenu({ anchorRect, onSelect, onClose }: TypeMenuProps) {
       ref={rootRef}
       className="type-menu"
       role="menu"
+      aria-label="블록 형식 선택"
       tabIndex={-1}
       style={{ top: position.top, left: position.left }}
       onKeyDown={(event) => {
@@ -86,6 +83,8 @@ export function TypeMenu({ anchorRect, onSelect, onClose }: TypeMenuProps) {
           <button
             key={option.kind}
             type="button"
+            role="menuitemradio"
+            aria-checked={selectedIndex === index}
             className={selectedIndex === index ? 'is-active' : ''}
             onMouseEnter={() => setSelectedIndex(index)}
             onClick={() => onSelect(option.kind)}

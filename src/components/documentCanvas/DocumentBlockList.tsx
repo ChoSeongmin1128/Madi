@@ -1,4 +1,4 @@
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import type { BlockVm } from '../../application/models/document';
 import { BlockCard } from '../BlockCard';
@@ -28,6 +28,8 @@ export function DocumentBlockList({
   onGripPointerDown,
   onToggleMenu,
 }: DocumentBlockListProps) {
+  const shouldReduceMotion = useReducedMotion();
+
   return (
     <>
       <div
@@ -38,11 +40,11 @@ export function DocumentBlockList({
         {blocks.map((block, index) => (
           <motion.div
             key={block.id}
-            layout
-            initial={{ opacity: 0, scale: 0.97, y: -4 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.96 }}
-            transition={{
+            layout={!shouldReduceMotion}
+            initial={shouldReduceMotion ? false : { opacity: 0, scale: 0.97, y: -4 }}
+            animate={shouldReduceMotion ? { opacity: 1 } : { opacity: 1, scale: 1, y: 0 }}
+            exit={shouldReduceMotion ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
+            transition={shouldReduceMotion ? { duration: 0.01 } : {
               layout: { duration: 0.2, ease: [0.2, 0.9, 0.3, 1] },
               opacity: { duration: 0.18 },
               scale: { duration: 0.18 },

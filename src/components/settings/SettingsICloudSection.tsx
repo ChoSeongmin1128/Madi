@@ -1,8 +1,6 @@
 import {
   AlertTriangle,
   CheckCircle2,
-  ChevronDown,
-  ChevronRight,
   Cloud,
   CloudOff,
   Download,
@@ -12,6 +10,9 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import type { ICloudSyncDebugInfoDto, ICloudSyncStatus } from '../../lib/types';
+import { SettingsSwitch } from './SettingsSwitch';
+
+type ICloudRecoveryAction = 'force-upload' | 'force-redownload';
 
 interface ICloudPresentation {
   label: string;
@@ -107,7 +108,24 @@ function getPresentation(status: ICloudSyncStatus): ICloudPresentation {
   };
 }
 
+const RECOVERY_ACTION_COPY: Record<
+  ICloudRecoveryAction,
+  { title: string; description: string; confirmLabel: string }
+> = {
+  'force-upload': {
+    title: 'Madi 클라우드 다시 올리기',
+    description: '현재 Mac의 문서 상태를 기준으로 Madi 클라우드 내용을 다시 씁니다.',
+    confirmLabel: '다시 올리기 실행',
+  },
+  'force-redownload': {
+    title: 'Madi 클라우드 다시 받기',
+    description: '이 Mac의 로컬 문서를 비우고 Madi 클라우드 기준으로 다시 받습니다.',
+    confirmLabel: '다시 받기 실행',
+  },
+};
+
 interface SettingsICloudSectionProps {
+  mode?: 'sync' | 'advanced';
   status: ICloudSyncStatus;
   debugInfo: ICloudSyncDebugInfoDto | null;
   debugError: string | null;
@@ -121,6 +139,7 @@ interface SettingsICloudSectionProps {
 }
 
 export function SettingsICloudSection({
+  mode = 'sync',
   status,
   debugInfo,
   debugError,
@@ -132,66 +151,69 @@ export function SettingsICloudSection({
   onForceUpload,
   onForceRedownload,
 }: SettingsICloudSectionProps) {
+  const [pendingRecoveryAction, setPendingRecoveryAction] = useState<ICloudRecoveryAction | null>(null);
   const presentation = getPresentation(status);
   const Icon = presentation.icon;
   const isBusy = status.state === 'checking' || status.state === 'syncing';
-  const [isAdvancedOpen, setAdvancedOpen] = useState(false);
-  const AdvancedIcon = isAdvancedOpen ? ChevronDown : ChevronRight;
+  const isAdvanced = mode === 'advanced';
+  const pendingRecoveryCopy = pendingRecoveryAction
+    ? RECOVERY_ACTION_COPY[pendingRecoveryAction]
+    : null;
+
+  const confirmRecoveryAction = () => {
+    if (pendingRecoveryAction === 'force-upload') {
+      onForceUpload();
+    }
+    if (pendingRecoveryAction === 'force-redownload') {
+      onForceRedownload();
+    }
+    setPendingRecoveryAction(null);
+  };
 
   return (
     <div className="settings-section">
       <div className="settings-section-header">
         <div className="settings-title-stack">
-          <span className="settings-section-title">iCloud 동기화</span>
+          <span className="settings-section-title">
+            {isAdvanced ? '동기화 진단과 복구' : 'iCloud 동기화'}
+          </span>
         </div>
         <span className={`settings-status-chip is-${presentation.tone}`}>
           <Icon className={presentation.spin ? 'spin' : undefined} size={14} />
           <span>{presentation.label}</span>
         </span>
       </div>
-      <p className="settings-description">
-        이 Mac에 먼저 저장한 뒤 iCloud로 백그라운드 동기화합니다. 오프라인이어도 작성 내용은 로컬에 유지됩니다.
-      </p>
-      <div className="settings-update-actions">
-        <button
-          className="ghost-button"
-          type="button"
-          disabled={isBusy}
-          onClick={() => {
-            onEnabledChange(!status.enabled);
-          }}
-        >
-          {status.enabled ? '동기화 끄기' : '동기화 켜기'}
-        </button>
-        <button
-          className="ghost-button"
-          type="button"
-          disabled={!status.enabled || isBusy}
-          onClick={onRunSync}
-        >
-          <RefreshCw size={14} />
-          지금 동기화
-        </button>
-      </div>
-      <div className="settings-advanced-panel">
-        <button
-          className="ghost-button settings-advanced-toggle"
-          type="button"
-          onClick={() => {
-            setAdvancedOpen((current) => !current);
-          }}
-        >
-          <span className="settings-title-stack">
-            <AdvancedIcon size={14} />
-            <span>고급 옵션</span>
-          </span>
-          <span className="settings-field-hint">진단 정보와 복구 도구</span>
-        </button>
-        {isAdvancedOpen ? (
+      {!isAdvanced ? (
+        <>
+          <p className="settings-description">
+            이 Mac에 먼저 저장한 뒤 iCloud로 백그라운드 동기화합니다. 오프라인이어도 작성 내용은 로컬에 유지됩니다.
+          </p>
+          <SettingsSwitch
+            id="settings-icloud-sync"
+            checked={status.enabled}
+            disabled={isBusy}
+            label="iCloud로 동기화"
+            description="같은 Apple 계정의 Mac 사이에서 문서를 이어서 사용합니다."
+            onChange={onEnabledChange}
+          />
+          <div className="settings-update-actions">
+            <button
+              className="ghost-button"
+              type="button"
+              disabled={!status.enabled || isBusy}
+              onClick={onRunSync}
+            >
+              <RefreshCw size={14} />
+              지금 동기화
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="settings-advanced-panel">
           <div className="settings-advanced-content">
             <div className="settings-icloud-debug">
               <div className="settings-section-header">
-                <span className="settings-section-title">동기화 진단</span>
+                <span className="settings-section-title">진단 정보</span>
                 <button
                   className="ghost-button settings-inline-action"
                   type="button"
@@ -204,29 +226,29 @@ export function SettingsICloudSection({
               </div>
               {debugInfo ? (
                 <div className="settings-debug-grid">
-                  <span>Bridge</span>
+                  <span>브리지</span>
                   <span>{debugInfo.bridgeAvailable ? '사용 가능' : '없음'}</span>
-                  <span>Zone</span>
+                  <span>구역</span>
                   <span>{debugInfo.zoneName}</span>
-                  <span>Token</span>
+                  <span>변경 토큰</span>
                   <span>{debugInfo.serverChangeTokenPresent ? '있음' : '없음'}</span>
-                  <span>Raw Pending</span>
+                  <span>업로드 대기</span>
                   <span>{debugInfo.pendingOperationCount}</span>
-                  <span>Processing</span>
+                  <span>현재 처리</span>
                   <span>{debugInfo.processingOperationCount}</span>
-                  <span>Failed</span>
+                  <span>실패</span>
                   <span>{debugInfo.failedOperationCount}</span>
-                  <span>Intents</span>
+                  <span>합쳐진 변경</span>
                   <span>{debugInfo.coalescedIntentCount}</span>
-                  <span>Tombstones</span>
+                  <span>삭제 기록</span>
                   <span>{debugInfo.tombstoneCount}</span>
-                  <span>Runtime</span>
+                  <span>실행 상태</span>
                   <span>{debugInfo.runtimePhase}</span>
-                  <span>Backoff</span>
+                  <span>재시도 횟수</span>
                   <span>{debugInfo.backoffAttempt}</span>
-                  <span>Next Retry</span>
+                  <span>다음 재시도</span>
                   <span>{formatDebugTimestamp(debugInfo.nextRetryAtMs)}</span>
-                  <span>Device</span>
+                  <span>기기</span>
                   <span>{debugInfo.deviceIdSuffix}</span>
                 </div>
               ) : null}
@@ -240,18 +262,54 @@ export function SettingsICloudSection({
                 <RefreshCw size={14} />
                 동기화 상태 초기화
               </button>
-              <button className="ghost-button" type="button" disabled={isBusy} onClick={onForceUpload}>
+              <button
+                className="ghost-button"
+                type="button"
+                disabled={isBusy}
+                onClick={() => setPendingRecoveryAction('force-upload')}
+              >
                 <Upload size={14} />
-                Cloud에 다시 업로드
+                Madi 클라우드로 다시 올리기
               </button>
-              <button className="ghost-button" type="button" disabled={isBusy} onClick={onForceRedownload}>
+              <button
+                className="ghost-button"
+                type="button"
+                disabled={isBusy}
+                onClick={() => setPendingRecoveryAction('force-redownload')}
+              >
                 <Download size={14} />
-                Cloud에서 다시 받기
+                Madi 클라우드에서 다시 받기
               </button>
             </div>
+            {pendingRecoveryCopy ? (
+              <div className="danger-confirm settings-recovery-confirm" role="group" aria-label={pendingRecoveryCopy.title}>
+                <div className="settings-title-stack">
+                  <AlertTriangle size={14} />
+                  <span className="settings-section-title">{pendingRecoveryCopy.title}</span>
+                </div>
+                <p className="settings-field-hint">{pendingRecoveryCopy.description}</p>
+                <div className="danger-confirm-actions">
+                  <button
+                    className="ghost-button"
+                    type="button"
+                    onClick={() => setPendingRecoveryAction(null)}
+                  >
+                    취소
+                  </button>
+                  <button
+                    className="document-menu-danger"
+                    type="button"
+                    disabled={isBusy}
+                    onClick={confirmRecoveryAction}
+                  >
+                    {pendingRecoveryCopy.confirmLabel}
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
-        ) : null}
-      </div>
+        </div>
+      )}
       {status.lastErrorMessage && (
         <p className="settings-field-hint">{status.lastErrorMessage}</p>
       )}

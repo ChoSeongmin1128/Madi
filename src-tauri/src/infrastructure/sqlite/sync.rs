@@ -15,6 +15,9 @@ use crate::infrastructure::cloudkit_bridge::{
     BridgeDocumentRecord, BridgeDocumentTombstoneRecord, CloudKitBridge, FetchChangesRequest,
     FetchChangesResponse,
 };
+use crate::infrastructure::legacy_identity_migration::{
+    LEGACY_ICLOUD_SCOPE_PRIVATE, LEGACY_ICLOUD_ZONE_NAME,
+};
 
 use super::*;
 
@@ -243,7 +246,8 @@ impl RemoteApplySummary {
     fn merge(&mut self, other: Self) {
         self.documents_changed |= other.documents_changed;
         self.trash_changed |= other.trash_changed;
-        self.affected_document_ids.extend(other.affected_document_ids);
+        self.affected_document_ids
+            .extend(other.affected_document_ids);
         self.affected_document_ids.sort();
         self.affected_document_ids.dedup();
     }
@@ -285,9 +289,7 @@ struct CoalescedSyncPlan {
 
 pub(crate) enum SyncRunPreparation {
     Disabled(ICloudSyncStatus),
-    Ready {
-        server_change_token: Option<String>,
-    },
+    Ready { server_change_token: Option<String> },
 }
 
 impl BuiltApplyOperations {
@@ -472,6 +474,83 @@ impl SqliteStore {
                 ICloudAccountStatus::Unknown.as_str()
             ],
         )?;
+        self.connection.execute(
+            "INSERT INTO cloudkit_state (
+         scope,
+         zone_name,
+         server_change_token,
+         last_sync_started_at_ms,
+         last_sync_succeeded_at_ms,
+         last_error_code,
+         last_error_message,
+         account_status,
+         sync_enabled,
+         subscription_installed,
+         subscription_last_verified_at_ms
+       ) VALUES (?1, ?2, NULL, NULL, NULL, NULL, NULL, ?3, 0, 0, NULL)
+       ON CONFLICT(scope) DO NOTHING",
+            params![
+                LEGACY_ICLOUD_SCOPE_PRIVATE,
+                LEGACY_ICLOUD_ZONE_NAME,
+                ICloudAccountStatus::Unknown.as_str()
+            ],
+        )?;
+        Ok(())
+    }
+
+    pub(crate) fn prepare_after_legacy_local_import(&mut self) -> Result<(), AppError> {
+        self.connection.execute(
+            "INSERT INTO cloudkit_state (
+         scope,
+         zone_name,
+         server_change_token,
+         last_sync_started_at_ms,
+         last_sync_succeeded_at_ms,
+         last_error_code,
+         last_error_message,
+         account_status,
+         sync_enabled,
+         subscription_installed,
+         subscription_last_verified_at_ms
+       )
+       SELECT ?1,
+              ?2,
+              server_change_token,
+              last_sync_started_at_ms,
+              last_sync_succeeded_at_ms,
+              last_error_code,
+              last_error_message,
+              account_status,
+              sync_enabled,
+              subscription_installed,
+              subscription_last_verified_at_ms
+       FROM cloudkit_state
+       WHERE scope = ?3
+       ON CONFLICT(scope) DO NOTHING",
+            params![
+                LEGACY_ICLOUD_SCOPE_PRIVATE,
+                LEGACY_ICLOUD_ZONE_NAME,
+                ICLOUD_SCOPE_PRIVATE
+            ],
+        )?;
+        self.connection.execute(
+            "UPDATE cloudkit_state
+       SET zone_name = ?1,
+           server_change_token = NULL,
+           last_sync_started_at_ms = NULL,
+           last_sync_succeeded_at_ms = NULL,
+           last_error_code = NULL,
+           last_error_message = NULL,
+           account_status = 'unknown',
+           subscription_installed = 0,
+           subscription_last_verified_at_ms = NULL
+       WHERE scope = ?2",
+            params![ICLOUD_ZONE_NAME, ICLOUD_SCOPE_PRIVATE],
+        )?;
+        self.connection
+            .execute("DELETE FROM document_sync_state", [])?;
+        self.queue_all_active_documents_for_sync()?;
+        self.set_state_value("madi_legacy_local_imported_at_ms", &Self::now().to_string())?;
         Ok(())
     }
 
@@ -600,7 +679,8 @@ impl SqliteStore {
     }
 
     pub(crate) fn cleanup_orphaned_sync_operations(&self) -> Result<(), AppError> {
-        let operations = self.list_sync_operations_with_statuses(&["pending", "processing", "failed"])?;
+        let operations =
+            self.list_sync_operations_with_statuses(&["pending", "processing", "failed"])?;
         let mut delete_ids = Vec::new();
 
         for operation in operations {
@@ -1301,8 +1381,8 @@ impl SqliteStore {
        SET server_change_token = NULL,
            last_error_code = NULL,
            last_error_message = NULL
-       WHERE scope = ?1",
-            params![ICLOUD_SCOPE_PRIVATE],
+       WHERE scope IN (?1, ?2)",
+            params![ICLOUD_SCOPE_PRIVATE, LEGACY_ICLOUD_SCOPE_PRIVATE],
         )?;
         self.get_icloud_sync_status()
     }
@@ -1315,7 +1395,8 @@ impl SqliteStore {
     pub(crate) fn force_redownload_from_cloud(&mut self) -> Result<ICloudSyncStatus, AppError> {
         self.connection.execute("DELETE FROM sync_operations", [])?;
         self.connection.execute("DELETE FROM sync_tombstones", [])?;
-        self.connection.execute("DELETE FROM document_sync_state", [])?;
+        self.connection
+            .execute("DELETE FROM document_sync_state", [])?;
         self.connection
             .execute(&format!("DELETE FROM {SEARCH_INDEX_TABLE}"), [])?;
         self.connection.execute("DELETE FROM blocks", [])?;
@@ -1325,8 +1406,8 @@ impl SqliteStore {
        SET server_change_token = NULL,
            last_error_code = NULL,
            last_error_message = NULL
-       WHERE scope = ?1",
-            params![ICLOUD_SCOPE_PRIVATE],
+       WHERE scope IN (?1, ?2)",
+            params![ICLOUD_SCOPE_PRIVATE, LEGACY_ICLOUD_SCOPE_PRIVATE],
         )?;
         self.get_icloud_sync_status()
     }
@@ -1479,11 +1560,15 @@ impl SqliteStore {
     }
 
     fn read_cloudkit_state(&self) -> Result<StoredCloudKitState, AppError> {
+        self.read_cloudkit_state_for_scope(ICLOUD_SCOPE_PRIVATE)
+    }
+
+    fn read_cloudkit_state_for_scope(&self, scope: &str) -> Result<StoredCloudKitState, AppError> {
         self.connection.query_row(
       "SELECT server_change_token, last_sync_started_at_ms, last_sync_succeeded_at_ms, last_error_code, last_error_message, account_status, sync_enabled, subscription_installed, subscription_last_verified_at_ms
        FROM cloudkit_state
        WHERE scope = ?1",
-      params![ICLOUD_SCOPE_PRIVATE],
+      params![scope],
       |row| {
         let account_status_raw = row.get::<_, String>(5)?;
         Ok(StoredCloudKitState {
@@ -1500,6 +1585,26 @@ impl SqliteStore {
         })
       },
     ).map_err(AppError::from)
+    }
+
+    pub(crate) fn legacy_server_change_token(&self) -> Result<Option<String>, AppError> {
+        self.read_cloudkit_state_for_scope(LEGACY_ICLOUD_SCOPE_PRIVATE)
+            .map(|state| state.server_change_token)
+    }
+
+    pub(crate) fn set_legacy_server_change_token(
+        &self,
+        token: Option<&str>,
+    ) -> Result<(), AppError> {
+        self.connection.execute(
+            "UPDATE cloudkit_state
+       SET server_change_token = ?1,
+           last_error_code = NULL,
+           last_error_message = NULL
+       WHERE scope = ?2",
+            params![token, LEGACY_ICLOUD_SCOPE_PRIVATE],
+        )?;
+        Ok(())
     }
 
     pub(crate) fn set_cloudkit_account_status(
@@ -1526,21 +1631,24 @@ impl SqliteStore {
             SUBSCRIPTION_RETRY_INTERVAL_MS
         };
 
-        Ok(stored.subscription_last_verified_at_ms.map_or(true, |verified_at| {
-            now.saturating_sub(verified_at) >= interval_ms
-        }))
+        Ok(stored
+            .subscription_last_verified_at_ms
+            .map_or(true, |verified_at| {
+                now.saturating_sub(verified_at) >= interval_ms
+            }))
     }
 
-    pub(crate) fn mark_cloudkit_subscription_check(
-        &self,
-        installed: bool,
-    ) -> Result<(), AppError> {
+    pub(crate) fn mark_cloudkit_subscription_check(&self, installed: bool) -> Result<(), AppError> {
         self.connection.execute(
             "UPDATE cloudkit_state
        SET subscription_installed = ?1,
            subscription_last_verified_at_ms = ?2
        WHERE scope = ?3",
-            params![if installed { 1 } else { 0 }, Self::now(), ICLOUD_SCOPE_PRIVATE],
+            params![
+                if installed { 1 } else { 0 },
+                Self::now(),
+                ICLOUD_SCOPE_PRIVATE
+            ],
         )?;
         Ok(())
     }
@@ -2104,10 +2212,7 @@ impl SqliteStore {
         operation_contexts: &mut HashMap<i64, BuiltOperationContext>,
         delete_record_names: &[String],
     ) {
-        let delete_record_names = delete_record_names
-            .iter()
-            .cloned()
-            .collect::<HashSet<_>>();
+        let delete_record_names = delete_record_names.iter().cloned().collect::<HashSet<_>>();
 
         save_documents.retain(|document| {
             let record_name = document_record_name_for(document);
@@ -2224,13 +2329,12 @@ impl SqliteStore {
 
             if let Some(context) = built.operation_contexts.get(operation_id) {
                 if let Some(document_id) = &context.document_id {
-                    let entry =
-                        document_apply_states
-                            .entry(document_id.clone())
-                            .or_insert(DocumentApplyState {
-                                all_succeeded: true,
-                                clears_sync_state: false,
-                            });
+                    let entry = document_apply_states.entry(document_id.clone()).or_insert(
+                        DocumentApplyState {
+                            all_succeeded: true,
+                            clears_sync_state: false,
+                        },
+                    );
                     entry.clears_sync_state |= context.clears_document_sync_state;
                 }
             }
@@ -2310,8 +2414,10 @@ impl SqliteStore {
                 continue;
             }
 
-            let Some(projected_updated_at_ms) =
-                built.document_projection_versions.get(&document_id).copied()
+            let Some(projected_updated_at_ms) = built
+                .document_projection_versions
+                .get(&document_id)
+                .copied()
             else {
                 continue;
             };
@@ -2345,7 +2451,8 @@ impl SqliteStore {
             .collect::<Vec<_>>();
 
         for operation_id in affected_operation_ids {
-            let should_remove_operation = match record_names_by_operation_id.get_mut(&operation_id) {
+            let should_remove_operation = match record_names_by_operation_id.get_mut(&operation_id)
+            {
                 Some(record_names) => {
                     record_names.remove(record_name);
                     record_names.is_empty()
@@ -3076,7 +3183,7 @@ mod tests {
     use crate::ports::repositories::DocumentRepository;
 
     fn test_db_path() -> PathBuf {
-        std::env::temp_dir().join(format!("minnote-sync-test-{}.db", uuid::Uuid::new_v4()))
+        std::env::temp_dir().join(format!("madi-sync-test-{}.db", uuid::Uuid::new_v4()))
     }
 
     fn test_store() -> SqliteStore {
@@ -3305,7 +3412,11 @@ mod tests {
 
         assert_eq!(
             final_ids,
-            vec![blocks[2].id.clone(), blocks[0].id.clone(), blocks[1].id.clone()],
+            vec![
+                blocks[2].id.clone(),
+                blocks[0].id.clone(),
+                blocks[1].id.clone()
+            ],
             "stale CloudKit block positions must not undo a local move"
         );
     }
@@ -3334,7 +3445,11 @@ mod tests {
             .collect::<Vec<_>>();
 
         let with_inserted = store
-            .create_block_below(&document.id, Some(&original_blocks[0].id), BlockKind::Markdown)
+            .create_block_below(
+                &document.id,
+                Some(&original_blocks[0].id),
+                BlockKind::Markdown,
+            )
             .expect("middle block should be inserted");
         let inserted_id = with_inserted[1].id.clone();
 
@@ -3357,7 +3472,11 @@ mod tests {
 
         assert_eq!(
             final_ids,
-            vec![original_blocks[0].id.clone(), inserted_id, original_blocks[1].id.clone()],
+            vec![
+                original_blocks[0].id.clone(),
+                inserted_id,
+                original_blocks[1].id.clone()
+            ],
             "stale CloudKit positions must not push a newly inserted block elsewhere"
         );
     }
@@ -3472,7 +3591,10 @@ mod tests {
 
         assert!(summary.documents_changed);
         assert!(!summary.trash_changed);
-        assert_eq!(summary.affected_document_ids, vec!["remote-doc".to_string()]);
+        assert_eq!(
+            summary.affected_document_ids,
+            vec!["remote-doc".to_string()]
+        );
     }
 
     #[test]
@@ -3507,7 +3629,8 @@ mod tests {
     }
 
     #[test]
-    fn document_tombstone_local_win_does_not_allow_child_block_tombstones_to_strip_active_document() {
+    fn document_tombstone_local_win_does_not_allow_child_block_tombstones_to_strip_active_document()
+    {
         let mut store = test_store();
         let document = store
             .create_document(Some("문서 tombstone 우선".to_string()))
@@ -3614,12 +3737,10 @@ mod tests {
             .force_redownload_from_cloud()
             .expect("force redownload should succeed");
 
-        assert!(
-            store
-                .read_document_sync_state(&document.id)
-                .expect("document sync state should load")
-                .is_none()
-        );
+        assert!(store
+            .read_document_sync_state(&document.id)
+            .expect("document sync state should load")
+            .is_none());
     }
 
     #[test]
@@ -3739,7 +3860,8 @@ mod tests {
             .collect::<HashSet<_>>();
 
         assert!(
-            !saved_block_record_names.contains(&SyncEntityType::Block.record_name(&deleted_block_id)),
+            !saved_block_record_names
+                .contains(&SyncEntityType::Block.record_name(&deleted_block_id)),
             "삭제된 블록은 ordering projection에서 다시 저장되면 안 됩니다"
         );
         assert_eq!(
@@ -3842,7 +3964,10 @@ mod tests {
             )
             .expect("remote block apply should succeed");
 
-        assert!(!applied, "로컬 tombstone이 있으면 remote block은 적용되면 안 됩니다");
+        assert!(
+            !applied,
+            "로컬 tombstone이 있으면 remote block은 적용되면 안 됩니다"
+        );
         assert!(
             store.fetch_block(&block_id).is_err(),
             "삭제된 블록은 remote upsert로 다시 생기면 안 됩니다"
@@ -3972,7 +4097,10 @@ mod tests {
             &[SyncEntityType::Block.record_name("block-1")],
         );
 
-        assert!(result.is_err(), "save/delete conflict는 bridge 호출 전에 차단해야 합니다");
+        assert!(
+            result.is_err(),
+            "save/delete conflict는 bridge 호출 전에 차단해야 합니다"
+        );
     }
 
     #[test]

@@ -1,5 +1,4 @@
 import { useEffect } from 'react';
-import { listen } from '@tauri-apps/api/event';
 import { AlertCircle, LoaderCircle, PanelLeft } from 'lucide-react';
 import { useDocumentController, useWorkspaceController } from './app/controllers';
 import { deriveEditorStatusPresentation } from './application/models/editorStatus';
@@ -9,12 +8,15 @@ import { EditorStatus } from './components/EditorStatus';
 import { Sidebar } from './components/Sidebar';
 import { DocumentCanvas } from './components/DocumentCanvas';
 import { SettingsModal } from './components/SettingsModal';
+import { TrashNoticeToast } from './components/TrashNoticeToast';
 import { WindowMenu } from './components/WindowMenu';
+import { WindowPinButton } from './components/WindowPinButton';
 import { useAppUpdater } from './hooks/useAppUpdater';
 import { useICloudSync } from './hooks/useICloudSync';
 import { useAppShortcuts } from './hooks/useAppShortcuts';
 import { useIsMobileViewport } from './hooks/useIsMobileViewport';
 import { applyEditorTypographyCssVars } from './lib/editorTypography';
+import { listenToTauriEvent } from './lib/tauriEvents';
 import type { ICloudSyncStatus, WorkspaceDocumentsChangedEvent } from './lib/types';
 import { useWorkspaceStore } from './stores/workspaceStore';
 import { useDocumentSessionStore } from './stores/documentSessionStore';
@@ -59,7 +61,7 @@ function App() {
   }, [bootstrapApp]);
 
   useEffect(() => {
-    const unlisten = listen('tray-open-settings', () => {
+    const unlisten = listenToTauriEvent('tray-open-settings', () => {
       setSettingsOpen(true);
     });
     return () => {
@@ -68,7 +70,7 @@ function App() {
   }, [setSettingsOpen]);
 
   useEffect(() => {
-    const unlisten = listen<ICloudSyncStatus>('icloud-sync-status-changed', (event) => {
+    const unlisten = listenToTauriEvent<ICloudSyncStatus>('icloud-sync-status-changed', (event) => {
       setICloudSyncStatus(event.payload);
     });
     return () => {
@@ -77,7 +79,7 @@ function App() {
   }, [setICloudSyncStatus]);
 
   useEffect(() => {
-    const unlisten = listen<WorkspaceDocumentsChangedEvent>('workspace-documents-changed', (event) => {
+    const unlisten = listenToTauriEvent<WorkspaceDocumentsChangedEvent>('workspace-documents-changed', (event) => {
       void refreshWorkspaceDocumentsAfterSync(event.payload);
     });
     return () => {
@@ -88,7 +90,7 @@ function App() {
   useEffect(() => {
     let shuttingDown = false;
 
-    const unlisten = listen('app-shutdown-requested', async () => {
+    const unlisten = listenToTauriEvent('app-shutdown-requested', async () => {
       if (shuttingDown) {
         return;
       }
@@ -165,6 +167,7 @@ function App() {
           </div>
           <div className="workspace-actions">
             <AppUpdateButton status={appUpdateStatus} />
+            <WindowPinButton />
             <WindowMenu />
             {currentDocument ? <DocumentMenu /> : null}
           </div>
@@ -184,6 +187,7 @@ function App() {
           <DocumentCanvas />
         )}
       </main>
+      <TrashNoticeToast />
     </div>
   );
 }

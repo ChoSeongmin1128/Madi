@@ -1,6 +1,7 @@
 import { relaunch } from '@tauri-apps/plugin-process';
 import { check } from '@tauri-apps/plugin-updater';
 import { updaterGateway } from '../../adapters/updaterGateway';
+import { isBrowserPreviewRuntime } from '../runtimeEnv';
 import {
   buildStatus,
   normalizeUpdateError,
@@ -35,6 +36,17 @@ async function closeDownloadedUpdate() {
 }
 
 async function performUpdateCheck(source: string) {
+  if (isBrowserPreviewRuntime()) {
+    setUpdateStatus({
+      state: 'idle',
+      version: null,
+      percent: null,
+      message: '브라우저 미리보기',
+      lastCheckedAt: Date.now(),
+    }, debugUpdater);
+    return;
+  }
+
   debugUpdater('check:start', { source });
   await closeDownloadedUpdate();
   preparedUpdateAction = null;
@@ -206,6 +218,10 @@ export async function runUpdateCheckFrom(source: string) {
 }
 
 export async function applyPreparedUpdate() {
+  if (isBrowserPreviewRuntime()) {
+    return;
+  }
+
   if (!preparedUpdateAction) {
     debugUpdater('install:skipped-no-prepared-update');
     return;

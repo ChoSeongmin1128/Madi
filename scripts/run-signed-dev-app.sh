@@ -12,7 +12,7 @@ usage() {
   cat <<'EOF'
 usage: ./scripts/run-signed-dev-app.sh [--release] [--no-open] [--strict-gatekeeper]
 
-Build a signed MinNote.app bundle for local verification and optionally open it.
+Build a signed Madi.app bundle for local verification and optionally open it.
 
 Options:
   --release         Build the release app bundle instead of debug
@@ -92,8 +92,8 @@ resolve_provisioning_profile_path() {
   fi
 
   for candidate in \
-    "$ROOT_DIR/.local-release/MinNote_Developer_ID_CloudKit.provisionprofile" \
-    "$ROOT_DIR/.local-release/minnote-cloudkit.provisionprofile"
+    "$ROOT_DIR/.local-release/Madi_Developer_ID_CloudKit.provisionprofile" \
+    "$ROOT_DIR/.local-release/madi-cloudkit.provisionprofile"
   do
     if [ -f "$candidate" ]; then
       echo "$candidate"
@@ -106,8 +106,8 @@ APPLE_PROVISIONING_PROFILE_RESOLVED="$(resolve_provisioning_profile_path || true
 
 sign_helper_app() {
   local app_path="$1"
-  local helper_app_path="$app_path/Contents/Resources/minnote-cloudkit-bridge.app"
-  local helper_exec_path="$helper_app_path/Contents/MacOS/minnote-cloudkit-bridge"
+  local helper_app_path="$app_path/Contents/Resources/madi-cloudkit-bridge.app"
+  local helper_exec_path="$helper_app_path/Contents/MacOS/madi-cloudkit-bridge"
 
   if [ ! -f "$helper_exec_path" ]; then
     return
@@ -138,10 +138,10 @@ fi
 echo "[1/4] app bundle build"
 pnpm exec tauri build "${BUILD_ARGS[@]}"
 
-APP_PATH="$ROOT_DIR/src-tauri/target/$TARGET/$BUILD_MODE/bundle/macos/MinNote.app"
+APP_PATH="$ROOT_DIR/src-tauri/target/$TARGET/$BUILD_MODE/bundle/macos/Madi.app"
 
 if [ ! -d "$APP_PATH" ]; then
-  echo "MinNote.app not found: $APP_PATH"
+  echo "Madi.app not found: $APP_PATH"
   exit 1
 fi
 
@@ -151,7 +151,7 @@ if [ -n "$APPLE_PROVISIONING_PROFILE_RESOLVED" ]; then
   cp "$APPLE_PROVISIONING_PROFILE_RESOLVED" "$APP_PATH/Contents/embedded.provisionprofile"
 fi
 sign_helper_app "$APP_PATH"
-codesign "${CODESIGN_ARGS[@]}" "$APP_PATH/Contents/MacOS/minnote"
+codesign "${CODESIGN_ARGS[@]}" "$APP_PATH/Contents/MacOS/madi"
 codesign "${CODESIGN_ARGS[@]}" "$APP_PATH"
 
 echo "[3/4] verify"

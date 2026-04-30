@@ -3,8 +3,6 @@ import type { BlockKind } from './types';
 export {
   CODE_LANGUAGE_OPTIONS,
   getCodeLanguageLabel,
-  highlightCodeToHtml,
-  loadCodeLanguageRegistration,
   normalizeCodeLanguage,
   type CodeLanguageId,
 } from './codeLanguageRegistry';

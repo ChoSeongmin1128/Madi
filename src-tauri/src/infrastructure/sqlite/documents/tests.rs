@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use super::*;
 
 fn test_db_path() -> PathBuf {
-  std::env::temp_dir().join(format!("minnote-documents-test-{}.db", uuid::Uuid::new_v4()))
+  std::env::temp_dir().join(format!("madi-documents-test-{}.db", uuid::Uuid::new_v4()))
 }
 
 fn test_store() -> SqliteStore {

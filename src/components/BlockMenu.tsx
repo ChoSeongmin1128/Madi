@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react';
 import type { BlockVm } from '../application/models/document';
 import { BLOCK_KIND_OPTIONS } from '../lib/blockOptions';
 import type { BlockKind } from '../lib/types';
+import { useDismissibleLayer } from '../hooks/useDismissibleLayer';
 
 interface BlockMenuProps {
   block: BlockVm;
@@ -25,29 +26,14 @@ export function BlockMenu({
     rootRef.current?.focus();
   }, []);
 
-  useEffect(() => {
-    const onPointerDown = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        onClose();
-      }
-    };
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onClose();
-      }
-    };
-
-    window.addEventListener('mousedown', onPointerDown);
-    window.addEventListener('keydown', onKeyDown);
-    return () => {
-      window.removeEventListener('mousedown', onPointerDown);
-      window.removeEventListener('keydown', onKeyDown);
-    };
-  }, [onClose]);
+  useDismissibleLayer({
+    enabled: true,
+    layerRef: rootRef,
+    onDismiss: onClose,
+  });
 
   return (
-    <div ref={rootRef} className="block-menu" role="menu" tabIndex={-1}>
+    <div ref={rootRef} className="block-menu" role="menu" aria-label="블록 메뉴" tabIndex={-1}>
       {isEmpty ? (
         <div className="block-menu-section">
           <span className="block-menu-label">형식</span>
@@ -59,6 +45,8 @@ export function BlockMenu({
                 <button
                   key={option.kind}
                   type="button"
+                  role="menuitemradio"
+                  aria-checked={block.kind === option.kind}
                   className={`block-menu-option${block.kind === option.kind ? ' is-active' : ''}`}
                   onClick={() => onSelectKind(option.kind)}
                 >
@@ -74,9 +62,9 @@ export function BlockMenu({
         </div>
       ) : null}
 
-      <div className="block-menu-divider" />
+      <div className="block-menu-divider" role="separator" />
 
-      <button className="block-menu-danger" type="button" onClick={onDelete}>
+      <button className="block-menu-danger" type="button" role="menuitem" onClick={onDelete}>
         <Trash2 size={14} />
         블록 삭제
       </button>

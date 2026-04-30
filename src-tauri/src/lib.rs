@@ -68,7 +68,7 @@ pub fn run() {
     Ok(app) => app.run(app_runtime::handle_run_event),
     Err(error) => {
       let message = error.to_string();
-      log::error!("MinNote startup failed: {message}");
+      log::error!("Madi startup failed: {message}");
       app_runtime::show_startup_error_dialog(&message);
     }
   }

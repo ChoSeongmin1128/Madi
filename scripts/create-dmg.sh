@@ -14,7 +14,7 @@ BACKGROUND_PNG="${BACKGROUND_PNG:-$ROOT_DIR/scripts/dmg-assets/background.png}"
 APP_PATH="$1"
 OUTPUT_DIR="$2"
 VERSION="$3"
-VOLUME_NAME="${VOLUME_NAME:-Install MinNote}"
+VOLUME_NAME="${VOLUME_NAME:-Install Madi}"
 WINDOW_W="${WINDOW_W:-640}"
 WINDOW_H="${WINDOW_H:-420}"
 APP_ICON_X="${APP_ICON_X:-170}"
@@ -24,7 +24,7 @@ APPS_ICON_Y="${APPS_ICON_Y:-230}"
 
 mkdir -p "$OUTPUT_DIR"
 
-FINAL_DMG="$OUTPUT_DIR/MinNote_${VERSION}.dmg"
+FINAL_DMG="$OUTPUT_DIR/Madi_${VERSION}.dmg"
 rm -f "$FINAL_DMG"
 
 if [ ! -d "$APP_PATH" ]; then
@@ -46,7 +46,7 @@ for candidate in dmgbuild "$HOME/.local/bin/dmgbuild"; do
 done
 
 if [ -z "$DMGBUILD_BIN" ]; then
-  echo "dmgbuild is required to create MinNote installer DMGs." >&2
+  echo "dmgbuild is required to create Madi installer DMGs." >&2
   echo "Install it with: pipx install dmgbuild" >&2
   exit 1
 fi
@@ -85,7 +85,7 @@ DMG_APPS_ICON_Y="$APPS_ICON_Y" \
 
 if [ -f "$VOLUME_ICON" ] && command -v Rez >/dev/null 2>&1 \
   && command -v DeRez >/dev/null 2>&1 && command -v SetFile >/dev/null 2>&1; then
-  ICON_TMP="$(mktemp -d "${TMPDIR:-/tmp}/minnote-dmg-icon.XXXXXX")"
+  ICON_TMP="$(mktemp -d "${TMPDIR:-/tmp}/madi-dmg-icon.XXXXXX")"
   cp "$VOLUME_ICON" "$ICON_TMP/icon.icns"
   sips -i "$ICON_TMP/icon.icns" >/dev/null
   DeRez -only icns "$ICON_TMP/icon.icns" > "$ICON_TMP/icon.rsrc"

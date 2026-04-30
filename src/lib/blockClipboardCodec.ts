@@ -1,7 +1,7 @@
 import { serializeBlockToMarkdown } from './markdown';
 import type { BlockKind } from './types';
 
-const BLOCK_CLIPBOARD_PREFIX = '<!--minnote-block:';
+const BLOCK_CLIPBOARD_PREFIX = '<!--madi-block:';
 const BLOCK_CLIPBOARD_SUFFIX = '-->';
 
 export interface ClipboardBlockData {

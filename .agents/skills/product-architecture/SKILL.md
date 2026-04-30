@@ -1,11 +1,11 @@
 ---
 name: product-architecture
-description: Use this skill when making product structure, block model, storage format, or architectural decisions for MinNote, especially when balancing Heynote-like block separation with Notion-like Markdown editing.
+description: Use this skill when making product structure, block model, storage format, or architectural decisions for Madi, especially when balancing Heynote-like block separation with Notion-like Markdown editing.
 ---
 
 # Product Architecture
 
-이 skill은 MinNote의 제품 구조와 핵심 의사결정 맥락을 다룹니다.
+이 skill은 Madi의 제품 구조와 핵심 의사결정 맥락을 다룹니다.
 
 다음 상황에서 먼저 사용합니다.
 - 블록 구조를 설계할 때

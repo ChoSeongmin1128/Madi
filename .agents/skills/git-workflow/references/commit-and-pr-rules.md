@@ -71,7 +71,7 @@ docs: 초기 Codex 문서 구조 추가
   - `package.json`
   - `src-tauri/tauri.conf.json`
   - `src-tauri/Cargo.toml`
-  - `src-tauri/Cargo.lock`의 `name = "minnote"` 항목
+  - `src-tauri/Cargo.lock`의 `name = "madi"` 항목
 - GitHub hosted runner는 공증된 `.app`과 updater 산출물(`.app.tar.gz`, `.sig`, `latest.json`)만 릴리스에 올립니다.
 - self-hosted macOS runner는 DMG 생성, DMG 서명/공증/검증, release publish를 담당합니다.
 - DMG가 release에 첨부되기 전까지는 배포 완료로 간주하지 않습니다.

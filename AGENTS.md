@@ -1,7 +1,7 @@
 # Repository Instructions
 
 ## Purpose
-- MinNote는 macOS 단독 데스크톱 앱입니다.
+- Madi는 macOS 단독 데스크톱 앱입니다.
 - 현재 제품 방향은 Heynote식 상위 블록 구분과 Notion식 Markdown 편집 경험을 함께 탐색하는 것입니다.
 
 ## Constraints
@@ -18,7 +18,7 @@
 - `package.json`
 - `src-tauri/tauri.conf.json`
 - `src-tauri/Cargo.toml`
-- `src-tauri/Cargo.lock`의 `name = "minnote"` 패키지 항목
+- `src-tauri/Cargo.lock`의 `name = "madi"` 패키지 항목
 - 버전 변경 작업을 사용자에게 보고하거나 문서화할 때는 위 체크리스트를 빠뜨리지 않고 명시합니다.
 
 ## Release Rules
@@ -38,4 +38,5 @@
 - 로컬 개발 환경, 실행/빌드 전제, 패키지 매니저 정책이 필요할 때는 `desktop-env` skill을 먼저 참고합니다.
 - 제품 구조, 블록 모델, 저장 포맷, 이전 의사결정 맥락이 필요할 때는 `product-architecture` skill을 먼저 참고합니다.
 - 편집 UX, 블록 구분, Markdown 상호작용 원칙이 필요할 때는 `ui-product` skill을 먼저 참고합니다.
+- UI/UX 시각 기준, 설정 화면 구조, 컨트롤 사용 기준이 필요할 때는 `DESIGN.md`를 먼저 참고합니다.
 - `README.md`를 갱신하거나 README 반영 여부를 판단할 때는 `readme-maintenance` skill을 먼저 참고합니다.

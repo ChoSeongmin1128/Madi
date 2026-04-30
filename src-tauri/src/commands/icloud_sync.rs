@@ -79,7 +79,7 @@ pub fn get_icloud_sync_debug_info(
     Ok(ICloudSyncDebugInfoDto {
         bridge_available,
         bridge_error,
-        zone_name: "MinNoteZone".to_string(),
+        zone_name: "MadiZone".to_string(),
         server_change_token_present: debug_snapshot.server_change_token_present,
         pending_operation_count: debug_snapshot.pending_operation_count,
         processing_operation_count: debug_snapshot.processing_operation_count,

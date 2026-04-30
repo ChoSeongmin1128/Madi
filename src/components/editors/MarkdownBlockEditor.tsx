@@ -1,5 +1,6 @@
 import { ko } from '@blocknote/core/locales';
 import { BlockNoteViewRaw, useCreateBlockNote } from '@blocknote/react';
+import '@blocknote/react/style.css';
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef } from 'react';
 import {
   focusBlockNote,

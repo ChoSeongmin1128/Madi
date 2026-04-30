@@ -119,8 +119,10 @@ export function createDocumentUseCases({
       applyBootstrapPayloadState(preferences, workspace, session, payload, 'always');
       session.markStructuralMutation();
       ui.setSettingsOpen(false);
+      return true;
     } catch (error) {
       workspace.setError(normalizeErrorMessage(error, '문서를 삭제하지 못했습니다.'));
+      return false;
     }
   }
 
@@ -140,8 +142,10 @@ export function createDocumentUseCases({
       workspace.clearError();
       applyBootstrapPayloadState(preferences, workspace, session, payload, 'if-missing');
       session.markStructuralMutation();
+      return true;
     } catch (error) {
       workspace.setError(normalizeErrorMessage(error, '문서를 복원하지 못했습니다.'));
+      return false;
     }
   }
 

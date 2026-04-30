@@ -24,7 +24,6 @@ interface SegmentedSelectorProps<T extends string> {
   onChange: (value: T) => void | Promise<void>;
   layout?: 'inline' | 'palette';
   tone?: 'settings' | 'popover';
-  motionStyle?: 'liquid' | 'subtle';
   columns?: number;
   disabled?: boolean;
   renderOption?: SegmentedSelectorRenderOption<T>;
@@ -37,7 +36,6 @@ export function SegmentedSelector<T extends string>({
   onChange,
   layout = 'inline',
   tone = 'settings',
-  motionStyle = 'liquid',
   columns = 3,
   disabled = false,
   renderOption,
@@ -46,7 +44,6 @@ export function SegmentedSelector<T extends string>({
   const optionRefs = useRef(new Map<T, HTMLButtonElement>());
   const [pendingValue, setPendingValue] = useState<T | null>(null);
   const isPalette = layout === 'palette';
-  const isSubtle = motionStyle === 'subtle';
   const toneClassName = tone === 'popover' ? ' is-popover' : ' is-settings';
   const lastPropValueRef = useRef(value);
   const displayValue = pendingValue ?? value;
@@ -65,8 +62,6 @@ export function SegmentedSelector<T extends string>({
     groupRef,
     optionRefs,
     selectedValue: displayValue,
-    isPalette,
-    isSubtle,
     columns,
     layout,
     options,
@@ -209,19 +204,16 @@ export function SegmentedSelector<T extends string>({
     <div
       ref={groupRef}
       aria-label={ariaLabel}
-      className={`segmented-selector${isPalette ? ' is-palette' : ' is-inline'}${toneClassName}${disabled ? ' is-disabled' : ''}${isSubtle ? ' is-subtle' : ''}`}
+      className={`segmented-selector${isPalette ? ' is-palette' : ' is-inline'}${toneClassName}${disabled ? ' is-disabled' : ''}`}
       role="radiogroup"
       style={{ '--segmented-columns': columns } as CSSProperties}
     >
       {hasThumb ? (
         <motion.div
           aria-hidden="true"
-          className={`segmented-selector-thumb${isAnimating ? ' is-animating' : ''}${isPalette ? ' is-palette' : ''}${toneClassName}${isSubtle ? ' is-subtle' : ''}`}
+          className={`segmented-selector-thumb${isAnimating ? ' is-animating' : ''}${isPalette ? ' is-palette' : ''}${toneClassName}`}
           style={thumbStyle}
-        >
-          <span className="segmented-selector-thumb-tint" />
-          <span className="segmented-selector-thumb-highlight" />
-        </motion.div>
+        />
       ) : null}
 
       {options.map((option) => {

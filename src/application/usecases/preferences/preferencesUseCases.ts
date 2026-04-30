@@ -270,7 +270,7 @@ export function createPreferencesUseCases({
       preferences.setICloudSyncStatus(result);
       return result;
     } catch (error) {
-      const message = normalizeErrorMessage(error, 'Cloud 기준으로 다시 받지 못했습니다.');
+      const message = normalizeErrorMessage(error, 'Madi 클라우드 기준으로 다시 받지 못했습니다.');
       workspace.setError(message);
       throw new Error(message);
     }

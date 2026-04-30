@@ -16,7 +16,7 @@ export function SettingsDangerZoneSection({
   return (
     <div className="settings-section danger-zone">
       <div className="settings-section-header">
-        <span className="settings-section-title">Danger Zone</span>
+        <span className="settings-section-title">위험 작업</span>
       </div>
       {!isConfirmOpen ? (
         <button className="document-menu-danger" type="button" onClick={onOpenConfirm}>

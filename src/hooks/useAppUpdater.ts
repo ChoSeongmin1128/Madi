@@ -1,9 +1,10 @@
 import { useEffect } from 'react';
 import { APP_UPDATE_CHECK_INTERVAL_MS, runUpdateCheckFrom } from '../lib/appUpdater';
+import { isBrowserPreviewRuntime } from '../lib/runtimeEnv';
 
 export function useAppUpdater(enabled: boolean) {
   useEffect(() => {
-    if (!enabled) {
+    if (!enabled || isBrowserPreviewRuntime()) {
       return undefined;
     }
 

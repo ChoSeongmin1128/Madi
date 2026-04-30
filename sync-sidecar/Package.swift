@@ -8,7 +8,7 @@ let package = Package(
   ],
   products: [
     .executable(
-      name: "minnote-cloudkit-bridge",
+      name: "madi-cloudkit-bridge",
       targets: ["CloudKitBridge"]
     ),
   ],

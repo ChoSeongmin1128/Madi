@@ -1,7 +1,7 @@
 [package]
-name = "minnote"
-version = "1.0.3"
-description = "MinNote desktop app"
+name = "madi"
+version = "1.1.0"
+description = "Madi desktop app"
 authors = ["seongmin"]
 license = ""
 repository = ""
@@ -11,7 +11,7 @@ rust-version = "1.77.2"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [lib]
-name = "minnote_lib"
+name = "madi_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

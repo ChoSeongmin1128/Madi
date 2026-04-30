@@ -6,6 +6,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use crate::domain::models::AppSettings;
 use crate::error::AppError;
 use crate::error::StartupError;
+use crate::infrastructure::legacy_identity_migration::migrate_legacy_local_database;
 #[cfg(target_os = "macos")]
 use crate::infrastructure::macos_remote_notifications::setup_remote_notifications;
 use crate::infrastructure::sync_engine::SyncEngine;
@@ -20,11 +21,12 @@ use tauri::tray::{TrayIcon, TrayIconBuilder, TrayIconEvent};
 use tauri::{Emitter, Manager};
 use tauri_plugin_window_state::{AppHandleExt, StateFlags};
 
-pub(crate) const TRAY_ID: &str = "minnote-tray";
+pub(crate) const TRAY_ID: &str = "madi-tray";
+const DATABASE_FILENAME: &str = "madi.sqlite3";
 const APP_SHUTDOWN_REQUESTED_EVENT: &str = "app-shutdown-requested";
-const OPEN_SETTINGS_ON_START_ENV: &str = "MINNOTE_OPEN_SETTINGS_ON_START";
-const RUN_ICLOUD_SYNC_ON_START_ENV: &str = "MINNOTE_RUN_ICLOUD_SYNC_ON_START";
-const SMOKE_RESULT_PATH_ENV: &str = "MINNOTE_SMOKE_STATUS_PATH";
+const OPEN_SETTINGS_ON_START_ENV: &str = "MADI_OPEN_SETTINGS_ON_START";
+const RUN_ICLOUD_SYNC_ON_START_ENV: &str = "MADI_RUN_ICLOUD_SYNC_ON_START";
+const SMOKE_RESULT_PATH_ENV: &str = "MADI_SMOKE_STATUS_PATH";
 const OPEN_SETTINGS_ON_START_ARG: &str = "--smoke-open-settings";
 const RUN_ICLOUD_SYNC_ON_START_ARG: &str = "--smoke-run-icloud-sync";
 const SMOKE_RESULT_PATH_ARG: &str = "--smoke-result-path";
@@ -84,7 +86,7 @@ pub(crate) fn build_tray_icon(app: &tauri::AppHandle) -> tauri::Result<TrayIcon>
 
     let builder = TrayIconBuilder::with_id(TRAY_ID)
         .icon(icon)
-        .tooltip("MinNote")
+        .tooltip("Madi")
         .menu(&menu)
         .show_menu_on_left_click(false)
         .on_tray_icon_event(|tray, event| {
@@ -139,7 +141,7 @@ fn smoke_result_path() -> std::path::PathBuf {
     }
     std::env::var_os(SMOKE_RESULT_PATH_ENV)
         .map(std::path::PathBuf::from)
-        .unwrap_or_else(|| std::env::temp_dir().join("minnote-icloud-smoke.json"))
+        .unwrap_or_else(|| std::env::temp_dir().join("madi-icloud-smoke.json"))
 }
 
 fn write_smoke_result(value: serde_json::Value) {
@@ -292,8 +294,25 @@ fn setup_startup_smoke(app: &tauri::App) {
 
 fn initialize_app_state(app_dir: &Path) -> Result<AppState, StartupError> {
     fs::create_dir_all(app_dir).map_err(StartupError::PrepareAppDataDir)?;
-    let database_path = app_dir.join("minnote.sqlite3");
-    AppState::new(&database_path).map_err(StartupError::InitializeState)
+    let migration = migrate_legacy_local_database(app_dir, DATABASE_FILENAME)?;
+    let database_path = app_dir.join(DATABASE_FILENAME);
+    let app_state = AppState::new(&database_path).map_err(StartupError::InitializeState)?;
+    if migration.imported {
+        if let Some(source_path) = migration.source_path {
+            log::info!(
+                "기존 앱 데이터를 Madi 저장소로 가져왔습니다: {}",
+                source_path.display()
+            );
+        }
+        let mut repository = app_state
+            .repository
+            .lock()
+            .map_err(|_| StartupError::InitializeState(AppError::StateLock))?;
+        repository
+            .prepare_after_legacy_local_import()
+            .map_err(StartupError::InitializeState)?;
+    }
+    Ok(app_state)
 }
 
 fn load_startup_settings(app_state: &AppState) -> Result<AppSettings, StartupError> {
@@ -337,7 +356,7 @@ pub(crate) fn sync_menu_bar_icon_runtime_state(
 
 pub(crate) fn show_startup_error_dialog(message: &str) {
     let _ = rfd::MessageDialog::new()
-        .set_title("MinNote 초기화 실패")
+        .set_title("Madi 초기화 실패")
         .set_description(message)
         .set_level(rfd::MessageLevel::Error)
         .show();

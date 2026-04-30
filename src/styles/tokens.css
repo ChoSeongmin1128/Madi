@@ -1,0 +1,29 @@
+:root {
+  --madi-radius-sm: 8px;
+  --madi-radius-md: 10px;
+  --madi-radius-lg: 14px;
+  --madi-control-height: 32px;
+  --madi-settings-sidebar-width: 184px;
+  --madi-settings-panel-width: 560px;
+  --madi-settings-bg: color-mix(in srgb, Canvas 96%, CanvasText 4%);
+  --madi-settings-sidebar-bg: color-mix(in srgb, Canvas 91%, CanvasText 5%);
+  --madi-settings-row-bg: color-mix(in srgb, Canvas 98%, CanvasText 2%);
+  --madi-settings-row-hover: color-mix(in srgb, CanvasText 6%, transparent);
+  --madi-focus-glow: 0 0 0 2px color-mix(in srgb, var(--brand-ring) 48%, transparent);
+}
+
+:root[data-theme-mode='dark'] {
+  --madi-settings-bg: color-mix(in srgb, Canvas 92%, CanvasText 8%);
+  --madi-settings-sidebar-bg: color-mix(in srgb, Canvas 86%, CanvasText 10%);
+  --madi-settings-row-bg: color-mix(in srgb, Canvas 94%, CanvasText 6%);
+  --madi-settings-row-hover: color-mix(in srgb, CanvasText 8%, transparent);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme-mode='light']) {
+    --madi-settings-bg: color-mix(in srgb, Canvas 92%, CanvasText 8%);
+    --madi-settings-sidebar-bg: color-mix(in srgb, Canvas 86%, CanvasText 10%);
+    --madi-settings-row-bg: color-mix(in srgb, Canvas 94%, CanvasText 6%);
+    --madi-settings-row-hover: color-mix(in srgb, CanvasText 8%, transparent);
+  }
+}

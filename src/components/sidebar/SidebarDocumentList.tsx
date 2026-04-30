@@ -23,32 +23,35 @@ export function SidebarDocumentList({
           <p>검색 결과가 없습니다.</p>
         </div>
       ) : (
-        documents.map((document) => (
-          <div
-            key={document.id}
-            className={`document-card${currentDocumentId === document.id ? ' is-active' : ''}`}
-            role="button"
-            tabIndex={0}
-            onClick={() => {
-              onOpenDocument(document.id);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                onOpenDocument(document.id);
-              }
-            }}
-          >
-            <div className="document-card-header">
-              <span className="document-card-title">{getVisibleDocumentTitle(document.title)}</span>
+        documents.map((document) => {
+          const isActive = currentDocumentId === document.id;
+          const documentTitle = getVisibleDocumentTitle(document.title);
+
+          return (
+            <div
+              key={document.id}
+              className={`document-card-shell${isActive ? ' is-active' : ''}`}
+            >
+              <button
+                className="document-card"
+                type="button"
+                aria-current={isActive ? 'page' : undefined}
+                onClick={() => {
+                  onOpenDocument(document.id);
+                }}
+              >
+                <span className="document-card-header">
+                  <span className="document-card-title">{documentTitle}</span>
+                </span>
+                <span className="document-card-sub">
+                  <span className="document-meta">{formatSidebarTimestamp(document.updatedAt)}</span>
+                  <span className="document-preview">{document.preview || ''}</span>
+                </span>
+              </button>
+              <SidebarDocumentMenu documentId={document.id} documentTitle={documentTitle} />
             </div>
-            <div className="document-card-sub">
-              <span className="document-meta">{formatSidebarTimestamp(document.updatedAt)}</span>
-              <span className="document-preview">{document.preview || ''}</span>
-            </div>
-            <SidebarDocumentMenu documentId={document.id} />
-          </div>
-        ))
+          );
+        })
       )}
     </div>
   );

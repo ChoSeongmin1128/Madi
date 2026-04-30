@@ -41,17 +41,17 @@ require_env() {
 
 app_path_for_target() {
   local target="$1"
-  echo "$ROOT_DIR/src-tauri/target/$target/release/bundle/macos/MinNote.app"
+  echo "$ROOT_DIR/src-tauri/target/$target/release/bundle/macos/Madi.app"
 }
 
 helper_app_path_for_app() {
   local app_path="$1"
-  echo "$app_path/Contents/Resources/minnote-cloudkit-bridge.app"
+  echo "$app_path/Contents/Resources/madi-cloudkit-bridge.app"
 }
 
 helper_exec_path_for_app() {
   local app_path="$1"
-  echo "$(helper_app_path_for_app "$app_path")/Contents/MacOS/minnote-cloudkit-bridge"
+  echo "$(helper_app_path_for_app "$app_path")/Contents/MacOS/madi-cloudkit-bridge"
 }
 
 build_app_bundle() {
@@ -61,7 +61,7 @@ build_app_bundle() {
   local app_path
   app_path="$(app_path_for_target "$target")"
   if [ ! -d "$app_path" ]; then
-    echo "MinNote.app not found for $target"
+    echo "Madi.app not found for $target"
     exit 1
   fi
 }
@@ -111,7 +111,7 @@ sign_app_bundle() {
   require_env APPLE_SIGNING_IDENTITY_REF
 
   app_path="$(app_path_for_target "$target")"
-  codesign --force --sign "$APPLE_SIGNING_IDENTITY_REF" --options runtime --entitlements "$APP_ENTITLEMENTS_PATH" "$app_path/Contents/MacOS/minnote"
+  codesign --force --sign "$APPLE_SIGNING_IDENTITY_REF" --options runtime --entitlements "$APP_ENTITLEMENTS_PATH" "$app_path/Contents/MacOS/madi"
   codesign --force --sign "$APPLE_SIGNING_IDENTITY_REF" --options runtime --entitlements "$APP_ENTITLEMENTS_PATH" "$app_path"
 }
 
@@ -123,7 +123,7 @@ zip_for_notarization() {
 
   app_path="$(app_path_for_target "$target")"
   mkdir -p "$output_dir"
-  app_zip_path="$output_dir/MinNote_${arch_label}.app.zip"
+  app_zip_path="$output_dir/Madi_${arch_label}.app.zip"
 
   rm -f "$app_zip_path"
   ditto -c -k --keepParent --sequesterRsrc "$app_path" "$app_zip_path"
@@ -177,15 +177,15 @@ package_updater_artifacts() {
 
   app_path="$(app_path_for_target "$target")"
   mkdir -p "$output_dir"
-  app_tar_path="$output_dir/MinNote_${arch_label}.app.tar.gz"
-  staging_dir="$(mktemp -d "${TMPDIR:-/tmp}/minnote-updater-stage.XXXXXX")"
-  extract_dir="$(mktemp -d "${TMPDIR:-/tmp}/minnote-updater-extract.XXXXXX")"
+  app_tar_path="$output_dir/Madi_${arch_label}.app.tar.gz"
+  staging_dir="$(mktemp -d "${TMPDIR:-/tmp}/madi-updater-stage.XXXXXX")"
+  extract_dir="$(mktemp -d "${TMPDIR:-/tmp}/madi-updater-extract.XXXXXX")"
 
-  ditto "$app_path" "$staging_dir/MinNote.app"
-  xattr -cr "$staging_dir/MinNote.app"
+  ditto "$app_path" "$staging_dir/Madi.app"
+  xattr -cr "$staging_dir/Madi.app"
 
   rm -f "$app_tar_path"
-  COPYFILE_DISABLE=1 bsdtar --disable-copyfile -czf "$app_tar_path" -C "$staging_dir" "MinNote.app"
+  COPYFILE_DISABLE=1 bsdtar --disable-copyfile -czf "$app_tar_path" -C "$staging_dir" "Madi.app"
 
   python3 - "$app_tar_path" <<'PY'
 import sys
@@ -208,7 +208,7 @@ if invalid_entries:
 PY
 
   tar -xzf "$app_tar_path" -C "$extract_dir"
-  [ -d "$extract_dir/MinNote.app" ] || { echo "Updater archive smoke extract failed: MinNote.app missing"; exit 1; }
+  [ -d "$extract_dir/Madi.app" ] || { echo "Updater archive smoke extract failed: Madi.app missing"; exit 1; }
   if find "$extract_dir" \( -name '._*' -o -name '.DS_Store' \) -print -quit | grep -q .; then
     echo "Updater archive smoke extract produced unsupported Apple metadata files"
     exit 1

@@ -1,0 +1,13 @@
+.settings-modal,
+.document-card,
+.block-card,
+.document-menu-popover,
+.context-menu {
+  border-radius: var(--madi-radius-lg);
+}
+
+.settings-section,
+.settings-icloud-debug,
+.settings-advanced-content {
+  border-radius: var(--madi-radius-lg);
+}

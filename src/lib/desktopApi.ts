@@ -1,4 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
+import { mockDesktopApi } from './mockDesktopApi';
+import { isTauriRuntime } from './runtimeEnv';
 import type {
   BlockDto,
   BlockKind,
@@ -42,7 +44,7 @@ function normalizeError(error: unknown) {
     }
   }
 
-  return 'MinNote backend와 통신하지 못했습니다. Tauri 환경에서 다시 실행해 주세요.';
+  return 'Madi backend와 통신하지 못했습니다. Tauri 환경에서 다시 실행해 주세요.';
 }
 
 async function call<T>(command: string, args?: Record<string, unknown>) {
@@ -53,7 +55,7 @@ async function call<T>(command: string, args?: Record<string, unknown>) {
   }
 }
 
-export const desktopApi = {
+const tauriDesktopApi = {
   bootstrapApp() {
     return call<BootstrapPayload>('bootstrap_app');
   },
@@ -193,3 +195,7 @@ export const desktopApi = {
     return call<string | null>('set_global_toggle_shortcut', { shortcut });
   },
 };
+
+export type DesktopApi = typeof tauriDesktopApi;
+
+export const desktopApi: DesktopApi = isTauriRuntime() ? tauriDesktopApi : mockDesktopApi;

@@ -1,3 +1,3 @@
 fn main() {
-  minnote_lib::run();
+  madi_lib::run();
 }

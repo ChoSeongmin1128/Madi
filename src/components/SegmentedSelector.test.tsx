@@ -116,7 +116,6 @@ describe('SegmentedSelector', () => {
       <SegmentedSelector
         ariaLabel="팝오버 선택"
         tone="popover"
-        motionStyle="subtle"
         value="left"
         options={[
           { value: 'left', label: '왼쪽' },

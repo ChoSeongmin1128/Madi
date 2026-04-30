@@ -214,7 +214,7 @@ mod tests {
   use super::*;
 
   fn test_db_path() -> PathBuf {
-    std::env::temp_dir().join(format!("minnote-app-state-test-{}.db", uuid::Uuid::new_v4()))
+    std::env::temp_dir().join(format!("madi-app-state-test-{}.db", uuid::Uuid::new_v4()))
   }
 
   fn test_store() -> SqliteStore {

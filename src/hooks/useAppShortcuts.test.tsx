@@ -9,7 +9,7 @@ const controllerMocks = vi.hoisted(() => ({
   copySelectedBlocks: vi.fn().mockResolvedValue(undefined),
   deleteSelectedBlocks: vi.fn().mockResolvedValue(undefined),
   flushCurrentDocument: vi.fn().mockResolvedValue(undefined),
-  isBlockClipboardText: vi.fn((text: string) => text.startsWith('<!--minnote-block:')),
+  isBlockClipboardText: vi.fn((text: string) => text.startsWith('<!--madi-block:')),
   pasteBlocks: vi.fn().mockResolvedValue(undefined),
   undoBlockOperation: vi.fn().mockResolvedValue(undefined),
   redoBlockOperation: vi.fn().mockResolvedValue(undefined),
@@ -121,7 +121,7 @@ describe('useAppShortcuts', () => {
     controllerMocks.deleteSelectedBlocks.mockClear();
     controllerMocks.flushCurrentDocument.mockClear();
     controllerMocks.isBlockClipboardText.mockClear();
-    controllerMocks.isBlockClipboardText.mockImplementation((text: string) => text.startsWith('<!--minnote-block:'));
+    controllerMocks.isBlockClipboardText.mockImplementation((text: string) => text.startsWith('<!--madi-block:'));
     controllerMocks.pasteBlocks.mockClear();
 
     useDocumentSessionStore.setState({
@@ -156,13 +156,13 @@ describe('useAppShortcuts', () => {
     expect(controllerMocks.deleteSelectedBlocks).toHaveBeenCalledTimes(2);
   });
 
-  it('lets plain-text paste pass through but intercepts MinNote block clipboard paste', async () => {
+  it('lets plain-text paste pass through but intercepts Madi block clipboard paste', async () => {
     render(<Harness />);
 
     dispatchPaste('plain text');
     expect(controllerMocks.pasteBlocks).not.toHaveBeenCalled();
 
-    const metadata = '<!--minnote-block:[{"kind":"markdown","content":"# Hello","language":null}]-->\n# Hello';
+    const metadata = '<!--madi-block:[{"kind":"markdown","content":"# Hello","language":null}]-->\n# Hello';
     dispatchPaste(metadata);
     await Promise.resolve();
 

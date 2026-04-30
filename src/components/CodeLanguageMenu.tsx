@@ -2,6 +2,7 @@ import { createPortal } from 'react-dom';
 import { Braces, Check, ChevronDown, Search } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { CODE_LANGUAGE_OPTIONS, normalizeCodeLanguage, type CodeLanguageId } from '../lib/blockOptions';
+import { useDismissibleLayer } from '../hooks/useDismissibleLayer';
 
 interface CodeLanguageMenuProps {
   anchorRect: DOMRect;
@@ -59,16 +60,11 @@ function CodeLanguageMenu({ anchorRect, value, onSelect, onClose }: CodeLanguage
     inputRef.current?.focus();
   }, []);
 
-  useEffect(() => {
-    const onPointerDown = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        onClose();
-      }
-    };
-
-    window.addEventListener('mousedown', onPointerDown);
-    return () => window.removeEventListener('mousedown', onPointerDown);
-  }, [onClose]);
+  useDismissibleLayer({
+    enabled: true,
+    layerRef: rootRef,
+    onDismiss: onClose,
+  });
 
   useEffect(() => {
     const active = listRef.current?.querySelector('.is-active');
@@ -82,7 +78,8 @@ function CodeLanguageMenu({ anchorRect, value, onSelect, onClose }: CodeLanguage
     <div
       ref={rootRef}
       className="code-language-menu"
-      role="menu"
+      role="dialog"
+      aria-label="코드 언어 선택"
       tabIndex={-1}
       style={{ top: position.top, left: position.left }}
     >
@@ -92,6 +89,8 @@ function CodeLanguageMenu({ anchorRect, value, onSelect, onClose }: CodeLanguage
           ref={inputRef}
           type="text"
           placeholder="언어 검색…"
+          aria-label="코드 언어 검색"
+          aria-controls="code-language-options"
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -123,7 +122,13 @@ function CodeLanguageMenu({ anchorRect, value, onSelect, onClose }: CodeLanguage
           }}
         />
       </div>
-      <div ref={listRef} className="code-language-list">
+      <div
+        id="code-language-options"
+        ref={listRef}
+        className="code-language-list"
+        role="listbox"
+        aria-label="코드 언어"
+      >
         {filtered.length === 0 ? (
           <span className="code-language-empty">결과 없음</span>
         ) : (
@@ -131,6 +136,8 @@ function CodeLanguageMenu({ anchorRect, value, onSelect, onClose }: CodeLanguage
             <button
               key={option.id}
               type="button"
+              role="option"
+              aria-selected={currentLanguage === option.id}
               className={activeIndex === index ? 'is-active' : ''}
               onMouseEnter={() => setSelectedIndex(index)}
               onClick={() => onSelect(option.id)}
@@ -182,6 +189,7 @@ export function CodeLanguageTrigger({ value, isVisible, onSelect }: CodeLanguage
         className="code-language-trigger"
         type="button"
         aria-label="코드 언어 선택"
+        aria-haspopup="dialog"
         aria-expanded={isOpen}
         onClick={handleToggle}
       >

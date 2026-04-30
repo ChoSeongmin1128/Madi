@@ -58,7 +58,7 @@ export function useICloudSync(isReady: boolean) {
     return () => {
       window.clearTimeout(timer);
     };
-  }, [icloudSyncStatus.enabled, isReady, runICloudSync]);
+  }, [icloudSyncStatus.enabled, icloudSyncStatus.state, isReady, runICloudSync]);
 
   useEffect(() => {
     const structuralMutationIsUnsynced =

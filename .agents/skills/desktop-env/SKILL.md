@@ -1,11 +1,11 @@
 ---
 name: desktop-env
-description: Use this skill when you need repository-specific environment facts such as pnpm usage, macOS-only assumptions, local setup expectations, or toolchain constraints for MinNote.
+description: Use this skill when you need repository-specific environment facts such as pnpm usage, macOS-only assumptions, local setup expectations, or toolchain constraints for Madi.
 ---
 
 # Desktop Env
 
-이 skill은 MinNote 작업에 필요한 환경 사실과 로컬 전제를 다룹니다.
+이 skill은 Madi 작업에 필요한 환경 사실과 로컬 전제를 다룹니다.
 
 다음 상황에서 먼저 사용합니다.
 - 설치나 실행 명령을 제안할 때

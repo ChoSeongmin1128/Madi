@@ -2318,6 +2318,34 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c41e0c4fef86961ac6d6f8a82609f55f31b05e4fce149ac5710e439df7619ba4"
 
 [[package]]
+name = "madi"
+version = "1.1.0"
+dependencies = [
+ "anyhow",
+ "block2",
+ "image",
+ "log",
+ "objc2",
+ "objc2-app-kit",
+ "objc2-cloud-kit",
+ "objc2-core-foundation",
+ "objc2-foundation",
+ "rfd",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-global-shortcut",
+ "tauri-plugin-log",
+ "tauri-plugin-process",
+ "tauri-plugin-updater",
+ "tauri-plugin-window-state",
+ "thiserror 2.0.18",
+ "uuid",
+]
+
+[[package]]
 name = "markup5ever"
 version = "0.14.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2394,34 +2422,6 @@ checksum = "1fa76a2c86f704bdb222d66965fb3d63269ce38518b83cb0575fca855ebb6316"
 dependencies = [
  "adler2",
  "simd-adler32",
-]
-
-[[package]]
-name = "minnote"
-version = "1.0.3"
-dependencies = [
- "anyhow",
- "block2",
- "image",
- "log",
- "objc2",
- "objc2-app-kit",
- "objc2-cloud-kit",
- "objc2-core-foundation",
- "objc2-foundation",
- "rfd",
- "rusqlite",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-global-shortcut",
- "tauri-plugin-log",
- "tauri-plugin-process",
- "tauri-plugin-updater",
- "tauri-plugin-window-state",
- "thiserror 2.0.18",
- "uuid",
 ]
 
 [[package]]

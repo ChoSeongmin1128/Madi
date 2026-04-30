@@ -16,9 +16,9 @@ fi
 
 if [ -z "${TAURI_SIGNING_PRIVATE_KEY_PATH:-}" ]; then
   for candidate in \
-    "$ROOT_DIR/.local-release/minnote-updater.key" \
-    "$HOME/Documents/minnote/minnote-updater.key" \
-    "$HOME/Documents/minnote-updater.key"
+    "$ROOT_DIR/.local-release/madi-updater.key" \
+    "$HOME/Documents/madi/madi-updater.key" \
+    "$HOME/Documents/madi-updater.key"
   do
     if [ -f "$candidate" ]; then
       export TAURI_SIGNING_PRIVATE_KEY_PATH="$candidate"
@@ -55,7 +55,7 @@ if [ -z "$TARGET_VALUE" ]; then
   BUILD_ARGS+=(--target aarch64-apple-darwin)
 elif [ "$TARGET_VALUE" != "aarch64-apple-darwin" ]; then
   echo "Unsupported target: $TARGET_VALUE"
-  echo "MinNote release builds support Apple Silicon macOS only."
+  echo "Madi release builds support Apple Silicon macOS only."
   exit 1
 fi
 

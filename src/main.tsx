@@ -1,8 +1,14 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import '@blocknote/react/style.css';
 import App from './App';
+import { installDevelopmentConsoleWarningFilter } from './lib/consoleWarnings';
 import './index.css';
+import './styles/tokens.css';
+import './styles/surfaces.css';
+import './styles/controls.css';
+import './styles/settings.css';
+
+installDevelopmentConsoleWarningFilter();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

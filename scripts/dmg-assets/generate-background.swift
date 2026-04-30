@@ -95,7 +95,7 @@ context.setStrokeColor(color(1, 1, 1, 0.12))
 context.setLineWidth(1)
 context.stroke(CGRect(x: 34.5, y: 30.5, width: width - 69, height: height - 61))
 
-let title = "MinNote"
+let title = "Madi"
 let subtitle = "Drag to Applications to install"
 let hint = "Apple Silicon macOS"
 

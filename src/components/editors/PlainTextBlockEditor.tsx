@@ -11,6 +11,8 @@ import { scheduleBlockDeletion } from '../../lib/backspaceHoldState';
 import {
   highlightCodeToHtml,
   loadCodeLanguageRegistration,
+} from '../../lib/codeHighlighter';
+import {
   normalizeCodeLanguage,
   type CodeLanguageId,
 } from '../../lib/blockOptions';

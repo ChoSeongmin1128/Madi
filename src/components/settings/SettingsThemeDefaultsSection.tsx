@@ -25,6 +25,8 @@ interface DocumentSurfaceToneOption {
   label: string;
 }
 
+type SettingsThemeDefaultsGroup = 'theme' | 'block-kind' | 'block-tint' | 'surface-tone';
+
 interface SettingsThemeDefaultsSectionProps {
   themeMode: ThemeMode;
   themeOptions: ThemeOption[];
@@ -34,6 +36,7 @@ interface SettingsThemeDefaultsSectionProps {
   blockTintOptions: BlockTintOption[];
   defaultDocumentSurfaceTonePreset: DocumentSurfaceTonePreset;
   documentSurfaceToneOptions: DocumentSurfaceToneOption[];
+  groups?: readonly SettingsThemeDefaultsGroup[];
   onThemeModeChange: (value: ThemeMode) => void;
   onDefaultBlockKindChange: (value: BlockKind) => void;
   onDefaultBlockTintPresetChange: (value: BlockTintPreset) => void;
@@ -49,13 +52,17 @@ export function SettingsThemeDefaultsSection({
   blockTintOptions,
   defaultDocumentSurfaceTonePreset,
   documentSurfaceToneOptions,
+  groups = ['theme', 'block-kind', 'block-tint', 'surface-tone'],
   onThemeModeChange,
   onDefaultBlockKindChange,
   onDefaultBlockTintPresetChange,
   onDefaultDocumentSurfaceTonePresetChange,
 }: SettingsThemeDefaultsSectionProps) {
+  const visibleGroups = new Set(groups);
+
   return (
     <>
+      {visibleGroups.has('theme') ? (
       <div className="settings-section">
         <div className="settings-section-header">
           <span className="settings-section-title">테마</span>
@@ -72,7 +79,9 @@ export function SettingsThemeDefaultsSection({
           onChange={onThemeModeChange}
         />
       </div>
+      ) : null}
 
+      {visibleGroups.has('block-kind') ? (
       <div className="settings-section">
         <div className="settings-section-header">
           <span className="settings-section-title">기본 블록 종류</span>
@@ -88,7 +97,9 @@ export function SettingsThemeDefaultsSection({
           onChange={onDefaultBlockKindChange}
         />
       </div>
+      ) : null}
 
+      {visibleGroups.has('block-tint') ? (
       <div className="settings-section">
         <div className="settings-section-header">
           <span className="settings-section-title">기본 블록 색상쌍</span>
@@ -109,7 +120,9 @@ export function SettingsThemeDefaultsSection({
           )}
         />
       </div>
+      ) : null}
 
+      {visibleGroups.has('surface-tone') ? (
       <div className="settings-section">
         <div className="settings-section-header">
           <span className="settings-section-title">기본 문서 배경 톤</span>
@@ -130,6 +143,7 @@ export function SettingsThemeDefaultsSection({
           )}
         />
       </div>
+      ) : null}
     </>
   );
 }

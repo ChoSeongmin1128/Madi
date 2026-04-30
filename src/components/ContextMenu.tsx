@@ -1,6 +1,7 @@
 import { createPortal } from 'react-dom';
 import { Check } from 'lucide-react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useDismissibleLayer } from '../hooks/useDismissibleLayer';
 
 export type ContextMenuItem =
   | {
@@ -46,16 +47,11 @@ export function ContextMenu({ x, y, items, onAction, onClose }: ContextMenuProps
     rootRef.current?.focus();
   }, []);
 
-  useEffect(() => {
-    const onPointerDown = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        onClose();
-      }
-    };
-
-    window.addEventListener('mousedown', onPointerDown);
-    return () => window.removeEventListener('mousedown', onPointerDown);
-  }, [onClose]);
+  useDismissibleLayer({
+    enabled: true,
+    layerRef: rootRef,
+    onDismiss: onClose,
+  });
 
   const selectedAction = actionItems.find((item) => item.id === selectedId) ?? null;
 
@@ -112,7 +108,7 @@ export function ContextMenu({ x, y, items, onAction, onClose }: ContextMenuProps
     >
       {items.map((item) =>
         item.type === 'separator' ? (
-          <div key={item.id} className="app-context-menu-separator" />
+          <div key={item.id} className="app-context-menu-separator" role="separator" />
         ) : (
           <button
             key={item.id}

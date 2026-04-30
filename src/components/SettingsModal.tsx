@@ -27,6 +27,7 @@ import { SettingsICloudSection } from './settings/SettingsICloudSection';
 import { SettingsThemeDefaultsSection } from './settings/SettingsThemeDefaultsSection';
 import { SettingsUpdateSection } from './settings/SettingsUpdateSection';
 import { SettingsWindowSection } from './settings/SettingsWindowSection';
+import { SETTINGS_CATEGORIES, type SettingsCategoryId } from './settings/settingsCategories';
 
 const THEME_OPTIONS: Array<{ id: ThemeMode; label: string; icon: typeof MonitorCog }> = [
   { id: 'system', label: '자동', icon: MonitorCog },
@@ -39,11 +40,6 @@ const BLOCK_KIND_OPTIONS: Array<{ id: BlockKind; label: string }> = [
   { id: 'text', label: '텍스트' },
   { id: 'code', label: '코드' },
 ];
-
-const MENU_BAR_OPTIONS = [
-  { value: 'off', label: '꺼짐' },
-  { value: 'on', label: '켜짐' },
-] as const;
 
 const BLOCK_TINT_OPTIONS = BLOCK_TINT_PRESETS.map((preset) => ({
   value: preset.id,
@@ -108,6 +104,132 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
     refresh: refreshIcloudDebugInfo,
   } = useICloudSyncDebugInfo(isOpen);
   const [isConfirmOpen, setConfirmOpen] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<SettingsCategoryId>('general');
+  const activeCategoryMeta =
+    SETTINGS_CATEGORIES.find((category) => category.id === activeCategory)
+    ?? SETTINGS_CATEGORIES[0];
+
+  const themeDefaultsProps = {
+    themeMode,
+    themeOptions: THEME_OPTIONS,
+    defaultBlockKind,
+    blockKindOptions: BLOCK_KIND_OPTIONS,
+    defaultBlockTintPreset,
+    blockTintOptions: BLOCK_TINT_OPTIONS,
+    defaultDocumentSurfaceTonePreset,
+    documentSurfaceToneOptions: DOCUMENT_SURFACE_TONE_OPTIONS,
+    onThemeModeChange: setThemeMode,
+    onDefaultBlockKindChange: setDefaultBlockKind,
+    onDefaultBlockTintPresetChange: setDefaultBlockTintPreset,
+    onDefaultDocumentSurfaceTonePresetChange: setDefaultDocumentSurfaceTonePreset,
+  };
+
+  const iCloudSectionProps = {
+    status: icloudSyncStatus,
+    debugInfo: icloudDebugInfo,
+    debugError: icloudDebugError,
+    debugLoading: isIcloudDebugLoading,
+    onEnabledChange: (enabled: boolean) => {
+      void setICloudSyncEnabled(enabled);
+    },
+    onRunSync: () => {
+      void runICloudSync();
+    },
+    onRefreshDebug: () => {
+      void refreshIcloudDebugInfo();
+    },
+    onResetCheckpoint: () => {
+      void resetICloudSyncCheckpoint();
+    },
+    onForceUpload: () => {
+      void forceUploadAllDocuments();
+    },
+    onForceRedownload: () => {
+      void forceRedownloadFromCloud();
+    },
+  };
+
+  const settingsContent = (() => {
+    switch (activeCategory) {
+      case 'general':
+        return (
+          <SettingsThemeDefaultsSection
+            {...themeDefaultsProps}
+            groups={['block-kind']}
+          />
+        );
+      case 'appearance':
+        return (
+          <>
+            <SettingsThemeDefaultsSection
+              {...themeDefaultsProps}
+              groups={['theme', 'block-tint', 'surface-tone']}
+            />
+          </>
+        );
+      case 'editing':
+        return (
+          <SettingsFontSection
+            bodyFontFamily={bodyFontFamily}
+            bodyFontSizePx={draftBodyFontSizePx}
+            codeFontFamily={codeFontFamily}
+            codeFontSizePx={draftCodeFontSizePx}
+            bodyFontOptions={BODY_FONT_OPTIONS}
+            codeFontOptions={CODE_FONT_OPTIONS}
+            minBodyFontSizePx={MIN_BODY_FONT_SIZE_PX}
+            maxBodyFontSizePx={MAX_BODY_FONT_SIZE_PX}
+            minCodeFontSizePx={MIN_CODE_FONT_SIZE_PX}
+            maxCodeFontSizePx={MAX_CODE_FONT_SIZE_PX}
+            onBodyFontFamilyChange={setBodyFontFamily}
+            onPreviewBodyFontSizePx={previewBodyFontSizePx}
+            onCommitBodyFontSizePx={commitBodyFontSizePx}
+            onCodeFontFamilyChange={setCodeFontFamily}
+            onPreviewCodeFontSizePx={previewCodeFontSizePx}
+            onCommitCodeFontSizePx={commitCodeFontSizePx}
+          />
+        );
+      case 'window':
+        return (
+          <SettingsWindowSection
+            menuBarIconEnabled={menuBarIconEnabled}
+            alwaysOnTopEnabled={alwaysOnTopEnabled}
+            draftOpacity={draftOpacity}
+            globalToggleShortcut={globalToggleShortcut}
+            globalShortcutError={globalShortcutError}
+            menuBarIconError={menuBarIconError}
+            windowPreferenceError={windowPreferenceError}
+            minOpacityPercent={MIN_WINDOW_OPACITY_PERCENT}
+            maxOpacityPercent={MAX_WINDOW_OPACITY_PERCENT}
+            onMenuBarIconEnabledChange={setMenuBarIconEnabled}
+            onAlwaysOnTopEnabledChange={setAlwaysOnTopEnabled}
+            onPreviewOpacity={previewOpacity}
+            onCommitOpacity={commitOpacity}
+            onGlobalToggleShortcutCommit={setGlobalToggleShortcut}
+          />
+        );
+      case 'sync':
+        return <SettingsICloudSection {...iCloudSectionProps} mode="sync" />;
+      case 'updates':
+        return <SettingsUpdateSection appUpdateStatus={appUpdateStatus} />;
+      case 'advanced':
+        return (
+          <>
+            <SettingsICloudSection {...iCloudSectionProps} mode="advanced" />
+            <SettingsDangerZoneSection
+              isConfirmOpen={isConfirmOpen}
+              onOpenConfirm={() => setConfirmOpen(true)}
+              onCloseConfirm={() => setConfirmOpen(false)}
+              onDeleteAllDocuments={async () => {
+                await deleteAllDocuments();
+                setConfirmOpen(false);
+              }}
+            />
+          </>
+        );
+      default:
+        return null;
+    }
+  })();
 
   useEffect(() => {
     if (!isOpen) {
@@ -138,114 +260,44 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       <button className="modal-backdrop" type="button" aria-label="설정 닫기" onClick={onClose} />
       <section className="settings-modal" role="dialog" aria-modal="true" aria-label="전체 설정">
         <div className="settings-modal-header">
-          <h2 className="settings-title">전체 설정</h2>
+          <h2 className="settings-title">설정</h2>
           <button className="icon-button" type="button" aria-label="설정 닫기" onClick={onClose}>
             <X size={16} />
           </button>
         </div>
 
-        <SettingsThemeDefaultsSection
-          themeMode={themeMode}
-          themeOptions={THEME_OPTIONS}
-          defaultBlockKind={defaultBlockKind}
-          blockKindOptions={BLOCK_KIND_OPTIONS}
-          defaultBlockTintPreset={defaultBlockTintPreset}
-          blockTintOptions={BLOCK_TINT_OPTIONS}
-          defaultDocumentSurfaceTonePreset={defaultDocumentSurfaceTonePreset}
-          documentSurfaceToneOptions={DOCUMENT_SURFACE_TONE_OPTIONS}
-          onThemeModeChange={setThemeMode}
-          onDefaultBlockKindChange={setDefaultBlockKind}
-          onDefaultBlockTintPresetChange={setDefaultBlockTintPreset}
-          onDefaultDocumentSurfaceTonePresetChange={setDefaultDocumentSurfaceTonePreset}
-        />
-
-        <SettingsFontSection
-          bodyFontFamily={bodyFontFamily}
-          bodyFontSizePx={draftBodyFontSizePx}
-          codeFontFamily={codeFontFamily}
-          codeFontSizePx={draftCodeFontSizePx}
-          bodyFontOptions={BODY_FONT_OPTIONS}
-          codeFontOptions={CODE_FONT_OPTIONS}
-          minBodyFontSizePx={MIN_BODY_FONT_SIZE_PX}
-          maxBodyFontSizePx={MAX_BODY_FONT_SIZE_PX}
-          minCodeFontSizePx={MIN_CODE_FONT_SIZE_PX}
-          maxCodeFontSizePx={MAX_CODE_FONT_SIZE_PX}
-          onBodyFontFamilyChange={setBodyFontFamily}
-          onPreviewBodyFontSizePx={previewBodyFontSizePx}
-          onCommitBodyFontSizePx={commitBodyFontSizePx}
-          onCodeFontFamilyChange={setCodeFontFamily}
-          onPreviewCodeFontSizePx={previewCodeFontSizePx}
-          onCommitCodeFontSizePx={commitCodeFontSizePx}
-        />
-
-        <SettingsWindowSection
-          menuBarIconEnabled={menuBarIconEnabled}
-          alwaysOnTopEnabled={alwaysOnTopEnabled}
-          draftOpacity={draftOpacity}
-          globalToggleShortcut={globalToggleShortcut}
-          globalShortcutError={globalShortcutError}
-          menuBarIconError={menuBarIconError}
-          windowPreferenceError={windowPreferenceError}
-          menuBarOptions={MENU_BAR_OPTIONS}
-          minOpacityPercent={MIN_WINDOW_OPACITY_PERCENT}
-          maxOpacityPercent={MAX_WINDOW_OPACITY_PERCENT}
-          onMenuBarIconEnabledChange={setMenuBarIconEnabled}
-          onAlwaysOnTopEnabledChange={setAlwaysOnTopEnabled}
-          onPreviewOpacity={previewOpacity}
-          onCommitOpacity={commitOpacity}
-          onGlobalToggleShortcutCommit={setGlobalToggleShortcut}
-        />
-
-        <SettingsICloudSection
-          status={icloudSyncStatus}
-          debugInfo={icloudDebugInfo}
-          debugError={icloudDebugError}
-          debugLoading={isIcloudDebugLoading}
-          onEnabledChange={(enabled) => {
-            void setICloudSyncEnabled(enabled);
-          }}
-          onRunSync={() => {
-            void runICloudSync();
-          }}
-          onRefreshDebug={() => {
-            void refreshIcloudDebugInfo();
-          }}
-          onResetCheckpoint={() => {
-            void resetICloudSyncCheckpoint();
-          }}
-          onForceUpload={() => {
-            if (
-              !window.confirm(
-                '현재 Mac의 문서 상태를 기준으로 iCloud 내용을 다시 업로드합니다. 계속하시겠습니까?',
-              )
-            ) {
-              return;
-            }
-            void forceUploadAllDocuments();
-          }}
-          onForceRedownload={() => {
-            if (
-              !window.confirm(
-                '현재 Mac의 로컬 문서를 비우고 iCloud 기준으로 다시 받습니다. 계속하시겠습니까?',
-              )
-            ) {
-              return;
-            }
-            void forceRedownloadFromCloud();
-          }}
-        />
-
-        <SettingsUpdateSection appUpdateStatus={appUpdateStatus} />
-
-        <SettingsDangerZoneSection
-          isConfirmOpen={isConfirmOpen}
-          onOpenConfirm={() => setConfirmOpen(true)}
-          onCloseConfirm={() => setConfirmOpen(false)}
-          onDeleteAllDocuments={async () => {
-            await deleteAllDocuments();
-            setConfirmOpen(false);
-          }}
-        />
+        <div className="settings-window-body">
+          <nav className="settings-sidebar" aria-label="설정 카테고리">
+            {SETTINGS_CATEGORIES.map((category) => {
+              const Icon = category.icon;
+              const isActive = activeCategory === category.id;
+              return (
+                <button
+                  key={category.id}
+                  className={`settings-category-button${isActive ? ' is-active' : ''}`}
+                  type="button"
+                  aria-current={isActive ? 'page' : undefined}
+                  onClick={() => setActiveCategory(category.id)}
+                >
+                  <Icon size={16} />
+                  <span className="settings-category-copy">
+                    <span className="settings-category-label">{category.label}</span>
+                    <span className="settings-category-description">{category.description}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
+          <div className="settings-detail-panel">
+            <div className="settings-detail-header">
+              <span className="settings-detail-title">{activeCategoryMeta.label}</span>
+              <span className="settings-detail-description">{activeCategoryMeta.description}</span>
+            </div>
+            <div className="settings-detail-content">
+              {settingsContent}
+            </div>
+          </div>
+        </div>
       </section>
     </>
   );
