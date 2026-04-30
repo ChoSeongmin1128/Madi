@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from 'vitest';
-import { replaceBlockNoteTaskShortcut, type BlockNoteEditorLike } from './blocknoteBridge';
+import { nestBlockNote, replaceBlockNoteTaskShortcut, type BlockNoteEditorLike } from './blocknoteBridge';
+
+type TestBlock = {
+  id: string;
+  type: string;
+  content: Array<{ type: string; text: string; styles: Record<string, never> }>;
+  children: TestBlock[];
+};
 
 function createTaskShortcutEditor(beforeText: string, afterText = '') {
   const updateBlock = vi.fn();
@@ -60,5 +67,72 @@ describe('blocknote bridge', () => {
     expect(updateBlock).not.toHaveBeenCalled();
     expect(focus).not.toHaveBeenCalled();
     expect(setTextCursorPosition).not.toHaveBeenCalled();
+  });
+
+  it('keeps Notion-like sibling depth when re-indenting a block with absorbed children', () => {
+    const nestedSibling: TestBlock = {
+      id: '2-c',
+      type: 'paragraph',
+      content: [{ type: 'text', text: '2-c', styles: {} }],
+      children: [
+        {
+          id: '3-a',
+          type: 'paragraph',
+          content: [{ type: 'text', text: '3-a', styles: {} }],
+          children: [],
+        },
+      ],
+    };
+    const currentBlock: TestBlock = {
+      id: '2-b',
+      type: 'paragraph',
+      content: [{ type: 'text', text: '2-b', styles: {} }],
+      children: [nestedSibling],
+    };
+    const rootBlock: TestBlock = {
+      id: '1',
+      type: 'paragraph',
+      content: [{ type: 'text', text: '1', styles: {} }],
+      children: [
+        {
+          id: '2-a',
+          type: 'paragraph',
+          content: [{ type: 'text', text: '2-a', styles: {} }],
+          children: [],
+        },
+      ],
+    };
+    const editor = {
+      document: [rootBlock, currentBlock],
+      getTextCursorPosition: () => ({ block: { id: '2-b' } }),
+      nestBlock: vi.fn(() => {
+        editor.document = [{ ...rootBlock, children: [...rootBlock.children, currentBlock] }];
+      }),
+      updateBlock: vi.fn((block: { children: unknown[] }, update: { children: unknown[] }) => {
+        block.children = update.children;
+      }),
+      insertBlocks: vi.fn((blocksToInsert: unknown[], referenceBlock: { id: string }) => {
+        const parentChildren = editor.document[0].children;
+        const referenceIndex = parentChildren.findIndex((block: TestBlock) => block.id === referenceBlock.id);
+        parentChildren.splice(referenceIndex + 1, 0, ...(blocksToInsert as TestBlock[]));
+      }),
+    } as unknown as BlockNoteEditorLike;
+
+    const nested = nestBlockNote(editor);
+
+    expect(nested).toBe(true);
+    expect(editor.nestBlock).toHaveBeenCalled();
+    expect(editor.updateBlock).toHaveBeenCalledWith(currentBlock, { children: [] });
+    expect(editor.insertBlocks).toHaveBeenCalledWith([nestedSibling], currentBlock, 'after');
+    expect(editor.document).toEqual([
+      {
+        ...rootBlock,
+        children: [
+          rootBlock.children[0],
+          { ...currentBlock, children: [] },
+          nestedSibling,
+        ],
+      },
+    ]);
   });
 });

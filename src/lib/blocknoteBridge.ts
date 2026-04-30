@@ -10,6 +10,7 @@ export type BlockNoteEditorLike = {
   getSelectedText: () => string;
   pasteMarkdown: (markdown: string) => void;
   updateBlock?: (blockOrId: any, update: any) => void;
+  insertBlocks?: (blocksToInsert: any[], referenceBlock: any, placement?: 'before' | 'after') => void;
   getTextCursorPosition?: () => { block?: any };
   canNestBlock?: () => boolean;
   nestBlock?: () => void;
@@ -36,6 +37,70 @@ function getBlockId(block: unknown): string | null {
 
   const { id } = block as { id?: unknown };
   return typeof id === 'string' ? id : null;
+}
+
+function getBlockChildren(block: unknown): unknown[] {
+  if (!block || typeof block !== 'object' || !('children' in block)) {
+    return [];
+  }
+
+  const { children } = block as { children?: unknown };
+  return Array.isArray(children) ? children : [];
+}
+
+function findBlockById(blocks: unknown[], blockId: string): unknown | null {
+  for (const block of blocks) {
+    const id = getBlockId(block);
+    if (id === blockId) {
+      return block;
+    }
+
+    const match = findBlockById(getBlockChildren(block), blockId);
+    if (match) {
+      return match;
+    }
+  }
+
+  return null;
+}
+
+function cloneBlockTree(block: unknown): unknown {
+  if (Array.isArray(block)) {
+    return block.map((item) => cloneBlockTree(item));
+  }
+
+  if (!block || typeof block !== 'object') {
+    return block;
+  }
+
+  const clone: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(block)) {
+    clone[key] = cloneBlockTree(value);
+  }
+  return clone;
+}
+
+function promoteCurrentBlockChildrenToSiblings(editor: BlockNoteEditorLike, blockId: string) {
+  if (typeof editor.updateBlock !== 'function' || typeof editor.insertBlocks !== 'function') {
+    return false;
+  }
+
+  const currentBlock = findBlockById(editor.document, blockId);
+  if (!currentBlock) {
+    return false;
+  }
+
+  const children = getBlockChildren(currentBlock);
+  if (children.length === 0) {
+    return false;
+  }
+
+  const childrenToInsert = children.map((child) => cloneBlockTree(child));
+  editor.updateBlock(currentBlock, { children: [] });
+
+  const updatedBlock = findBlockById(editor.document, blockId) ?? currentBlock;
+  editor.insertBlocks(childrenToInsert, updatedBlock, 'after');
+  return true;
 }
 
 function restoreCursorToBlockEnd(editor: BlockNoteEditorLike, blockId: string) {
@@ -266,7 +331,16 @@ export function nestBlockNote(editor: BlockNoteEditorLike) {
     return false;
   }
 
+  const cursorBlockId =
+    typeof editor.getTextCursorPosition === 'function'
+      ? getBlockId(editor.getTextCursorPosition().block)
+      : null;
+
   editor.nestBlock();
+  if (cursorBlockId) {
+    // Match Notion-style absolute indentation: re-indenting a lifted block should not make its absorbed siblings deeper.
+    promoteCurrentBlockChildrenToSiblings(editor, cursorBlockId);
+  }
   return true;
 }
 
