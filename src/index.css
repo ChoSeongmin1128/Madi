@@ -2202,6 +2202,16 @@ button {
   padding: 2px 0;
 }
 
+.markdown-blocknote-shell .bn-block-outer,
+.markdown-blocknote-shell .bn-block-content,
+.markdown-blocknote-shell .bn-block-content::before {
+  transition: none !important;
+}
+
+.markdown-blocknote-shell .bn-block-outer[data-prev-depth-change] {
+  margin-left: 0 !important;
+}
+
 .markdown-blocknote-shell .bn-block-group .bn-block-group > .bn-block-outer::before {
   display: none !important;
   content: none !important;
