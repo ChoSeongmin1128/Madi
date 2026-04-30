@@ -1,4 +1,4 @@
-use tauri::{AppHandle, Manager, WebviewWindow};
+use tauri::{AppHandle, Manager, PhysicalPosition, PhysicalSize, WebviewWindow};
 
 use crate::domain::models::AppSettings;
 use crate::ports::repositories::AppStateRepository;
@@ -9,11 +9,22 @@ use super::{MAX_WINDOW_OPACITY_PERCENT, MIN_WINDOW_OPACITY_PERCENT};
 pub(crate) fn show_main_window(app: &AppHandle) -> Result<(), String> {
   let window = main_window(app)?;
   apply_window_preferences(app)?;
+  ensure_window_visible_on_screen(&window)?;
 
   let _ = window.unminimize();
   let _ = window.show();
   let _ = window.set_focus();
   Ok(())
+}
+
+pub(crate) fn ensure_main_window_visible_on_screen(app: &AppHandle) -> Result<(), String> {
+  let window = main_window(app)?;
+  ensure_window_visible_on_screen(&window)
+}
+
+pub(crate) fn recenter_main_window_on_preferred_display(app: &AppHandle) -> Result<(), String> {
+  let window = main_window(app)?;
+  recenter_window_on_preferred_display(&window)
 }
 
 pub(crate) fn toggle_main_window(app: &AppHandle) -> Result<(), String> {
@@ -89,6 +100,107 @@ fn main_window(app: &AppHandle) -> Result<WebviewWindow, String> {
   app
     .get_webview_window("main")
     .ok_or_else(|| "메인 창을 찾을 수 없습니다.".to_string())
+}
+
+fn ensure_window_visible_on_screen(window: &WebviewWindow) -> Result<(), String> {
+  let position = window.outer_position().map_err(|error| error.to_string())?;
+  let monitors = window
+    .available_monitors()
+    .map_err(|error| error.to_string())?;
+
+  if monitors.is_empty() || window_title_anchor_is_visible(position, &monitors) {
+    return Ok(());
+  }
+
+  recenter_window_on_preferred_display(window)
+}
+
+fn recenter_window_on_preferred_display(window: &WebviewWindow) -> Result<(), String> {
+  let position = window.outer_position().map_err(|error| error.to_string())?;
+  let size = window.outer_size().map_err(|error| error.to_string())?;
+  let monitors = window
+    .available_monitors()
+    .map_err(|error| error.to_string())?;
+  let monitor = monitor_containing_origin(&monitors).or_else(|| {
+    window
+      .primary_monitor()
+      .ok()
+      .flatten()
+      .or_else(|| monitors.first().cloned())
+  });
+  let Some(monitor) = monitor else {
+    return Ok(());
+  };
+
+  let work_area = monitor.work_area();
+  let work_position = work_area.position;
+  let work_size = work_area.size;
+  let margin = 24_i32;
+  let max_width = (work_size.width as i32 - margin * 2).max(640) as u32;
+  let max_height = (work_size.height as i32 - margin * 2).max(480) as u32;
+  let target_size = PhysicalSize {
+    width: size.width.min(max_width),
+    height: size.height.min(max_height),
+  };
+
+  if target_size != size {
+    window
+      .set_size(target_size)
+      .map_err(|error| error.to_string())?;
+  }
+
+  let target_x =
+    work_position.x + ((work_size.width as i32 - target_size.width as i32) / 2).max(margin);
+  let target_y =
+    work_position.y + ((work_size.height as i32 - target_size.height as i32) / 2).max(margin);
+
+  log::warn!(
+    "창 위치가 현재 화면 밖에 있어 기본 표시 영역으로 이동합니다: ({}, {}) -> ({}, {})",
+    position.x,
+    position.y,
+    target_x,
+    target_y
+  );
+
+  window
+    .set_position(PhysicalPosition {
+      x: target_x,
+      y: target_y,
+    })
+    .map_err(|error| error.to_string())
+}
+
+fn window_title_anchor_is_visible(
+  position: PhysicalPosition<i32>,
+  monitors: &[tauri::Monitor],
+) -> bool {
+  let anchor_x = position.x + 80;
+  let anchor_y = position.y + 24;
+
+  monitors.iter().any(|monitor| {
+    let work_area = monitor.work_area();
+    let left = work_area.position.x;
+    let top = work_area.position.y;
+    let right = left + work_area.size.width as i32;
+    let bottom = top + work_area.size.height as i32;
+
+    anchor_x >= left && anchor_x < right && anchor_y >= top && anchor_y < bottom
+  })
+}
+
+fn monitor_containing_origin(monitors: &[tauri::Monitor]) -> Option<tauri::Monitor> {
+  monitors
+    .iter()
+    .find(|monitor| {
+      let work_area = monitor.work_area();
+      let left = work_area.position.x;
+      let top = work_area.position.y;
+      let right = left + work_area.size.width as i32;
+      let bottom = top + work_area.size.height as i32;
+
+      0 >= left && 0 < right && 0 >= top && 0 < bottom
+    })
+    .cloned()
 }
 
 #[cfg(target_os = "macos")]

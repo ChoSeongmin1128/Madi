@@ -7,8 +7,10 @@ pub(crate) use shortcut_registration::{
 };
 pub(crate) use window_state::{
   apply_window_preferences_with_settings,
+  ensure_main_window_visible_on_screen,
   menu_bar_icon,
   preview_window_opacity,
+  recenter_main_window_on_preferred_display,
   show_main_window,
   toggle_main_window,
 };

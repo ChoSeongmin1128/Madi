@@ -13,8 +13,9 @@ use crate::infrastructure::sync_engine::SyncEngine;
 use crate::ports::repositories::AppStateRepository;
 use crate::state::{AppState, SyncRuntimePhase};
 use crate::window_controls::{
-    apply_window_preferences_with_settings, menu_bar_icon, register_saved_global_shortcut,
-    show_main_window, toggle_main_window,
+    apply_window_preferences_with_settings, ensure_main_window_visible_on_screen, menu_bar_icon,
+    recenter_main_window_on_preferred_display, register_saved_global_shortcut, show_main_window,
+    toggle_main_window,
 };
 use tauri::menu::{MenuBuilder, PredefinedMenuItem};
 use tauri::tray::{TrayIcon, TrayIconBuilder, TrayIconEvent};
@@ -30,6 +31,8 @@ const SMOKE_RESULT_PATH_ENV: &str = "MADI_SMOKE_STATUS_PATH";
 const OPEN_SETTINGS_ON_START_ARG: &str = "--smoke-open-settings";
 const RUN_ICLOUD_SYNC_ON_START_ARG: &str = "--smoke-run-icloud-sync";
 const SMOKE_RESULT_PATH_ARG: &str = "--smoke-result-path";
+const LEGACY_LOCAL_IMPORTED_STATE_KEY: &str = "madi_legacy_local_imported_at_ms";
+const LEGACY_WINDOW_RECENTERED_STATE_KEY: &str = "madi_legacy_window_recentered_at_ms";
 
 pub(crate) fn emit_shutdown_request(app_handle: &tauri::AppHandle) {
     let _ = app_handle.emit(APP_SHUTDOWN_REQUESTED_EVENT, ());
@@ -325,6 +328,31 @@ fn load_startup_settings(app_state: &AppState) -> Result<AppSettings, StartupErr
         .map_err(StartupError::LoadSettings)
 }
 
+fn now_ms_string() -> String {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or(Duration::ZERO)
+        .as_millis()
+        .to_string()
+}
+
+fn should_recenter_legacy_window(app_state: &AppState) -> Result<bool, AppError> {
+    let repository = app_state.repository.lock().map_err(|_| AppError::StateLock)?;
+    let imported = repository
+        .get_state_value(LEGACY_LOCAL_IMPORTED_STATE_KEY)?
+        .is_some();
+    let already_recentered = repository
+        .get_state_value(LEGACY_WINDOW_RECENTERED_STATE_KEY)?
+        .is_some();
+
+    Ok(imported && !already_recentered)
+}
+
+fn mark_legacy_window_recentered(app_state: &AppState) -> Result<(), AppError> {
+    let repository = app_state.repository.lock().map_err(|_| AppError::StateLock)?;
+    repository.set_state_value(LEGACY_WINDOW_RECENTERED_STATE_KEY, &now_ms_string())
+}
+
 pub(crate) fn sync_tray_icon_enabled(app: &tauri::AppHandle, enabled: bool) -> Result<(), String> {
     if enabled {
         if app.tray_by_id(TRAY_ID).is_none() {
@@ -377,6 +405,29 @@ pub(crate) fn setup_app(app: &mut tauri::App) -> Result<(), Box<dyn std::error::
     if let Some(managed_state) = app.try_state::<AppState>() {
         apply_window_preferences_with_settings(app.handle(), &settings)
             .map_err(StartupError::ApplyWindowPreferences)?;
+        match should_recenter_legacy_window(&managed_state) {
+            Ok(true) => match recenter_main_window_on_preferred_display(app.handle()) {
+                Ok(()) => {
+                    if let Err(error) = mark_legacy_window_recentered(&managed_state) {
+                        log::warn!("legacy 창 위치 복구 상태를 기록하지 못했습니다: {error}");
+                    }
+                }
+                Err(error) => {
+                    log::warn!("legacy 창 위치를 주 화면으로 복구하지 못했습니다: {error}");
+                }
+            },
+            Ok(false) => {
+                if let Err(error) = ensure_main_window_visible_on_screen(app.handle()) {
+                    log::warn!("시작 시 창 위치를 보정하지 못했습니다: {error}");
+                }
+            }
+            Err(error) => {
+                log::warn!("legacy 창 위치 복구 필요 여부를 확인하지 못했습니다: {error}");
+                if let Err(error) = ensure_main_window_visible_on_screen(app.handle()) {
+                    log::warn!("시작 시 창 위치를 보정하지 못했습니다: {error}");
+                }
+            }
+        }
 
         if menu_bar_icon_enabled && app.tray_by_id(TRAY_ID).is_none() {
             if let Err(error) = sync_menu_bar_icon_runtime_state(&managed_state, app.handle(), true)
