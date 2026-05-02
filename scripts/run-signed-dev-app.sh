@@ -58,6 +58,19 @@ if [ -f "$ENV_FILE" ]; then
   set +a
 fi
 
+resolve_repo_path() {
+  local value="$1"
+  if [[ "$value" = /* ]]; then
+    echo "$value"
+  else
+    echo "$ROOT_DIR/$value"
+  fi
+}
+
+if [ -n "${APPLE_PROVISIONING_PROFILE_PATH:-}" ]; then
+  export APPLE_PROVISIONING_PROFILE_PATH="$(resolve_repo_path "$APPLE_PROVISIONING_PROFILE_PATH")"
+fi
+
 required_vars=(
   APPLE_SIGNING_IDENTITY
   APPLE_TEAM_ID

@@ -26,6 +26,23 @@ set -a
 source "$ENV_FILE"
 set +a
 
+resolve_repo_path() {
+  local value="$1"
+  if [[ "$value" = /* ]]; then
+    echo "$value"
+  else
+    echo "$ROOT_DIR/$value"
+  fi
+}
+
+if [ -n "${TAURI_SIGNING_PRIVATE_KEY_PATH:-}" ]; then
+  export TAURI_SIGNING_PRIVATE_KEY_PATH="$(resolve_repo_path "$TAURI_SIGNING_PRIVATE_KEY_PATH")"
+fi
+
+if [ -n "${APPLE_PROVISIONING_PROFILE_PATH:-}" ]; then
+  export APPLE_PROVISIONING_PROFILE_PATH="$(resolve_repo_path "$APPLE_PROVISIONING_PROFILE_PATH")"
+fi
+
 required_vars=(
   TAURI_SIGNING_PRIVATE_KEY_PASSWORD
   TAURI_SIGNING_PRIVATE_KEY_PATH

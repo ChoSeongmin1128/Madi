@@ -14,6 +14,19 @@ if [ -f "$ENV_FILE" ]; then
   set +a
 fi
 
+resolve_repo_path() {
+  local value="$1"
+  if [[ "$value" = /* ]]; then
+    echo "$value"
+  else
+    echo "$ROOT_DIR/$value"
+  fi
+}
+
+if [ -n "${TAURI_SIGNING_PRIVATE_KEY_PATH:-}" ]; then
+  export TAURI_SIGNING_PRIVATE_KEY_PATH="$(resolve_repo_path "$TAURI_SIGNING_PRIVATE_KEY_PATH")"
+fi
+
 if [ -z "${TAURI_SIGNING_PRIVATE_KEY_PATH:-}" ]; then
   for candidate in \
     "$ROOT_DIR/.local-release/madi-updater.key" \
