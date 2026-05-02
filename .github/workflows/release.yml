@@ -12,7 +12,14 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Validate release version and identity
+        run: node ./scripts/validate-release-version.mjs "${{ github.ref_name }}"
 
       - name: Validate hosted release secrets
         env:
@@ -34,12 +41,24 @@ jobs:
           security cms -D -i "$PROFILE_PATH" > "$PROFILE_PLIST"
           /usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.aps-environment" "$PROFILE_PLIST" >/dev/null
           /usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.icloud-services" "$PROFILE_PLIST" >/dev/null
-          /usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.icloud-container-identifiers" "$PROFILE_PLIST" | grep -Fq "iCloud.com.seongmin.madi" || { echo "Madi iCloud container is required."; exit 1; }
+          CONTAINERS="$(/usr/libexec/PlistBuddy -c "Print :Entitlements:com.apple.developer.icloud-container-identifiers" "$PROFILE_PLIST")"
+          OLD_PRODUCT_NAME="$(printf 'Min%s' 'Note')"
+          OLD_PRODUCT_LOWER="$(printf 'min%s' 'note')"
+          OLD_PRODUCT_TITLE="$(printf 'Min%s' 'note')"
+          OLD_PRODUCT_UPPER="$(printf '%s' "$OLD_PRODUCT_LOWER" | tr '[:lower:]' '[:upper:]')"
+          echo "$CONTAINERS" | grep -Fq "iCloud.com.seongmin.madi" || { echo "Madi iCloud container is required."; exit 1; }
+          ! echo "$CONTAINERS" | grep -Eiq "$OLD_PRODUCT_NAME|$OLD_PRODUCT_LOWER|$OLD_PRODUCT_TITLE|$OLD_PRODUCT_UPPER" || { echo "Provisioning profile contains old app identity."; exit 1; }
+          CONTAINER_COUNT="$(echo "$CONTAINERS" | grep -Ec 'iCloud\.')"
+          [ "$CONTAINER_COUNT" -eq 1 ] || { echo "Provisioning profile must contain exactly one iCloud container."; exit 1; }
+          APP_IDENTIFIER="$(/usr/libexec/PlistBuddy -c "Print :Entitlements:application-identifier" "$PROFILE_PLIST")"
+          echo "$APP_IDENTIFIER" | grep -Fq "com.seongmin.madi" || { echo "Provisioning profile must target com.seongmin.madi."; exit 1; }
+          ! echo "$APP_IDENTIFIER" | grep -Eiq "$OLD_PRODUCT_NAME|$OLD_PRODUCT_LOWER|$OLD_PRODUCT_TITLE|$OLD_PRODUCT_UPPER" || { echo "Provisioning profile app identifier contains old app identity."; exit 1; }
           [ -x ./scripts/package-notarized-app.sh ] || { echo "scripts/package-notarized-app.sh must be executable."; exit 1; }
           [ -x ./scripts/package-notarized-dmg.sh ] || { echo "scripts/package-notarized-dmg.sh must be executable."; exit 1; }
+          [ -x ./scripts/validate-release-app.sh ] || { echo "scripts/validate-release-app.sh must be executable."; exit 1; }
 
       - name: Import Apple certificate
-        uses: apple-actions/import-codesign-certs@v6
+        uses: apple-actions/import-codesign-certs@v7
         with:
           p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
           p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -61,11 +80,11 @@ jobs:
       TARGET: aarch64-apple-darwin
       ARCH_LABEL: aarch64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
 
@@ -78,7 +97,7 @@ jobs:
         run: pnpm install
 
       - name: Import Apple certificate
-        uses: apple-actions/import-codesign-certs@v6
+        uses: apple-actions/import-codesign-certs@v7
         with:
           p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
           p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -113,6 +132,9 @@ jobs:
           APPLE_SIGNING_IDENTITY_REF: ${{ env.APPLE_SIGNING_IDENTITY_REF }}
         run: ./scripts/package-notarized-app.sh sign-app "$TARGET"
 
+      - name: Validate signed app bundle
+        run: ./scripts/validate-release-app.sh "src-tauri/target/$TARGET/release/bundle/macos/Madi.app" "${{ github.ref_name }}"
+
       - name: Zip app for notarization
         run: |
           APP_ZIP_PATH="$(./scripts/package-notarized-app.sh zip-for-notarization "$TARGET" "$ARCH_LABEL" "$PWD")"
@@ -137,7 +159,7 @@ jobs:
         run: ./scripts/package-notarized-app.sh package-updater "$TARGET" "$ARCH_LABEL" "$PWD"
 
       - name: Upload notarized app artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: notarized-app
           path: |
@@ -153,16 +175,16 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
 
       - name: Download notarized app artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: notarized-app
 
@@ -186,6 +208,9 @@ jobs:
 
       - name: Validate updater release assets
         run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+
           for FILE in \
             Madi_aarch64.app.tar.gz \
             Madi_aarch64.app.tar.gz.sig
@@ -220,6 +245,7 @@ jobs:
             mkdir -p "$EXTRACT_DIR"
             tar -xzf "$FILE" -C "$EXTRACT_DIR"
             [ -d "$EXTRACT_DIR/Madi.app" ] || { echo "Updater archive did not extract Madi.app from $FILE"; exit 1; }
+            ./scripts/validate-release-app.sh "$EXTRACT_DIR/Madi.app" "$VERSION"
           done
 
       - name: Upload updater release assets
@@ -253,7 +279,14 @@ jobs:
               }
             }' > latest.json
 
-          jq -e '.version and .pub_date and .platforms["darwin-aarch64"]' latest.json >/dev/null
+          jq -e \
+            --arg version "$VERSION" \
+            --arg arm_url "$ARM_DOWNLOAD_URL" \
+            '.version == $version
+              and (.pub_date | type == "string" and length > 0)
+              and .platforms["darwin-aarch64"].url == $arm_url
+              and (.platforms["darwin-aarch64"].signature | type == "string" and length > 0)' \
+            latest.json >/dev/null
           grep -q "Madi_aarch64.app.tar.gz" latest.json
 
           gh release upload "$TAG" latest.json --clobber
@@ -280,16 +313,16 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
 
       - name: Download notarized app artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: notarized-app
 
@@ -309,7 +342,7 @@ jobs:
           [ -n "$APPLE_SIGNING_IDENTITY_REF" ] || { echo "Unable to resolve codesigning identity fingerprint for $APPLE_SIGNING_IDENTITY"; exit 1; }
 
       - name: Import Apple certificate
-        uses: apple-actions/import-codesign-certs@v6
+        uses: apple-actions/import-codesign-certs@v7
         with:
           p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
           p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -318,6 +351,12 @@ jobs:
         run: |
           mkdir -p dist/app
           tar -xzf Madi_aarch64.app.tar.gz -C dist/app
+
+      - name: Validate notarized app bundle
+        run: |
+          VERSION="${{ github.ref_name }}"
+          VERSION="${VERSION#v}"
+          ./scripts/validate-release-app.sh "dist/app/Madi.app" "$VERSION"
 
       - name: Create signed and notarized DMG
         env:
@@ -383,7 +422,7 @@ jobs:
             "Madi_aarch64.app.tar.gz.sig" \
             "latest.json"
           do
-            echo "$ASSETS_JSON" | jq -e --arg name "$ASSET" '.assets[] | select(.name == $name)' >/dev/null || {
+            echo "$ASSETS_JSON" | jq -e --arg name "$ASSET" '.assets[] | select(.name == $name and .size > 0)' >/dev/null || {
               echo "Missing release asset: $ASSET"
               exit 1
             }
